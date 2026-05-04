@@ -9,6 +9,9 @@ See `docs/technical/benchmark.md` for the full design.
 ## Prerequisites
 
 - `bun >= 1.0` (already required by the rest of the repo).
+- `akm` CLI available either via `node_modules/.bin/akm` (installed by
+  `bun install`) or by pointing `AKM_BENCH_AKM_BIN` at another `akm`
+  executable.
 - `opencode` CLI on `PATH`. The bench shells out via the built-in
   `opencode` profile in `src/integrations/agent/profiles.ts`.
 - `BENCH_OPENCODE_MODEL` env var. The model identifier is stamped into
@@ -174,7 +177,7 @@ replace them. Build args:
 
 - `AKM_INSTALL=source` (default) — `bun link` from the in-context source.
 - `AKM_INSTALL=npm` + `AKM_VERSION=<x.y.z|latest>` — `npm install -g
-  @itlackey/akm@${AKM_VERSION}`.
+  akm-cli@${AKM_VERSION}`.
 
 ## Parent-repo dependencies (extraction seam)
 

@@ -33,10 +33,9 @@
  * real `loadFixtureStash`.
  */
 
-import path from "node:path";
-
 import type { SpawnFn } from "../../src/integrations/agent/spawn";
 import { type LoadedFixtureStash, loadFixtureStash } from "../fixtures/stashes/load";
+import { resolveAkmCommand } from "./akm-command";
 import { registerCleanup } from "./cleanup";
 import type { TaskMetadata, TaskSlice } from "./corpus";
 import { computeLessonMetrics, type LessonMetrics } from "./evolve-metrics";
@@ -618,13 +617,12 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
 }
 
 /**
- * Default subprocess invoker — runs `bun run src/cli.ts <args>` in `cwd`
- * with the supplied env. Real runs use this; tests inject a fake.
+ * Default subprocess invoker — runs the resolved `akm` CLI in `cwd` with the
+ * supplied env. Real runs use this; tests inject a fake.
  */
 async function defaultAkmCli(args: string[], cwd: string, env: Record<string, string>): Promise<AkmCliResult> {
-  const cli = path.resolve(__dirname, "..", "..", "src", "cli.ts");
   const proc = Bun.spawnSync({
-    cmd: ["bun", "run", cli, ...args],
+    cmd: [...resolveAkmCommand(), ...args],
     cwd,
     env: { ...process.env, ...env },
     stdout: "pipe",

@@ -5,6 +5,7 @@ Standalone benchmark harness extracted from `itlackey/akm` for evaluating agent 
 ## Requirements
 
 - `bun >= 1.0`
+- `akm` CLI available locally (installed by `bun install` from `akm-cli`, or overridden via `AKM_BENCH_AKM_BIN`)
 - `opencode` on `PATH`
 - `BENCH_OPENCODE_MODEL` set, unless your providers file supplies `defaultModel`
 - Python + `pytest` on `PATH` for tasks that use `verifier: pytest`
@@ -32,4 +33,4 @@ bun run check
 
 ## Documentation
 
-See `/home/runner/work/akm-bench/akm-bench/tests/bench/BENCH.md` for the full operator guide, configuration schema, fixtures, and workflow evaluation rules.
+See `tests/bench/BENCH.md` for the full operator guide, configuration schema, fixtures, and workflow evaluation rules.

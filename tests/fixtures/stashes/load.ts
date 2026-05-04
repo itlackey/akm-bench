@@ -13,10 +13,9 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { resolveAkmCommand } from "../../bench/akm-command";
 
 const FIXTURES_ROOT = __dirname;
-const REPO_ROOT = path.resolve(FIXTURES_ROOT, "..", "..", "..");
-const CLI_ENTRY = path.join(REPO_ROOT, "src", "cli.ts");
 
 export interface LoadedFixtureStash {
   /** Absolute path to the materialised stash directory. */
@@ -126,7 +125,7 @@ export function loadFixtureStash(name: string, options: LoadFixtureStashOptions 
     // touches the operator's real ~/.cache/akm or pulls in their configured
     // registries / sources. The shipped fixture is the only thing indexed.
     const result = Bun.spawnSync({
-      cmd: ["bun", "run", CLI_ENTRY, "index"],
+      cmd: [...resolveAkmCommand(), "index"],
       cwd: stashDir,
       env: {
         ...process.env,
