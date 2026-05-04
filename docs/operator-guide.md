@@ -24,6 +24,26 @@ bun test ./tests
 bun run src/cli.ts configs/nano-quick.json
 ```
 
+Common examples:
+
+Run the quick benchmark config:
+
+```sh
+bun run src/cli.ts configs/nano-quick.json
+```
+
+Run the full checked-in config:
+
+```sh
+bun run src/cli.ts configs/full.json
+```
+
+Override seeds or parallelism for a checked-in config:
+
+```sh
+bun run src/cli.ts configs/nano-quick.json --seeds 3 --parallel 2
+```
+
 Config-file mode is the preferred path. The committed configs are:
 
 - `configs/nano-quick.json`
@@ -49,6 +69,22 @@ Model resolution order is:
 2. config `defaultModel`
 3. providers file `defaultModel`
 
+Examples:
+
+Use a custom provider file for one run:
+
+```sh
+bun run src/cli.ts configs/nano-quick.json --opencode-config /path/to/providers.json
+```
+
+Use an environment override for the provider file and model:
+
+```sh
+BENCH_OPENCODE_CONFIG=configs/opencode-providers.local.json \
+BENCH_OPENCODE_MODEL=openai/gpt-5 \
+bun run src/cli.ts configs/nano-quick.json
+```
+
 Baseline result files referenced by configs live under `results/`.
 
 ## Tmp Root
@@ -63,6 +99,20 @@ Persistent run artifacts are written under `${AKM_CACHE_DIR}/bench-reports/`.
 The report-stamping helpers live in `src/report.ts`, and `compare` / `attribute`
 operate on those JSON envelopes.
 
+Examples:
+
+Compare two saved benchmark reports:
+
+```sh
+bun run src/cli.ts compare --base results/baseline.json --current /tmp/current-report.json
+```
+
+Compute per-asset attribution from a saved utility report:
+
+```sh
+bun run src/cli.ts attribute --base /tmp/utility-report.json --top 5
+```
+
 ## Test Scope
 
 The default `bun test ./tests` run executes unit-focused coverage. Spawned CLI
@@ -75,3 +125,11 @@ AKM_BENCH_RUN_CLI_TESTS=1 bun test ./tests/cli.test.ts
 
 This keeps the default verification loop fast while preserving the heavier
 end-to-end coverage as an explicit check.
+
+For the normal verification loop, run:
+
+```sh
+bun run lint
+bun run typecheck
+bun test ./tests
+```

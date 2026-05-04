@@ -6,7 +6,8 @@ Benchmark-only repo for evaluating akm-assisted agent runs.
 
 | Path | Purpose |
 | --- | --- |
-| `src/` | Runtime harness, CLI, and the operator guide in `src/BENCH.md` |
+| `src/` | Runtime harness and CLI |
+| `docs/` | Operator guide and harness documentation |
 | `fixtures/corpus/` | Benchmark inputs: task fixtures and workflow specs |
 | `fixtures/stashes/` | Reusable fixture stashes loaded by corpus tasks and stash-loader tests |
 | `configs/` | Run configs, provider config fixtures, and the config schema |
@@ -28,5 +29,5 @@ bun run src/cli.ts configs/nano-quick.json
 ## Scope
 
 - Keep repo-level orientation here.
-- Keep harness/operator details in `src/BENCH.md`.
+- Keep harness/operator details in `docs/operator-guide.md`.
 - Treat `fixtures/` as benchmark inputs, not operator docs.

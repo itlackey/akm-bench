@@ -2,7 +2,7 @@
  * Smoke tests for the shared fixture-stash loader.
  *
  * Validates that loadFixtureStash, fixtureContentHash, and listFixtures
- * behave as advertised in README.md and src/BENCH.md.
+ * behave as advertised in README.md and docs/operator-guide.md.
  */
 
 import { describe, expect, test } from "bun:test";

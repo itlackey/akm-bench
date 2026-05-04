@@ -9,7 +9,7 @@
  *   • `evolve`     — longitudinal evolution loop (Track B). Stub.
  *   • `kill`       — send SIGTERM to a running bench process (reads bench.pid).
  *
- * Implementation status and validity rules live in `src/BENCH.md`.
+ * Implementation status and validity rules live in `docs/operator-guide.md`.
  *
  * NOTE: The bench binary is intentionally argv-light. citty is the project's
  * CLI framework but the bench is not part of the public CLI surface, so a
@@ -62,7 +62,7 @@ Usage:
 
 Config-file mode (recommended):
   Pass a path to a configs/*.json file as the first argument.
-  See src/BENCH.md for the run-config schema and provider
+  See docs/operator-guide.md for the run-config schema and provider
   discovery chain (BENCH_OPENCODE_CONFIG → providers/providersRef →
   ~/.config/akm/bench-providers.json).
 
@@ -92,7 +92,7 @@ utility flags:
                            operators can see whether AKM beats a self-notes baseline.
   --opencode-config <path> path to an opencode providers JSON file. Auto-discovered
                            from BENCH_OPENCODE_CONFIG env var or the fixture defaults when
-                           omitted. See BENCH.md for the discovery order.
+                           omitted. See docs/operator-guide.md for the discovery order.
   --json                   suppress the markdown summary on stderr (machine-readable only).
                            Without --json, JSON still goes to stdout and the markdown
                            summary is also written to stderr for human-friendly reads.
@@ -148,7 +148,7 @@ Auto-discovery order for --opencode-config (first existing file wins):
   4. configs/opencode-providers.json        (committed fixture)
   5. None found → empty isolated dir, opencode uses cloud-provider defaults.
 
-See src/BENCH.md for the operator guide.
+See docs/operator-guide.md for the operator guide.
 `;
 
 interface ParsedArgs {
@@ -821,7 +821,7 @@ function warnObsolete(name: string, replacement: string): void {
 
 /**
  * Detect whether the user supplied any of the flags marked obsolete in
- * BENCH.md §G and emit one warning per used flag. The flags continue to
+ * `docs/operator-guide.md` and emit one warning per used flag. The flags continue to
  * function — the warning is the only behavior change.
  */
 function warnIfObsoleteFlagsUsed(parsed: ParsedArgs): void {

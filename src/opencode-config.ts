@@ -6,7 +6,7 @@
  * credentials, no extra top-level keys), and writes a minimal
  * `opencode.json` into the per-run isolated `OPENCODE_CONFIG` directory.
  *
- * Design: `src/BENCH.md` §"Config-driven opencode provider".
+ * Design: `docs/operator-guide.md` §"Provider Discovery".
  */
 
 import fs from "node:fs";

@@ -2,7 +2,7 @@
  * akm-bench driver — `runOne(options)` executes a single (task, arm, seed)
  * triple end-to-end and returns a v1 RunResult envelope.
  *
- * See `README.md` for the repo layout and `src/BENCH.md` for runtime details
+ * See `README.md` for the repo layout and `docs/operator-guide.md` for runtime details
  * for the isolation/budget rules. The shapes here are the v1 contract that
  * #238/#239/#240/#243 will extend without breaking.
  *
