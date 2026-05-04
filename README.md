@@ -1,36 +1,30 @@
 # akm-bench
 
-Standalone benchmark harness extracted from `itlackey/akm` for evaluating agent runs with and without akm assistance.
+Benchmark-only repo for evaluating akm-assisted agent runs.
 
-## Requirements
+## Repo Map
 
-- `bun >= 1.0`
-- `akm` CLI available locally (installed by `bun install` from `akm-cli`, or overridden via `AKM_BENCH_AKM_BIN`)
-- `opencode` on `PATH`
-- `BENCH_OPENCODE_MODEL` set, unless your providers file supplies `defaultModel`
-- Python + `pytest` on `PATH` for tasks that use `verifier: pytest`
+| Path | Purpose |
+| --- | --- |
+| `bench/` | Runtime harness, CLI, configs, baselines, and the operator guide in `bench/BENCH.md` |
+| `corpus/` | Benchmark inputs: task fixtures, workflow specs, and provider fixtures |
+| `stashes/` | Reusable fixture stashes loaded by corpus tasks and stash-loader tests |
+| `test/` | Harness and fixture-loader test files |
 
-## Setup
-
-```sh
-bun install
-cp tests/fixtures/bench/opencode-providers.json tests/fixtures/bench/opencode-providers.local.json
-$EDITOR tests/fixtures/bench/opencode-providers.local.json
-```
+The corpus lives under `corpus/tasks/<domain>/<task-id>/`.
+Each task directory includes `task.yaml`, a `workspace/` seed, and a deterministic verifier.
+Workflow-compliance tasks live alongside the other corpus domains; their workflow specs live under `corpus/workflows/`.
 
 ## Run
 
 ```sh
-bun run tests/bench/cli.ts tests/bench/configs/nano-quick.json
-bun run tests/bench/cli.ts tests/bench/configs/full.json --json > report.json
+bun install
+bun test ./test
+bun run bench/cli.ts bench/configs/nano-quick.json
 ```
 
-## Validation
+## Scope
 
-```sh
-bun run check
-```
-
-## Documentation
-
-See `tests/bench/BENCH.md` for the full operator guide, configuration schema, fixtures, and workflow evaluation rules.
+- Keep repo-level orientation here.
+- Keep harness/operator details in `bench/BENCH.md`.
+- Treat `corpus/` and `stashes/` as benchmark inputs, not operator docs.

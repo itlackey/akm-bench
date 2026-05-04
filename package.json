@@ -5,21 +5,13 @@
   "type": "module",
   "description": "Standalone benchmark harness for evaluating akm-assisted agent runs.",
   "license": "MPL-2.0",
-  "homepage": "https://github.com/itlackey/akm-bench#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/itlackey/akm-bench.git"
-  },
-  "bugs": {
-    "url": "https://github.com/itlackey/akm-bench/issues"
-  },
   "scripts": {
     "typecheck": "bunx tsc --noEmit",
-    "test": "bun test ./tests",
-    "lint": "bunx biome check src/ tests/",
-    "lint:fix": "bunx biome check --write src/ tests/",
-    "format": "bunx biome format --write src/ tests/",
-    "check": "bun run lint && bun run typecheck && bun test ./tests"
+    "test": "bun test ./test",
+    "lint": "bunx biome check bench/ corpus/ stashes/ test/",
+    "lint:fix": "bunx biome check --write bench/ corpus/ stashes/ test/",
+    "format": "bunx biome format --write bench/ corpus/ stashes/ test/",
+    "check": "bun run lint && bun run typecheck && bun test ./test"
   },
   "engines": {
     "bun": ">=1.0.0"

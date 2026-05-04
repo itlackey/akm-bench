@@ -15,6 +15,6 @@
     }
   },
   "files": {
-    "includes": ["src/**", "tests/**"]
+    "includes": ["bench/**", "corpus/**", "stashes/**", "test/**"]
   }
 }
