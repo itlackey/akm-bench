@@ -14,7 +14,7 @@ AKM changes how an agent performs on benchmark tasks.
 Task fixtures live under `fixtures/corpus/tasks/<domain>/<task-id>/`.
 Workflow specs live under `fixtures/corpus/workflows/`.
 Fixture stashes live under `fixtures/stashes/`.
-Committed provider fixtures live under `fixtures/corpus/opencode-providers.json`.
+Committed provider fixtures live under `configs/opencode-providers.json`.
 
 ## Run
 
@@ -39,8 +39,8 @@ Provider resolution order is:
 
 1. `--opencode-config <path>`
 2. `BENCH_OPENCODE_CONFIG`
-3. `fixtures/corpus/opencode-providers.local.json`
-4. `fixtures/corpus/opencode-providers.json`
+3. `configs/opencode-providers.local.json`
+4. `configs/opencode-providers.json`
 5. `${XDG_CONFIG_HOME:-~/.config}/akm/bench-providers.json`
 
 Model resolution order is:

@@ -7,9 +7,9 @@ Benchmark-only repo for evaluating akm-assisted agent runs.
 | Path | Purpose |
 | --- | --- |
 | `src/` | Runtime harness, CLI, and the operator guide in `src/BENCH.md` |
-| `fixtures/corpus/` | Benchmark inputs: task fixtures, workflow specs, and provider fixtures |
+| `fixtures/corpus/` | Benchmark inputs: task fixtures and workflow specs |
 | `fixtures/stashes/` | Reusable fixture stashes loaded by corpus tasks and stash-loader tests |
-| `configs/` | Run configs and the config schema |
+| `configs/` | Run configs, provider config fixtures, and the config schema |
 | `results/` | Checked-in baseline result snapshots |
 | `tests/` | Harness and fixture-loader test files |
 

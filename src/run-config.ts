@@ -158,11 +158,11 @@ export function resolveProviders(config: BenchRunConfigFile, configDir: string):
   //    `discoverOpencodeProviders` checks. The gitignored `.local.json`
   //    overlay wins over the committed fixture so an operator's local
   //    overrides survive a `git pull` without needing a config edit.
-  const repoLocalPath = path.resolve(__dirname, "..", "fixtures", "corpus", "opencode-providers.local.json");
+  const repoLocalPath = path.resolve(__dirname, "..", "configs", "opencode-providers.local.json");
   if (fs.existsSync(repoLocalPath)) {
     return loadOpencodeProviders(repoLocalPath);
   }
-  const repoFixturePath = path.resolve(__dirname, "..", "fixtures", "corpus", "opencode-providers.json");
+  const repoFixturePath = path.resolve(__dirname, "..", "configs", "opencode-providers.json");
   if (fs.existsSync(repoFixturePath)) {
     return loadOpencodeProviders(repoFixturePath);
   }

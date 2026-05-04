@@ -286,7 +286,7 @@ describe("loadBenchRunConfig — provider discovery", () => {
     delete process.env.BENCH_OPENCODE_CONFIG;
     const loaded = discoverOpencodeProviders();
     expect(loaded).toBeDefined();
-    expect(loaded?.source).toContain(path.join("fixtures", "corpus", "opencode-providers.json"));
+    expect(loaded?.source).toContain(path.join("configs", "opencode-providers.json"));
   });
 });
 

@@ -27,7 +27,7 @@ import {
 import { benchMkdtemp } from "../src/tmp";
 
 /** Absolute path to the committed fixture. */
-const FIXTURE_PATH = path.resolve(__dirname, "..", "fixtures", "corpus", "opencode-providers.json");
+const FIXTURE_PATH = path.resolve(__dirname, "..", "configs", "opencode-providers.json");
 
 /** Write a temp JSON file and return its path. */
 function writeTmp(dir: string, name: string, content: unknown): string {

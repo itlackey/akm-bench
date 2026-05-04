@@ -144,8 +144,8 @@ Environment:
 Auto-discovery order for --opencode-config (first existing file wins):
   1. --opencode-config <path>  flag value
   2. BENCH_OPENCODE_CONFIG     env var
-  3. fixtures/corpus/opencode-providers.local.json  (gitignored operator overlay)
-  4. fixtures/corpus/opencode-providers.json        (committed fixture)
+  3. configs/opencode-providers.local.json  (gitignored operator overlay)
+  4. configs/opencode-providers.json        (committed fixture)
   5. None found → empty isolated dir, opencode uses cloud-provider defaults.
 
 See src/BENCH.md for the operator guide.
@@ -197,12 +197,12 @@ function parseArgs(argv: string[]): ParsedArgs {
  * Absolute path to the committed default bench opencode providers fixture.
  * Used as the final fallback in the auto-discovery chain.
  */
-const DEFAULT_PROVIDERS_PATH = path.resolve(__dirname, "..", "fixtures", "corpus", "opencode-providers.json");
+const DEFAULT_PROVIDERS_PATH = path.resolve(__dirname, "..", "configs", "opencode-providers.json");
 /**
  * Absolute path to the gitignored operator overlay. Takes precedence over
  * the committed fixture when it exists.
  */
-const LOCAL_PROVIDERS_PATH = path.resolve(__dirname, "..", "fixtures", "corpus", "opencode-providers.local.json");
+const LOCAL_PROVIDERS_PATH = path.resolve(__dirname, "..", "configs", "opencode-providers.local.json");
 
 /**
  * Auto-discover and load the bench opencode providers file.
@@ -210,8 +210,8 @@ const LOCAL_PROVIDERS_PATH = path.resolve(__dirname, "..", "fixtures", "corpus",
  * Discovery order (first existing file wins):
  *   1. `flagPath`  — `--opencode-config` flag value (already resolved by caller).
  *   2. `BENCH_OPENCODE_CONFIG` env var.
- *   3. `fixtures/corpus/opencode-providers.local.json` (gitignored overlay).
- *   4. `fixtures/corpus/opencode-providers.json` (committed fixture).
+ *   3. `configs/opencode-providers.local.json` (gitignored overlay).
+ *   4. `configs/opencode-providers.json` (committed fixture).
  *   5. None found → returns `undefined` (empty isolated dir, cloud-provider fallback).
  *
  * When a file is found but fails to load, the BenchConfigError is re-thrown
