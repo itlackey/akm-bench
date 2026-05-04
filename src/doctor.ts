@@ -20,12 +20,12 @@ import path from "node:path";
 import process from "node:process";
 import { buildIsolatedEnv, buildSanitizedEnvSource, createIsolationDirs } from "./driver";
 import { validateFixtureCorpus, writeOpencodeJson } from "./environment";
-import { BenchConfigError, type LoadedOpencodeProviders, selectProviderForModel } from "./opencode-config";
+import { BenchConfigError, type LoadedOpencodeConfig, selectProviderForModel } from "./opencode-config";
 import { getBuiltinAgentProfile, runAgent } from "./support/agent";
 import { benchMkdtemp } from "./tmp";
 
 // Re-export for external consumers.
-export type { LoadedOpencodeProviders };
+export type { LoadedOpencodeConfig };
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -117,7 +117,7 @@ async function checkOpencodeReachable(verbose: boolean): Promise<DoctorCheck> {
  */
 async function checkModelResolves(
   model: string,
-  opencodeProviders: LoadedOpencodeProviders | undefined,
+  opencodeProviders: LoadedOpencodeConfig | undefined,
   verbose: boolean,
 ): Promise<DoctorCheck> {
   const name = "model resolves";
@@ -237,7 +237,7 @@ async function checkModelResolves(
  */
 async function checkMaterialiseAndRun(
   model: string,
-  opencodeProviders: LoadedOpencodeProviders | undefined,
+  opencodeProviders: LoadedOpencodeConfig | undefined,
   verbose: boolean,
 ): Promise<DoctorCheck> {
   const name = "materialise + run";
@@ -464,7 +464,7 @@ async function checkVerifierBinaries(verbose: boolean): Promise<DoctorCheck[]> {
  */
 async function checkOpencodeJsonInvariants(
   model: string,
-  opencodeProviders: LoadedOpencodeProviders | undefined,
+  opencodeProviders: LoadedOpencodeConfig | undefined,
   verbose: boolean,
 ): Promise<DoctorCheck> {
   const name = "opencode.json bench invariants";
@@ -541,7 +541,7 @@ export interface DoctorOptions {
   /** The model to test (e.g. "don/mlx-community/qwen3.6-35b-a3b"). */
   model: string;
   /** Pre-loaded opencode provider config (from auto-discovery). */
-  opencodeProviders?: LoadedOpencodeProviders;
+  opencodeProviders?: LoadedOpencodeConfig;
   /** Emit detailed diagnostic output to stderr. */
   verbose?: boolean;
   /** When supplied, check 7 validates all stash references. */

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://akm.dev/schemas/bench-run-config.schema.json",
   "title": "akm-bench run config",
-  "description": "Single-file description of a bench utility/evolve run: providers, default model, tasks, arms, seeds, budgets, parallel, baseline. Loaded by bench/run-config.ts.",
+  "description": "Single-file description of a bench utility/evolve run: opencode config, model, tasks, arms, seeds, budgets, parallel, baseline. Loaded by src/run-config.ts.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion"],
@@ -21,18 +21,18 @@
       "description": "Free-form note about what this run measures."
     },
 
-    "providers": {
+    "opencodeConfig": {
       "type": "object",
-      "description": "Inline providers map (same shape as BenchOpencodeProvidersFile.providers). Mutually exclusive with providersRef. Only use this when you genuinely need to commit provider details."
+      "description": "Inline standard opencode config object. Bench reads only its `model` and `provider` fields. Mutually exclusive with opencodeConfigRef."
     },
-    "providersRef": {
+    "opencodeConfigRef": {
       "type": "string",
-      "description": "Path to a providers JSON file. Resolved relative to this config's directory. Supports absolute paths, ~/... (tilde expansion), and ${VAR}/... (env-var expansion). Mutually exclusive with `providers`."
+      "description": "Path to a standard opencode JSON config file. Resolved relative to this config's directory. Supports absolute paths, ~/... (tilde expansion), and ${VAR}/... (env-var expansion). Mutually exclusive with `opencodeConfig`."
     },
 
-    "defaultModel": {
+    "model": {
       "type": "string",
-      "description": "Override the providers file's defaultModel. BENCH_OPENCODE_MODEL env still wins over both."
+      "description": "Override the opencode config file's model. BENCH_OPENCODE_MODEL env still wins over both."
     },
 
     "tasks": {
@@ -88,10 +88,10 @@
   },
   "allOf": [
     {
-      "description": "providers and providersRef are mutually exclusive.",
+      "description": "opencodeConfig and opencodeConfigRef are mutually exclusive.",
       "not": {
         "type": "object",
-        "required": ["providers", "providersRef"]
+        "required": ["opencodeConfig", "opencodeConfigRef"]
       }
     }
   ]

@@ -43,7 +43,7 @@ import {
   type GoldRankRunRecord,
   type PerTaskMetrics,
 } from "./metrics";
-import type { LoadedOpencodeProviders } from "./opencode-config";
+import type { LoadedOpencodeConfig } from "./opencode-config";
 import { resolveGitBranch, resolveGitCommit, type UtilityReportTaskEntry, type UtilityRunReport } from "./report";
 import type { SpawnFn } from "./support/agent";
 import { warn } from "./support/warn";
@@ -246,7 +246,7 @@ export interface RunUtilityOptions {
    * When omitted, the per-run `OPENCODE_CONFIG` dir is left empty and
    * opencode falls back to its cloud-provider defaults.
    */
-  opencodeProviders?: LoadedOpencodeProviders;
+  opencodeProviders?: LoadedOpencodeConfig;
   /**
    * Optional `{ taskId: passRate (0..1) }` map. When supplied, the report
    * carries it through to `renderUtilityReport` so the markdown gains a
@@ -609,7 +609,7 @@ async function runOneIsolated(args: {
   spawn?: SpawnFn;
   warnings: string[];
   prompt?: string;
-  opencodeProviders?: LoadedOpencodeProviders;
+  opencodeProviders?: LoadedOpencodeConfig;
   indexCacheHome?: string;
 }): Promise<RunResult> {
   const workspace = benchMkdtemp(`akm-bench-ws-${args.task.domain}-`);

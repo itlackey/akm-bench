@@ -1,8 +1,7 @@
 {
-  "$schema": "../../../schemas/bench-opencode-providers.schema.json",
-  "schemaVersion": 1,
-  "defaultModel": "local/qwen/qwen3.5-9b",
-  "providers": {
+  "$schema": "https://opencode.ai/config.json",
+  "model": "local/qwen/qwen3.5-9b",
+  "provider": {
     "local": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "LM Studio (localhost)",

@@ -47,7 +47,7 @@ import {
   type ProposalLogEntry,
   type ProposalQualityMetrics,
 } from "./metrics";
-import type { LoadedOpencodeProviders } from "./opencode-config";
+import type { LoadedOpencodeConfig } from "./opencode-config";
 import type { UtilityRunReport } from "./report";
 import { runUtility } from "./runner";
 import type { SpawnFn } from "./support/agent";
@@ -100,7 +100,7 @@ export interface RunEvolveOptions {
    * into every `runUtility` phase (Phase 1, Phase 3 pre/post/synthetic).
    * When omitted, the per-run `OPENCODE_CONFIG` dir is left empty.
    */
-  opencodeProviders?: LoadedOpencodeProviders;
+  opencodeProviders?: LoadedOpencodeConfig;
 }
 
 /** One Phase-1 feedback event the runner emitted (or attempted). */

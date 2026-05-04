@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveAkmCommand } from "./akm-command";
 import { buildIsolatedEnv, buildSanitizedEnvSource, createIsolationDirs, type IsolationDirs } from "./driver";
-import { BenchConfigError, type LoadedOpencodeProviders, selectProviderForModel } from "./opencode-config";
+import { BenchConfigError, type LoadedOpencodeConfig, selectProviderForModel } from "./opencode-config";
 import { benchMkdtemp } from "./tmp";
 
 // ── Bench isolation invariants ───────────────────────────────────────────────
@@ -97,7 +97,7 @@ export interface WriteOpencodeJsonResult {
 export function writeOpencodeJson(
   opencodeConfigDir: string,
   model: string,
-  providers?: LoadedOpencodeProviders,
+  providers?: LoadedOpencodeConfig,
 ): WriteOpencodeJsonResult {
   const warnings: string[] = [];
   let providerKey: string | undefined;
@@ -151,7 +151,7 @@ export interface BenchEnvParams {
   stashDir?: string;
   /** Pre-built FTS5 index cache from `loadFixtureStash().indexCacheHome`. */
   indexCacheHome?: string;
-  providers?: LoadedOpencodeProviders;
+  providers?: LoadedOpencodeConfig;
   /**
    * When true, skip the akm config write and index copy/build. Used by unit
    * tests that inject a fake spawn — the fake stash doesn't exist on disk.

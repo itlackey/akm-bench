@@ -25,7 +25,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { setupBenchEnvironment } from "./environment";
-import type { LoadedOpencodeProviders } from "./opencode-config";
+import type { LoadedOpencodeConfig } from "./opencode-config";
 import { BUILTIN_AGENT_PROFILE_NAMES, getBuiltinAgentProfile, runAgent, type SpawnFn } from "./support/agent";
 import type { EventEnvelope } from "./support/events";
 import { benchMkdtemp } from "./tmp";
@@ -83,7 +83,7 @@ export interface RunOptions {
    * `OPENCODE_CONFIG` directory before spawning the agent. When omitted, the
    * dir is left empty and opencode falls back to its cloud-provider defaults.
    */
-  opencodeProviders?: LoadedOpencodeProviders;
+  opencodeProviders?: LoadedOpencodeConfig;
   /**
    * Path to a pre-built index cache home (`<dir>/akm/index.db` exists here).
    * When supplied, `runOne` copies the index into the per-run `XDG_CACHE_HOME`

@@ -1,14 +1,14 @@
 /**
  * akm-bench run-config loader.
  *
- * A bench run config (`configs/*.json`) is a single-file
- * description of a utility/evolve invocation: providers, default model,
- * tasks, arms, seeds, budgets, parallel, baseline. Loading a config
- * resolves the providers file (from explicit `providers` / `providersRef`
- * fields, the `BENCH_OPENCODE_CONFIG` env var, or
- * `${XDG_CONFIG_HOME:-~/.config}/akm/bench-providers.json`), looks up the
- * effective default model, and resolves the task selector + baseline file
- * paths.
+ * A bench run config (`configs/*.json`) is a single-file description of a
+ * utility/evolve invocation: opencode config, model, tasks, arms, seeds,
+ * budgets, parallel, baseline. Loading a config resolves the opencode config
+ * (from explicit `opencodeConfig` / `opencodeConfigRef` fields, the
+ * `BENCH_OPENCODE_CONFIG` env var, or the repo-local `configs/opencode*.json`
+ * defaults),
+ * looks up the effective model, and resolves the task selector + baseline
+ * file paths.
  *
  * Self-contained — does not import from sibling app code so the harness stays
  * liftable to a standalone repo.
@@ -19,12 +19,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { listTasks, loadTask, type TaskMetadata, type TaskSlice } from "./corpus";
-import {
-  BenchConfigError,
-  type BenchOpencodeProvidersFile,
-  type LoadedOpencodeProviders,
-  loadOpencodeProviders,
-} from "./opencode-config";
+import { BenchConfigError, type LoadedOpencodeConfig, loadOpencodeConfig } from "./opencode-config";
 import type { Arm } from "./runner";
 import { benchMkdtemp } from "./tmp";
 
@@ -34,9 +29,9 @@ export interface BenchRunConfigFile {
   schemaVersion: 1;
   name?: string;
   description?: string;
-  providers?: Record<string, unknown>;
-  providersRef?: string;
-  defaultModel?: string;
+  opencodeConfig?: Record<string, unknown>;
+  opencodeConfigRef?: string;
+  model?: string;
   tasks?: string | string[];
   arms?: Arm[];
   seeds?: number;
@@ -58,11 +53,11 @@ export interface ResolvedBenchRunConfig {
   /** Display name (config `name` field, or basename without extension). */
   name: string;
   /** Resolved providers, ready to forward into `runUtility`. */
-  providers: LoadedOpencodeProviders;
+  opencodeConfig: LoadedOpencodeConfig;
   /**
    * The model id stamped into every RunResult and the report. Resolved
-   * precedence: `BENCH_OPENCODE_MODEL` env > config `defaultModel` >
-   * providers file `defaultModel`.
+   * precedence: `BENCH_OPENCODE_MODEL` env > config `model` >
+   * opencode config `model`.
    */
   model: string;
   /** Selected tasks, after `listTasks()` filtering. */
@@ -107,103 +102,78 @@ export function resolvePathString(value: string, baseDir: string): string {
   return path.resolve(baseDir, s);
 }
 
-/** Default per-operator providers location: `${XDG_CONFIG_HOME:-~/.config}/akm/bench-providers.json`. */
-export function defaultUserProvidersPath(): string {
-  const xdg = process.env.XDG_CONFIG_HOME;
-  const root = xdg && xdg.length > 0 ? xdg : path.join(os.homedir(), ".config");
-  return path.join(root, "akm", "bench-providers.json");
-}
-
 /**
- * Resolve the providers file using the §A discovery chain and load it.
+ * Resolve the opencode config using the discovery chain and load it.
  *
  *   1. `BENCH_OPENCODE_CONFIG` env var (absolute path).
- *   2. `providers` inline in the config (materialised to a synthetic
- *      `LoadedOpencodeProviders` without touching disk).
- *   3. `providersRef` in the config (with tilde / env-var expansion).
- *   4. `${XDG_CONFIG_HOME:-~/.config}/akm/bench-providers.json`.
- *   5. Throw — the caller is expected to map this to exit code 2.
- *
- * Returns `{ providers, source }` where `source` is the absolute path the
- * providers came from (or `"<inline>"` for the inline case).
+ *   2. `opencodeConfig` inline in the config.
+ *   3. `opencodeConfigRef` in the config (with tilde / env-var expansion).
+ *   4. `configs/opencode.local.json`.
+ *   5. `configs/opencode.json`.
+ *   6. Throw — the caller is expected to map this to exit code 2.
  */
-export function resolveProviders(config: BenchRunConfigFile, configDir: string): LoadedOpencodeProviders {
+export function resolveOpencodeConfig(config: BenchRunConfigFile, configDir: string): LoadedOpencodeConfig {
   // 1. BENCH_OPENCODE_CONFIG env var wins.
   const envPath = process.env.BENCH_OPENCODE_CONFIG;
   if (envPath && envPath.length > 0) {
-    return loadOpencodeProviders(path.isAbsolute(envPath) ? envPath : path.resolve(envPath));
+    return loadOpencodeConfig(path.isAbsolute(envPath) ? envPath : path.resolve(envPath));
   }
 
-  // 2. Inline providers in the config.
-  if (config.providers !== undefined) {
-    if (config.providersRef !== undefined) {
-      throw new BenchConfigError("bench run config: only one of `providers` or `providersRef` may be set", true);
+  // 2. Inline opencode config in the config.
+  if (config.opencodeConfig !== undefined) {
+    if (config.opencodeConfigRef !== undefined) {
+      throw new BenchConfigError(
+        "bench run config: only one of `opencodeConfig` or `opencodeConfigRef` may be set",
+        true,
+      );
     }
-    return materialiseInlineProviders(config);
+    return materialiseInlineOpencodeConfig(config);
   }
 
-  // 3. Explicit providersRef.
-  if (config.providersRef !== undefined) {
-    const resolved = resolvePathString(config.providersRef, configDir);
-    return loadOpencodeProviders(resolved);
+  // 3. Explicit opencodeConfigRef.
+  if (config.opencodeConfigRef !== undefined) {
+    const resolved = resolvePathString(config.opencodeConfigRef, configDir);
+    return loadOpencodeConfig(resolved);
   }
 
-  // 4. Per-operator default location.
-  const userPath = defaultUserProvidersPath();
-  if (fs.existsSync(userPath)) {
-    return loadOpencodeProviders(userPath);
-  }
-
-  // 5. Repo-local fallbacks — the same locations the legacy
-  //    `discoverOpencodeProviders` checks. The gitignored `.local.json`
+  // 4. Repo-local fallbacks — the same locations the legacy
+  //    `discoverOpencodeConfig` checks. The gitignored `.local.json`
   //    overlay wins over the committed fixture so an operator's local
   //    overrides survive a `git pull` without needing a config edit.
-  const repoLocalPath = path.resolve(__dirname, "..", "configs", "opencode-providers.local.json");
+  const repoLocalPath = path.resolve(__dirname, "..", "configs", "opencode.local.json");
   if (fs.existsSync(repoLocalPath)) {
-    return loadOpencodeProviders(repoLocalPath);
+    return loadOpencodeConfig(repoLocalPath);
   }
-  const repoFixturePath = path.resolve(__dirname, "..", "configs", "opencode-providers.json");
+  const repoFixturePath = path.resolve(__dirname, "..", "configs", "opencode.json");
   if (fs.existsSync(repoFixturePath)) {
-    return loadOpencodeProviders(repoFixturePath);
+    return loadOpencodeConfig(repoFixturePath);
   }
 
-  // 6. No providers found.
+  // 5. No config found.
   throw new BenchConfigError(
-    `bench run config: no opencode providers found. Set \`providers\` or \`providersRef\` in the config, set BENCH_OPENCODE_CONFIG, or create ${userPath}.`,
+    "bench run config: no opencode config found. Set `opencodeConfig` or `opencodeConfigRef` in the config, set BENCH_OPENCODE_CONFIG explicitly, or create configs/opencode.json.",
     true,
   );
 }
 
 /**
- * Build a `LoadedOpencodeProviders` from an inline `providers` map without
- * round-tripping through disk. We still validate via `loadOpencodeProviders`
- * by writing to a tmp file? No — that would risk leaving secrets on disk.
- * Instead, do a minimal in-memory validation that matches what the on-disk
- * loader checks (forbidden top-level keys are not applicable here, since
- * the inline providers already live inside a `providers` object; but the
- * credential heuristic still applies).
+ * Validate and load an inline standard opencode config by reusing the same
+ * disk-backed loader as file-based configs.
  */
-function materialiseInlineProviders(config: BenchRunConfigFile): LoadedOpencodeProviders {
-  if (config.providers === null || typeof config.providers !== "object" || Array.isArray(config.providers)) {
-    throw new BenchConfigError("bench run config: `providers` must be an object", false);
+function materialiseInlineOpencodeConfig(config: BenchRunConfigFile): LoadedOpencodeConfig {
+  if (
+    config.opencodeConfig === null ||
+    typeof config.opencodeConfig !== "object" ||
+    Array.isArray(config.opencodeConfig)
+  ) {
+    throw new BenchConfigError("bench run config: `opencodeConfig` must be an object", false);
   }
-  // Reuse `loadOpencodeProviders` indirectly by stamping a synthetic
-  // BenchOpencodeProvidersFile — without touching disk we still want the
-  // credential scan applied. The simplest path is: write a tmp file mode
-  // 0o600 and load it, then unlink. That keeps the credential-scan logic
-  // co-located in opencode-config.ts.
-  const file: BenchOpencodeProvidersFile = {
-    schemaVersion: 1,
-    providers: config.providers,
-    ...(config.defaultModel !== undefined ? { defaultModel: config.defaultModel } : {}),
-  };
-  // Per #276: bench tmp dirs MUST live under `${AKM_CACHE_DIR}/bench/`,
-  // never the OS-default tmp root. `benchMkdtemp` is the drop-in.
+  const file = config.opencodeConfig;
   const tmpDir = benchMkdtemp("akm-bench-inline-");
-  const tmpPath = path.join(tmpDir, "providers.json");
+  const tmpPath = path.join(tmpDir, "opencode.json");
   try {
     fs.writeFileSync(tmpPath, JSON.stringify(file), { mode: 0o600 });
-    const loaded = loadOpencodeProviders(tmpPath);
+    const loaded = loadOpencodeConfig(tmpPath);
     return { ...loaded, source: "<inline>" };
   } finally {
     try {
@@ -327,9 +297,9 @@ function validateConfig(parsed: unknown, source: string): BenchRunConfigFile {
     "schemaVersion",
     "name",
     "description",
-    "providers",
-    "providersRef",
-    "defaultModel",
+    "opencodeConfig",
+    "opencodeConfigRef",
+    "model",
     "tasks",
     "arms",
     "seeds",
@@ -344,9 +314,9 @@ function validateConfig(parsed: unknown, source: string): BenchRunConfigFile {
       throw new BenchConfigError(`bench run config: ${source}: unknown field "${key}"`, false);
     }
   }
-  if (obj.providers !== undefined && obj.providersRef !== undefined) {
+  if (obj.opencodeConfig !== undefined && obj.opencodeConfigRef !== undefined) {
     throw new BenchConfigError(
-      `bench run config: ${source}: only one of "providers" or "providersRef" may be set`,
+      `bench run config: ${source}: only one of "opencodeConfig" or "opencodeConfigRef" may be set`,
       true,
     );
   }
@@ -421,14 +391,13 @@ export function loadBenchRunConfig(
   const config = validateConfig(parsed, absPath);
   const configDir = path.dirname(absPath);
 
-  const providers = resolveProviders(config, configDir);
+  const opencodeConfig = resolveOpencodeConfig(config, configDir);
 
   const envModel = process.env.BENCH_OPENCODE_MODEL;
-  const model =
-    (envModel && envModel.length > 0 ? envModel : undefined) ?? config.defaultModel ?? providers.defaultModel;
+  const model = (envModel && envModel.length > 0 ? envModel : undefined) ?? config.model ?? opencodeConfig.model;
   if (!model) {
     throw new BenchConfigError(
-      `bench run config: ${absPath}: no model specified. Set "defaultModel" in the config, set "defaultModel" in the providers file, or set BENCH_OPENCODE_MODEL.`,
+      `bench run config: ${absPath}: no model specified. Set "model" in the config, set "model" in the opencode config, or set BENCH_OPENCODE_MODEL.`,
       true,
     );
   }
@@ -466,7 +435,7 @@ export function loadBenchRunConfig(
   return {
     source: absPath,
     name,
-    providers,
+    opencodeConfig,
     model,
     tasks: resolved.tasks,
     arms,

@@ -30,7 +30,7 @@ import {
   rehydrateRunFromSerialized,
   runMaskedCorpus,
 } from "./metrics";
-import { BenchConfigError, type LoadedOpencodeProviders, loadOpencodeProviders } from "./opencode-config";
+import { BenchConfigError, type LoadedOpencodeConfig, loadOpencodeConfig } from "./opencode-config";
 import {
   type RunRecordSerialized,
   renderAttributionTable,
@@ -62,9 +62,9 @@ Usage:
 
 Config-file mode (recommended):
   Pass a path to a configs/*.json file as the first argument.
-  See docs/operator-guide.md for the run-config schema and provider
-  discovery chain (BENCH_OPENCODE_CONFIG → providers/providersRef →
-  ~/.config/akm/bench-providers.json).
+  See docs/operator-guide.md for the run-config schema and opencode-config
+  discovery chain (BENCH_OPENCODE_CONFIG → opencodeConfig/opencodeConfigRef →
+  configs/opencode.local.json → configs/opencode.json).
 
 Subcommands (legacy; still supported):
   utility       Track A: paired noakm vs akm utility benchmark.
@@ -90,7 +90,7 @@ utility flags:
   --include-synthetic      add a third 'synthetic' arm where the model writes/uses its own
                            scratch notes (no AKM stash). Reports akm_over_synthetic_lift so
                            operators can see whether AKM beats a self-notes baseline.
-  --opencode-config <path> path to an opencode providers JSON file. Auto-discovered
+  --opencode-config <path> path to a standard opencode JSON config file. Auto-discovered
                            from BENCH_OPENCODE_CONFIG env var or the fixture defaults when
                            omitted. See docs/operator-guide.md for the discovery order.
   --json                   suppress the markdown summary on stderr (machine-readable only).
@@ -107,7 +107,7 @@ evolve flags:
   --force-parallel         suppress the high-parallelism warning when --parallel > 4.
   --negative-threshold-count <N>  absolute negative-feedback count to evolve (default: 2)
   --negative-threshold-ratio <R>  ratio of negatives to total feedback (default: 0.5)
-  --opencode-config <path> path to an opencode providers JSON file (same as utility).
+  --opencode-config <path> path to a standard opencode JSON config file (same as utility).
   --json                   suppress the markdown summary on stderr.
 
 compare flags:
@@ -127,7 +127,7 @@ compare flags:
 attribute flags:
   --base <path>            path to a §13.3 utility run JSON (required).
   --top <N>                number of top-loaded assets to mask (default: 5; clamped).
-  --opencode-config <path> path to an opencode providers JSON file (same as utility).
+  --opencode-config <path> path to a standard opencode JSON config file (same as utility).
   --json                   suppress the markdown summary on stderr.
 
 kill flags:
@@ -137,15 +137,15 @@ kill flags:
 
 Environment:
   BENCH_OPENCODE_MODEL      model id stamped into every RunResult. REQUIRED for utility/evolve
-                            unless the loaded providers file supplies a defaultModel.
-  BENCH_OPENCODE_CONFIG     path to the bench opencode providers JSON file. Overrides the
+                            unless the loaded opencode config supplies a model.
+  BENCH_OPENCODE_CONFIG     path to the bench opencode JSON config file. Overrides the
                             default fixture; overridden by --opencode-config flag.
 
 Auto-discovery order for --opencode-config (first existing file wins):
   1. --opencode-config <path>  flag value
   2. BENCH_OPENCODE_CONFIG     env var
-  3. configs/opencode-providers.local.json  (gitignored operator overlay)
-  4. configs/opencode-providers.json        (committed fixture)
+  3. configs/opencode.local.json  (gitignored operator overlay)
+  4. configs/opencode.json        (committed fixture)
   5. None found → empty isolated dir, opencode uses cloud-provider defaults.
 
 See docs/operator-guide.md for the operator guide.
@@ -197,32 +197,32 @@ function parseArgs(argv: string[]): ParsedArgs {
  * Absolute path to the committed default bench opencode providers fixture.
  * Used as the final fallback in the auto-discovery chain.
  */
-const DEFAULT_PROVIDERS_PATH = path.resolve(__dirname, "..", "configs", "opencode-providers.json");
+const DEFAULT_OPENCODE_CONFIG_PATH = path.resolve(__dirname, "..", "configs", "opencode.json");
 /**
  * Absolute path to the gitignored operator overlay. Takes precedence over
  * the committed fixture when it exists.
  */
-const LOCAL_PROVIDERS_PATH = path.resolve(__dirname, "..", "configs", "opencode-providers.local.json");
+const LOCAL_OPENCODE_CONFIG_PATH = path.resolve(__dirname, "..", "configs", "opencode.local.json");
 
 /**
- * Auto-discover and load the bench opencode providers file.
+ * Auto-discover and load the bench opencode config file.
  *
  * Discovery order (first existing file wins):
  *   1. `flagPath`  — `--opencode-config` flag value (already resolved by caller).
  *   2. `BENCH_OPENCODE_CONFIG` env var.
- *   3. `configs/opencode-providers.local.json` (gitignored overlay).
- *   4. `configs/opencode-providers.json` (committed fixture).
+ *   3. `configs/opencode.local.json` (gitignored overlay).
+ *   4. `configs/opencode.json` (committed fixture).
  *   5. None found → returns `undefined` (empty isolated dir, cloud-provider fallback).
  *
  * When a file is found but fails to load, the BenchConfigError is re-thrown
  * so the caller can map it to the correct exit code.
  */
-export function discoverOpencodeProviders(flagPath?: string): LoadedOpencodeProviders | undefined {
+export function discoverOpencodeConfig(flagPath?: string): LoadedOpencodeConfig | undefined {
   const candidates: Array<string | undefined> = [
     flagPath,
     getEnv("BENCH_OPENCODE_CONFIG"),
-    LOCAL_PROVIDERS_PATH,
-    DEFAULT_PROVIDERS_PATH,
+    LOCAL_OPENCODE_CONFIG_PATH,
+    DEFAULT_OPENCODE_CONFIG_PATH,
   ];
 
   for (const candidate of candidates) {
@@ -230,7 +230,7 @@ export function discoverOpencodeProviders(flagPath?: string): LoadedOpencodeProv
     const absPath = path.isAbsolute(candidate) ? candidate : path.resolve(candidate);
     if (fs.existsSync(absPath)) {
       // Throws BenchConfigError on validation failure; callers propagate it.
-      return loadOpencodeProviders(absPath);
+      return loadOpencodeConfig(absPath);
     }
     // When a flag or env-var path was given explicitly but doesn't exist,
     // treat it as a usage error rather than silently skipping to the next
@@ -238,10 +238,10 @@ export function discoverOpencodeProviders(flagPath?: string): LoadedOpencodeProv
     // silently skipped when absent.
     if (candidate === flagPath && flagPath) {
       // This throws with isUsageError: true (file not found).
-      return loadOpencodeProviders(absPath);
+      return loadOpencodeConfig(absPath);
     }
     if (candidate === getEnv("BENCH_OPENCODE_CONFIG") && candidate) {
-      return loadOpencodeProviders(absPath);
+      return loadOpencodeConfig(absPath);
     }
   }
 
@@ -279,7 +279,7 @@ export interface UtilityCliOptions {
   commit?: string;
   timestamp?: string;
   /** Pre-loaded opencode provider config. Forwarded into `runUtility`. */
-  opencodeProviders?: LoadedOpencodeProviders;
+  opencodeProviders?: LoadedOpencodeConfig;
 }
 
 export interface UtilityCliResult {
@@ -834,7 +834,7 @@ function warnIfObsoleteFlagsUsed(parsed: ParsedArgs): void {
   if (parsed.flags.has("opencode-config")) {
     warnObsolete(
       "--opencode-config",
-      "use `providersRef` in a run config, BENCH_OPENCODE_CONFIG, or ~/.config/akm/bench-providers.json",
+      "use `opencodeConfigRef` in a run config, BENCH_OPENCODE_CONFIG, or configs/opencode.json",
     );
   }
   if (parsed.flags.has("budget-tokens")) {
@@ -907,7 +907,7 @@ export async function runConfigCli(options: ConfigCliOptions): Promise<UtilityCl
     ...(options.timestamp !== undefined ? { timestamp: options.timestamp } : {}),
     ...(options.branch !== undefined ? { branch: options.branch } : {}),
     ...(options.commit !== undefined ? { commit: options.commit } : {}),
-    opencodeProviders: resolved.providers,
+    opencodeProviders: resolved.opencodeConfig,
     // Synthetic arm follows from `arms` containing "synthetic".
     ...(resolved.arms.includes("synthetic") ? { includeSynthetic: true } : {}),
   });
@@ -938,7 +938,7 @@ export interface EvolveCliOptions {
   commit?: string;
   timestamp?: string;
   /** Pre-loaded opencode provider config. Forwarded into `runEvolve`. */
-  opencodeProviders?: LoadedOpencodeProviders;
+  opencodeProviders?: LoadedOpencodeConfig;
 }
 
 /**
@@ -1037,17 +1037,17 @@ async function main(argv: string[]): Promise<number> {
       const slice = sliceRaw as "train" | "eval" | "all";
 
       // Load provider config at CLI startup (before any runs).
-      let opencodeProviders: LoadedOpencodeProviders | undefined;
+      let opencodeProviders: LoadedOpencodeConfig | undefined;
       try {
-        opencodeProviders = discoverOpencodeProviders(parsed.flags.get("opencode-config"));
+        opencodeProviders = discoverOpencodeConfig(parsed.flags.get("opencode-config"));
       } catch (err) {
         const exitCode = err instanceof BenchConfigError && err.isUsageError ? 2 : 78;
         process.stderr.write(`bench utility: ${err instanceof Error ? err.message : String(err)}\n`);
         return exitCode;
       }
 
-      // BENCH_OPENCODE_MODEL: flag → env var → loaded.defaultModel → error exit 2.
-      const model = getEnv("BENCH_OPENCODE_MODEL") ?? opencodeProviders?.defaultModel;
+      // BENCH_OPENCODE_MODEL: env var → loaded.model → error exit 2.
+      const model = getEnv("BENCH_OPENCODE_MODEL") ?? opencodeProviders?.model;
       if (!model) {
         process.stderr.write("bench utility: BENCH_OPENCODE_MODEL environment variable is required.\n");
         return 2;
@@ -1085,16 +1085,16 @@ async function main(argv: string[]): Promise<number> {
       }
 
       // Load provider config at CLI startup (before any runs).
-      let opencodeProvidersEvolve: LoadedOpencodeProviders | undefined;
+      let opencodeProvidersEvolve: LoadedOpencodeConfig | undefined;
       try {
-        opencodeProvidersEvolve = discoverOpencodeProviders(parsed.flags.get("opencode-config"));
+        opencodeProvidersEvolve = discoverOpencodeConfig(parsed.flags.get("opencode-config"));
       } catch (err) {
         const exitCode = err instanceof BenchConfigError && err.isUsageError ? 2 : 78;
         process.stderr.write(`bench evolve: ${err instanceof Error ? err.message : String(err)}\n`);
         return exitCode;
       }
 
-      const model = getEnv("BENCH_OPENCODE_MODEL") ?? opencodeProvidersEvolve?.defaultModel;
+      const model = getEnv("BENCH_OPENCODE_MODEL") ?? opencodeProvidersEvolve?.model;
       if (!model) {
         process.stderr.write("bench evolve: BENCH_OPENCODE_MODEL environment variable is required.\n");
         return 2;
@@ -1152,9 +1152,9 @@ async function main(argv: string[]): Promise<number> {
       }
 
       // Load provider config for parity (attribute re-runs use the same model + provider).
-      let opencodeProvidersAttr: LoadedOpencodeProviders | undefined;
+      let opencodeProvidersAttr: LoadedOpencodeConfig | undefined;
       try {
-        opencodeProvidersAttr = discoverOpencodeProviders(parsed.flags.get("opencode-config"));
+        opencodeProvidersAttr = discoverOpencodeConfig(parsed.flags.get("opencode-config"));
       } catch (err) {
         const exitCode = err instanceof BenchConfigError && err.isUsageError ? 2 : 78;
         process.stderr.write(`bench attribute: ${err instanceof Error ? err.message : String(err)}\n`);

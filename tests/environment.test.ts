@@ -13,7 +13,7 @@ import {
   validateFixtureCorpus,
   writeOpencodeJson,
 } from "../src/environment";
-import type { LoadedOpencodeProviders } from "../src/opencode-config";
+import type { LoadedOpencodeConfig } from "../src/opencode-config";
 import { benchMkdtemp } from "../src/tmp";
 
 // ── writeOpencodeJson ────────────────────────────────────────────────────────
@@ -46,9 +46,9 @@ describe("writeOpencodeJson", () => {
     const dir = path.join(tmp, "with-provider");
     fs.mkdirSync(dir, { recursive: true });
 
-    const providers: LoadedOpencodeProviders = {
+    const providers: LoadedOpencodeConfig = {
       source: "/fake/providers.json",
-      providers: { myprov: { npm: "@ai-sdk/openai-compatible", name: "My Provider" } },
+      provider: { myprov: { npm: "@ai-sdk/openai-compatible", name: "My Provider" } },
     };
 
     const result = writeOpencodeJson(dir, "myprov/my-model", providers);
@@ -64,9 +64,9 @@ describe("writeOpencodeJson", () => {
     const dir = path.join(tmp, "cloud-stub");
     fs.mkdirSync(dir, { recursive: true });
 
-    const providers: LoadedOpencodeProviders = {
+    const providers: LoadedOpencodeConfig = {
       source: "/fake/providers.json",
-      providers: { otherprov: {} },
+      provider: { otherprov: {} },
     };
 
     const result = writeOpencodeJson(dir, "opencode/big-pickle", providers);
@@ -83,9 +83,9 @@ describe("writeOpencodeJson", () => {
     const dir = path.join(tmp, "local-prefix-missing");
     fs.mkdirSync(dir, { recursive: true });
 
-    const providers: LoadedOpencodeProviders = {
+    const providers: LoadedOpencodeConfig = {
       source: "/fake/providers.json",
-      providers: { otherprov: {} },
+      provider: { otherprov: {} },
     };
 
     // "shredder" is not in BUILTIN_CLOUD_PREFIXES and not in the providers map.
@@ -98,9 +98,9 @@ describe("writeOpencodeJson", () => {
     const dir = path.join(tmp, "local-prefix-found");
     fs.mkdirSync(dir, { recursive: true });
 
-    const providers: LoadedOpencodeProviders = {
+    const providers: LoadedOpencodeConfig = {
       source: "/fake/providers.json",
-      providers: { shredder: { npm: "@ai-sdk/openai-compatible", name: "Shredder" } },
+      provider: { shredder: { npm: "@ai-sdk/openai-compatible", name: "Shredder" } },
     };
 
     const result = writeOpencodeJson(dir, "shredder/qwen3.5-9b", providers);

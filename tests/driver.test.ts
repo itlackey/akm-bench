@@ -20,7 +20,7 @@ import {
   runOne,
   stripAkmStashDir,
 } from "../src/driver";
-import type { LoadedOpencodeProviders } from "../src/opencode-config";
+import type { LoadedOpencodeConfig } from "../src/opencode-config";
 import type { SpawnedSubprocess, SpawnFn } from "../src/support/agent";
 import { benchMkdtemp } from "../src/tmp";
 
@@ -356,15 +356,15 @@ describe("runOne", () => {
       return inner(cmd, options);
     };
 
-    const fakeProviders: LoadedOpencodeProviders = {
+    const fakeProviders: LoadedOpencodeConfig = {
       source: "/fake/providers.json",
-      providers: {
+      provider: {
         testprov: {
           npm: "@ai-sdk/openai-compatible",
           options: { baseURL: "http://localhost:9999/v1" },
         },
       },
-      defaultModel: "testprov/my-model",
+      model: "testprov/my-model",
     };
 
     const result = await runOne({
@@ -431,9 +431,9 @@ describe("runOne", () => {
     // a model-only stub and proceed rather than returning harness_error. Built-in
     // cloud models like "opencode/big-pickle" resolve via opencode's own registry
     // and do NOT need a custom provider entry.
-    const fakeProviders: LoadedOpencodeProviders = {
+    const fakeProviders: LoadedOpencodeConfig = {
       source: "/fake/providers.json",
-      providers: { myprov: {} },
+      provider: { myprov: {} },
     };
 
     let stubContent: string | undefined;

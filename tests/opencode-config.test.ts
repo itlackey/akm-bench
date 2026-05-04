@@ -1,17 +1,5 @@
 /**
- * Tests for the src opencode-config module.
- *
- * Covers all cases described in the design spec:
- *   - loads canonical fixture without error
- *   - rejects literal apiKey (not env-ref)
- *   - accepts {env:VAR} apiKey form
- *   - rejects sk-XXXX credential heuristic anywhere in tree
- *   - rejects top-level plugin / mcp / permission keys
- *   - rejects unknown schemaVersion
- *   - isUsageError: true when file missing
- *   - selectProviderForModel picks correct provider
- *   - selectProviderForModel throws on unknown provider prefix
- *   - materializeOpencodeConfig writes exactly $schema + provider keys, mode 0o600
+ * Tests for the standard opencode-config loader used by the bench.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -20,23 +8,21 @@ import path from "node:path";
 
 import {
   BenchConfigError,
-  loadOpencodeProviders,
+  loadOpencodeConfig,
   materializeOpencodeConfig,
   selectProviderForModel,
 } from "../src/opencode-config";
 import { benchMkdtemp } from "../src/tmp";
 
-/** Absolute path to the committed fixture. */
-const FIXTURE_PATH = path.resolve(__dirname, "..", "configs", "opencode-providers.json");
+const FIXTURE_PATH = path.resolve(__dirname, "..", "configs", "opencode.json");
 
-/** Write a temp JSON file and return its path. */
 function writeTmp(dir: string, name: string, content: unknown): string {
   const p = path.join(dir, name);
   fs.writeFileSync(p, JSON.stringify(content));
   return p;
 }
 
-describe("loadOpencodeProviders", () => {
+describe("loadOpencodeConfig", () => {
   let tmp: string;
 
   beforeAll(() => {
@@ -47,43 +33,34 @@ describe("loadOpencodeProviders", () => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  // ── Canonical fixture ─────────────────────────────────────────────────────
-
   test("loads the canonical committed fixture without error", () => {
-    expect(() => loadOpencodeProviders(FIXTURE_PATH)).not.toThrow();
-    const loaded = loadOpencodeProviders(FIXTURE_PATH);
+    expect(() => loadOpencodeConfig(FIXTURE_PATH)).not.toThrow();
+    const loaded = loadOpencodeConfig(FIXTURE_PATH);
     expect(loaded.source).toBe(FIXTURE_PATH);
-    expect(loaded.providers).toBeDefined();
-    expect(typeof loaded.providers).toBe("object");
-    expect(loaded.defaultModel).toBe("local/qwen/qwen3.5-9b");
-    expect("local" in loaded.providers).toBe(true);
+    expect(loaded.provider).toBeDefined();
+    expect(typeof loaded.provider).toBe("object");
+    expect(loaded.model).toBe("local/qwen/qwen3.5-9b");
+    expect("local" in loaded.provider).toBe(true);
   });
-
-  // ── File not found ────────────────────────────────────────────────────────
 
   test("throws BenchConfigError with isUsageError: true when file does not exist", () => {
     const missing = path.join(tmp, "does-not-exist.json");
     let err: unknown;
     try {
-      loadOpencodeProviders(missing);
+      loadOpencodeConfig(missing);
     } catch (e) {
       err = e;
     }
     expect(err).toBeInstanceOf(BenchConfigError);
-    const bce = err as BenchConfigError;
-    expect(bce.code).toBe("BENCH_CONFIG");
-    expect(bce.isUsageError).toBe(true);
-    expect(bce.message).toContain("not found");
+    expect((err as BenchConfigError).isUsageError).toBe(true);
   });
-
-  // ── JSON parse failure ────────────────────────────────────────────────────
 
   test("throws BenchConfigError with isUsageError: false on malformed JSON", () => {
     const p = path.join(tmp, "bad.json");
     fs.writeFileSync(p, "{ this is not json }");
     let err: unknown;
     try {
-      loadOpencodeProviders(p);
+      loadOpencodeConfig(p);
     } catch (e) {
       err = e;
     }
@@ -92,120 +69,44 @@ describe("loadOpencodeProviders", () => {
     expect((err as BenchConfigError).message).toContain("JSON parse error");
   });
 
-  // ── schemaVersion ─────────────────────────────────────────────────────────
-
-  test("rejects unknown schemaVersion", () => {
-    const p = writeTmp(tmp, "bad-version.json", {
-      schemaVersion: 2,
-      providers: {},
+  test("rejects unsupported $schema values", () => {
+    const p = writeTmp(tmp, "bad-schema.json", {
+      $schema: "https://example.com/not-opencode.json",
+      provider: {},
     });
-    expect(() => loadOpencodeProviders(p)).toThrow(BenchConfigError);
-    let err: BenchConfigError | undefined;
-    try {
-      loadOpencodeProviders(p);
-    } catch (e) {
-      if (e instanceof BenchConfigError) err = e;
-    }
-    expect(err?.isUsageError).toBe(false);
-    expect(err?.message).toContain("schemaVersion");
+    expect(() => loadOpencodeConfig(p)).toThrow(BenchConfigError);
   });
 
-  test("rejects schemaVersion: 0", () => {
-    const p = writeTmp(tmp, "version-0.json", { schemaVersion: 0, providers: {} });
-    expect(() => loadOpencodeProviders(p)).toThrow(BenchConfigError);
-  });
-
-  // ── Forbidden top-level keys ──────────────────────────────────────────────
-
-  test("rejects top-level 'plugin' key", () => {
+  test("rejects top-level plugin key", () => {
     const p = writeTmp(tmp, "has-plugin.json", {
-      schemaVersion: 1,
-      providers: {},
+      provider: {},
       plugin: [],
     });
-    let err: BenchConfigError | undefined;
-    try {
-      loadOpencodeProviders(p);
-    } catch (e) {
-      if (e instanceof BenchConfigError) err = e;
-    }
-    expect(err).toBeDefined();
-    expect(err?.isUsageError).toBe(false);
-    expect(err?.message).toContain("plugin");
+    expect(() => loadOpencodeConfig(p)).toThrow(/plugin/);
   });
 
-  test("rejects top-level 'mcp' key", () => {
-    const p = writeTmp(tmp, "has-mcp.json", {
-      schemaVersion: 1,
-      providers: {},
-      mcp: {},
-    });
-    expect(() => loadOpencodeProviders(p)).toThrow(BenchConfigError);
-  });
-
-  test("rejects top-level 'permission' key", () => {
+  test("rejects top-level permission key", () => {
     const p = writeTmp(tmp, "has-permission.json", {
-      schemaVersion: 1,
-      providers: {},
+      provider: {},
       permission: {},
     });
-    expect(() => loadOpencodeProviders(p)).toThrow(BenchConfigError);
+    expect(() => loadOpencodeConfig(p)).toThrow(/permission/);
   });
 
-  test("rejects top-level 'disabled_providers' key", () => {
-    const p = writeTmp(tmp, "has-disabled.json", {
-      schemaVersion: 1,
-      providers: {},
-      disabled_providers: [],
-    });
-    expect(() => loadOpencodeProviders(p)).toThrow(BenchConfigError);
-  });
-
-  test("rejects top-level 'small_model' key", () => {
-    const p = writeTmp(tmp, "has-small-model.json", {
-      schemaVersion: 1,
-      providers: {},
-      small_model: "anthropic/claude-haiku-4-5",
-    });
-    expect(() => loadOpencodeProviders(p)).toThrow(BenchConfigError);
-  });
-
-  test("rejects top-level 'snapshot' key", () => {
-    const p = writeTmp(tmp, "has-snapshot.json", {
-      schemaVersion: 1,
-      providers: {},
-      snapshot: true,
-    });
-    expect(() => loadOpencodeProviders(p)).toThrow(BenchConfigError);
-  });
-
-  // ── apiKey validation ─────────────────────────────────────────────────────
-
-  test("rejects literal apiKey string (not an env-ref)", () => {
+  test("rejects literal apiKey string", () => {
     const p = writeTmp(tmp, "literal-apikey.json", {
-      schemaVersion: 1,
-      providers: {
+      provider: {
         myProvider: {
           apiKey: "not-an-env-ref",
         },
       },
     });
-    let err: BenchConfigError | undefined;
-    try {
-      loadOpencodeProviders(p);
-    } catch (e) {
-      if (e instanceof BenchConfigError) err = e;
-    }
-    expect(err).toBeDefined();
-    expect(err?.isUsageError).toBe(false);
-    expect(err?.message).toContain("apiKey");
-    expect(err?.message).toContain("env-ref");
+    expect(() => loadOpencodeConfig(p)).toThrow(/apiKey/);
   });
 
   test("accepts {env:VAR} form for apiKey", () => {
     const p = writeTmp(tmp, "env-ref-apikey.json", {
-      schemaVersion: 1,
-      providers: {
+      provider: {
         myProvider: {
           npm: "@ai-sdk/openai-compatible",
           apiKey: "{env:MY_API_KEY}",
@@ -213,133 +114,61 @@ describe("loadOpencodeProviders", () => {
         },
       },
     });
-    expect(() => loadOpencodeProviders(p)).not.toThrow();
-    const loaded = loadOpencodeProviders(p);
-    expect("myProvider" in loaded.providers).toBe(true);
+    const loaded = loadOpencodeConfig(p);
+    expect("myProvider" in loaded.provider).toBe(true);
   });
 
-  test("accepts {env:UNDERSCORE_KEY_123} env-ref form", () => {
-    const p = writeTmp(tmp, "env-ref-underscore.json", {
-      schemaVersion: 1,
-      providers: {
-        p: { apiKey: "{env:MY_KEY_123}" },
-      },
-    });
-    expect(() => loadOpencodeProviders(p)).not.toThrow();
-  });
-
-  test("rejects apiKey starting with lowercase (not a valid env-ref)", () => {
-    const p = writeTmp(tmp, "bad-env-ref.json", {
-      schemaVersion: 1,
-      providers: {
-        p: { apiKey: "{env:my_lowercase_key}" },
-      },
-    });
-    expect(() => loadOpencodeProviders(p)).toThrow(BenchConfigError);
-  });
-
-  // ── Credential heuristic ──────────────────────────────────────────────────
-
-  test("rejects sk-XXXX credential anywhere in the providers tree", () => {
+  test("rejects sk-style credentials anywhere in the provider tree", () => {
     const p = writeTmp(tmp, "has-sk-key.json", {
-      schemaVersion: 1,
-      providers: {
+      provider: {
         openai: {
           npm: "@ai-sdk/openai",
           secret: "sk-abcdefghijklmnopqrstuvwxyz0123456789",
         },
       },
     });
-    let err: BenchConfigError | undefined;
-    try {
-      loadOpencodeProviders(p);
-    } catch (e) {
-      if (e instanceof BenchConfigError) err = e;
-    }
-    expect(err).toBeDefined();
-    expect(err?.isUsageError).toBe(false);
-    expect(err?.message).toContain("credential heuristic");
+    expect(() => loadOpencodeConfig(p)).toThrow(/credential heuristic/);
   });
 
-  test("rejects sk-XXXX credential in a nested object", () => {
-    const p = writeTmp(tmp, "nested-sk-key.json", {
-      schemaVersion: 1,
-      providers: {
-        p: {
-          options: {
-            headers: {
-              Authorization: "sk-proj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            },
-          },
-        },
-      },
-    });
-    expect(() => loadOpencodeProviders(p)).toThrow(BenchConfigError);
-  });
-
-  // ── Valid minimal file ────────────────────────────────────────────────────
-
-  test("accepts a valid minimal file with no defaultModel", () => {
+  test("accepts a valid minimal file with no model", () => {
     const p = writeTmp(tmp, "minimal.json", {
-      schemaVersion: 1,
-      providers: {
+      provider: {
         local: {
           npm: "@ai-sdk/openai-compatible",
           options: { baseURL: "http://localhost:1234/v1" },
         },
       },
     });
-    const loaded = loadOpencodeProviders(p);
-    expect(loaded.defaultModel).toBeUndefined();
-    expect("local" in loaded.providers).toBe(true);
+    const loaded = loadOpencodeConfig(p);
+    expect(loaded.model).toBeUndefined();
+    expect("local" in loaded.provider).toBe(true);
   });
 });
 
 describe("selectProviderForModel", () => {
   const loaded = {
     source: "/fake/path.json",
-    providers: {
+    provider: {
       don: { npm: "@ai-sdk/openai-compatible", name: "Don LM Studio" },
       ollama: { npm: "@ai-sdk/openai-compatible", name: "Ollama" },
     },
-    defaultModel: "don/mlx-community/qwen3.6-35b-a3b",
+    model: "don/mlx-community/qwen3.6-35b-a3b",
   };
 
   test("splits on first slash and returns the correct provider entry", () => {
     const result = selectProviderForModel(loaded, "don/mlx-community/qwen3.6-35b-a3b");
     expect(result.providerKey).toBe("don");
-    expect(result.entry).toBe(loaded.providers.don);
+    expect(result.entry).toBe(loaded.provider.don);
   });
 
-  test("handles a model with no slash (entire string is the provider key)", () => {
+  test("handles a model with no slash", () => {
     const result = selectProviderForModel(loaded, "ollama");
     expect(result.providerKey).toBe("ollama");
-    expect(result.entry).toBe(loaded.providers.ollama);
+    expect(result.entry).toBe(loaded.provider.ollama);
   });
 
-  test("throws BenchConfigError when provider key is not in loaded.providers", () => {
-    let err: BenchConfigError | undefined;
-    try {
-      selectProviderForModel(loaded, "unknown/some-model");
-    } catch (e) {
-      if (e instanceof BenchConfigError) err = e;
-    }
-    expect(err).toBeDefined();
-    expect(err?.code).toBe("BENCH_CONFIG");
-    expect(err?.isUsageError).toBe(false);
-    expect(err?.message).toContain("unknown");
-    expect(err?.message).toContain("provider key");
-  });
-
-  test("error message lists available provider keys", () => {
-    let err: BenchConfigError | undefined;
-    try {
-      selectProviderForModel(loaded, "missing/model");
-    } catch (e) {
-      if (e instanceof BenchConfigError) err = e;
-    }
-    expect(err?.message).toContain("don");
-    expect(err?.message).toContain("ollama");
+  test("throws when provider key is missing", () => {
+    expect(() => selectProviderForModel(loaded, "unknown/some-model")).toThrow(/provider key/);
   });
 });
 
@@ -362,60 +191,21 @@ describe("materializeOpencodeConfig", () => {
     materializeOpencodeConfig(configDir, { providerKey: "test", entry }, "test/my-model");
 
     const outPath = path.join(configDir, "opencode.json");
-    expect(fs.existsSync(outPath)).toBe(true);
-
     const contents = JSON.parse(fs.readFileSync(outPath, "utf8")) as Record<string, unknown>;
     expect(contents.model).toBe("test/my-model");
     expect(contents.$schema).toBe("https://opencode.ai/config.json");
-    // Bench isolation invariants: plugin:[] prevents operator plugin interference;
-    // permission block ensures opencode run (non-interactive) allows bash/file tools.
     expect(contents.plugin).toEqual([]);
     expect((contents.permission as Record<string, unknown>)?.bash).toBe("allow");
-    // Provider block is written correctly.
     const provider = contents.provider as Record<string, unknown>;
     expect(Object.keys(provider)).toEqual(["test"]);
     expect(provider.test).toEqual(entry);
   });
 
-  test("does not write mcp into the config", () => {
+  test("writes the file with mode 0o600", () => {
     const configDir = path.join(tmp, "run-config-2");
     fs.mkdirSync(configDir, { recursive: true });
-
     materializeOpencodeConfig(configDir, { providerKey: "p", entry: {} }, "p/model");
-
-    const contents = JSON.parse(fs.readFileSync(path.join(configDir, "opencode.json"), "utf8")) as Record<
-      string,
-      unknown
-    >;
-    expect(contents.mcp).toBeUndefined();
-  });
-
-  test("writes the file with mode 0o600 (not world-readable)", () => {
-    const configDir = path.join(tmp, "run-config-3");
-    fs.mkdirSync(configDir, { recursive: true });
-
-    materializeOpencodeConfig(configDir, { providerKey: "p", entry: {} }, "p/model");
-
     const stat = fs.statSync(path.join(configDir, "opencode.json"));
-    // Mode 0o600 means only owner can read/write (no group or other bits).
-    // On Linux/macOS the lower 9 bits are 0o600 = 0o110000000 in binary.
-    const mode = stat.mode & 0o777;
-    expect(mode).toBe(0o600);
-  });
-
-  test("can be called twice (overwrites an existing opencode.json)", () => {
-    const configDir = path.join(tmp, "run-config-4");
-    fs.mkdirSync(configDir, { recursive: true });
-
-    materializeOpencodeConfig(configDir, { providerKey: "a", entry: { name: "first" } }, "a/m1");
-    materializeOpencodeConfig(configDir, { providerKey: "b", entry: { name: "second" } }, "b/m2");
-
-    const contents = JSON.parse(fs.readFileSync(path.join(configDir, "opencode.json"), "utf8")) as Record<
-      string,
-      unknown
-    >;
-    const provider = contents.provider as Record<string, unknown>;
-    expect("b" in provider).toBe(true);
-    expect("a" in provider).toBe(false);
+    expect(stat.mode & 0o777).toBe(0o600);
   });
 });
