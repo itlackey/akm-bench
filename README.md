@@ -6,25 +6,27 @@ Benchmark-only repo for evaluating akm-assisted agent runs.
 
 | Path | Purpose |
 | --- | --- |
-| `bench/` | Runtime harness, CLI, configs, baselines, and the operator guide in `bench/BENCH.md` |
-| `corpus/` | Benchmark inputs: task fixtures, workflow specs, and provider fixtures |
-| `stashes/` | Reusable fixture stashes loaded by corpus tasks and stash-loader tests |
-| `test/` | Harness and fixture-loader test files |
+| `src/` | Runtime harness, CLI, and the operator guide in `src/BENCH.md` |
+| `fixtures/corpus/` | Benchmark inputs: task fixtures, workflow specs, and provider fixtures |
+| `fixtures/stashes/` | Reusable fixture stashes loaded by corpus tasks and stash-loader tests |
+| `configs/` | Run configs and the config schema |
+| `results/` | Checked-in baseline result snapshots |
+| `tests/` | Harness and fixture-loader test files |
 
-The corpus lives under `corpus/tasks/<domain>/<task-id>/`.
+The corpus lives under `fixtures/corpus/tasks/<domain>/<task-id>/`.
 Each task directory includes `task.yaml`, a `workspace/` seed, and a deterministic verifier.
-Workflow-compliance tasks live alongside the other corpus domains; their workflow specs live under `corpus/workflows/`.
+Workflow-compliance tasks live alongside the other corpus domains; their workflow specs live under `fixtures/corpus/workflows/`.
 
 ## Run
 
 ```sh
 bun install
-bun test ./test
-bun run bench/cli.ts bench/configs/nano-quick.json
+bun test ./tests
+bun run src/cli.ts configs/nano-quick.json
 ```
 
 ## Scope
 
 - Keep repo-level orientation here.
-- Keep harness/operator details in `bench/BENCH.md`.
-- Treat `corpus/` and `stashes/` as benchmark inputs, not operator docs.
+- Keep harness/operator details in `src/BENCH.md`.
+- Treat `fixtures/` as benchmark inputs, not operator docs.

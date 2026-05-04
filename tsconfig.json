@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["bun-types"]
   },
-  "include": ["bench/**/*.ts", "corpus/**/*.ts", "stashes/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "fixtures/**/*.ts", "configs/**/*.json", "results/**/*.json", "tests/**/*.ts"]
 }

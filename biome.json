@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.9/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.14/schema.json",
   "formatter": {
     "indentStyle": "space",
     "indentWidth": 2,
@@ -15,6 +15,16 @@
     }
   },
   "files": {
-    "includes": ["bench/**", "corpus/**", "stashes/**", "test/**"]
+    "includes": [
+      "src/**",
+      "fixtures/**",
+      "configs/**",
+      "results/**",
+      "tests/**",
+      "README.md",
+      ".gitignore",
+      "package.json",
+      "tsconfig.json"
+    ]
   }
 }
