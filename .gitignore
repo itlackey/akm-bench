@@ -1,0 +1,6 @@
+node_modules
+dist/
+.DS_Store
+bench-results/
+tests/fixtures/bench/opencode-providers.local.json
+tests/bench/*.json
