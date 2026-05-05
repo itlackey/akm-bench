@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["bun-types"]
   },
-  "include": ["src/**/*.ts", "fixtures/**/*.ts", "configs/**/*.json", "results/**/*.json", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "fixtures/**/*.ts", "config/**/*.json", "results/**/*.json", "tests/**/*.ts"]
 }

@@ -61,10 +61,10 @@ Usage:
   bun run src/cli.ts <subcommand> [...flags]
 
 Config-file mode (recommended):
-  Pass a path to a configs/*.json file as the first argument.
+  Pass a path to a config/*.json file as the first argument.
   See docs/operator-guide.md for the run-config schema and opencode-config
   discovery chain (BENCH_OPENCODE_CONFIG → opencodeConfig/opencodeConfigRef →
-  configs/opencode.local.json → configs/opencode.json).
+  config/opencode.local.json → config/opencode.json).
 
 Subcommands (legacy; still supported):
   utility       Track A: paired noakm vs akm utility benchmark.
@@ -144,8 +144,8 @@ Environment:
 Auto-discovery order for --opencode-config (first existing file wins):
   1. --opencode-config <path>  flag value
   2. BENCH_OPENCODE_CONFIG     env var
-  3. configs/opencode.local.json  (gitignored operator overlay)
-  4. configs/opencode.json        (committed fixture)
+  3. config/opencode.local.json  (gitignored operator overlay)
+  4. config/opencode.json        (committed fixture)
   5. None found → empty isolated dir, opencode uses cloud-provider defaults.
 
 See docs/operator-guide.md for the operator guide.
@@ -197,12 +197,12 @@ function parseArgs(argv: string[]): ParsedArgs {
  * Absolute path to the committed default bench opencode providers fixture.
  * Used as the final fallback in the auto-discovery chain.
  */
-const DEFAULT_OPENCODE_CONFIG_PATH = path.resolve(__dirname, "..", "configs", "opencode.json");
+const DEFAULT_OPENCODE_CONFIG_PATH = path.resolve(__dirname, "..", "config", "opencode.json");
 /**
  * Absolute path to the gitignored operator overlay. Takes precedence over
  * the committed fixture when it exists.
  */
-const LOCAL_OPENCODE_CONFIG_PATH = path.resolve(__dirname, "..", "configs", "opencode.local.json");
+const LOCAL_OPENCODE_CONFIG_PATH = path.resolve(__dirname, "..", "config", "opencode.local.json");
 
 /**
  * Auto-discover and load the bench opencode config file.
@@ -210,8 +210,8 @@ const LOCAL_OPENCODE_CONFIG_PATH = path.resolve(__dirname, "..", "configs", "ope
  * Discovery order (first existing file wins):
  *   1. `flagPath`  — `--opencode-config` flag value (already resolved by caller).
  *   2. `BENCH_OPENCODE_CONFIG` env var.
- *   3. `configs/opencode.local.json` (gitignored overlay).
- *   4. `configs/opencode.json` (committed fixture).
+ *   3. `config/opencode.local.json` (gitignored overlay).
+ *   4. `config/opencode.json` (committed fixture).
  *   5. None found → returns `undefined` (empty isolated dir, cloud-provider fallback).
  *
  * When a file is found but fails to load, the BenchConfigError is re-thrown
@@ -834,7 +834,7 @@ function warnIfObsoleteFlagsUsed(parsed: ParsedArgs): void {
   if (parsed.flags.has("opencode-config")) {
     warnObsolete(
       "--opencode-config",
-      "use `opencodeConfigRef` in a run config, BENCH_OPENCODE_CONFIG, or configs/opencode.json",
+      "use `opencodeConfigRef` in a run config, BENCH_OPENCODE_CONFIG, or config/opencode.json",
     );
   }
   if (parsed.flags.has("budget-tokens")) {

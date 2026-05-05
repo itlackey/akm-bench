@@ -1,33 +1,169 @@
 # akm-bench
 
-Benchmark-only repo for evaluating akm-assisted agent runs.
+`akm-bench` is a benchmark harness for measuring how an agent performs on the
+same task set with AKM enabled.
 
-## Repo Map
+This README is the fast path for running benchmarks. For the full reference,
+see `docs/operator-guide.md`.
 
-| Path | Purpose |
-| --- | --- |
-| `src/` | Runtime harness and CLI |
-| `docs/` | Operator guide and harness documentation |
-| `fixtures/corpus/` | Benchmark inputs: task fixtures and workflow specs |
-| `fixtures/stashes/` | Reusable fixture stashes loaded by corpus tasks and stash-loader tests |
-| `configs/` | Run configs, provider config fixtures, and the config schema |
-| `results/` | Checked-in baseline result snapshots |
-| `tests/` | Harness and fixture-loader test files |
+## What You Need
 
-The corpus lives under `fixtures/corpus/tasks/<domain>/<task-id>/`.
-Each task directory includes `task.yaml`, a `workspace/` seed, and a deterministic verifier.
-Workflow-compliance tasks live alongside the other corpus domains; their workflow specs live under `fixtures/corpus/workflows/`.
+- `bun`
+- `opencode`
+- an opencode config that can access the model you want to benchmark
 
-## Run
+## Quick Start
+
+1. Install dependencies.
 
 ```sh
 bun install
-bun test ./tests
-bun run src/cli.ts configs/nano-quick.json
 ```
 
-## Scope
+2. Create a repo-local opencode config.
 
-- Keep repo-level orientation here.
-- Keep harness/operator details in `docs/operator-guide.md`.
-- Treat `fixtures/` as benchmark inputs, not operator docs.
+```sh
+cp ~/.config/opencode.json ./config/opencode.local.json
+```
+
+This repo does not automatically read a global opencode config. That is
+intentional so benchmark runs do not accidentally consume tokens from a paid or
+metered setup.
+
+3. Run the smallest benchmark.
+
+```sh
+bun run src/cli.ts config/nano-quick.json
+```
+
+Start with `config/nano-quick.json`. It is the fastest way to verify that your
+setup works.
+
+## Common Commands
+
+Run the quick benchmark:
+
+```sh
+bun run src/cli.ts config/nano-quick.json
+```
+
+Run the larger benchmark:
+
+```sh
+bun run src/cli.ts config/full.json
+```
+
+Override seeds or parallelism:
+
+```sh
+bun run src/cli.ts config/nano-quick.json --seeds 3 --parallel 2
+```
+
+Use a custom opencode config for one run:
+
+```sh
+bun run src/cli.ts config/nano-quick.json --opencode-config /path/to/opencode.json
+```
+
+Compare two saved reports:
+
+```sh
+bun run src/cli.ts compare --base results/baseline.json --current results/current.json
+```
+
+Compute per-asset attribution:
+
+```sh
+bun run src/cli.ts attribute --base results/current.json --top 5
+```
+
+## Local Models
+
+If you want to benchmark against a local model, use `config/opencode.local.json`.
+
+The full setup guide for LM Studio and Ollama lives in `docs/operator-guide.md`.
+
+LM Studio example:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "lmstudio/qwen/qwen3.5-9b",
+  "provider": {
+    "lmstudio": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LM Studio",
+      "options": {
+        "baseURL": "http://127.0.0.1:1234/v1",
+        "timeout": 600000
+      },
+      "models": {
+        "qwen/qwen3.5-9b": {
+          "name": "Qwen3.5 9B",
+          "limit": {
+            "context": 32768,
+            "output": 8192
+          },
+          "capabilities": {
+            "tool": true
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Ollama example:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "ollama/qwen3.5:9b",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama",
+      "options": {
+        "baseURL": "http://127.0.0.1:11434/v1",
+        "timeout": 600000
+      },
+      "models": {
+        "qwen3.5:9b": {
+          "name": "Qwen3.5 9B",
+          "limit": {
+            "context": 32768,
+            "output": 8192
+          },
+          "capabilities": {
+            "tool": true
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+The top-level `model` must match `<provider-key>/<model-key>`, for example
+`lmstudio/qwen/qwen3.5-9b` or `ollama/qwen3.5:9b`.
+
+## Results
+
+Successful runs write a timestamped JSON report into `results/`.
+
+Typical filename:
+
+```text
+results/bench-report-utility-main-<commit>-<timestamp>-<model>.json
+```
+
+## More Detail
+
+See `docs/operator-guide.md` for:
+
+- config discovery order
+- local provider setup notes
+- repo layout
+- tmp directory behavior
+- test scope and verification commands

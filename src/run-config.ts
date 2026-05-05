@@ -1,11 +1,11 @@
 /**
  * akm-bench run-config loader.
  *
- * A bench run config (`configs/*.json`) is a single-file description of a
+ * A bench run config (`config/*.json`) is a single-file description of a
  * utility/evolve invocation: opencode config, model, tasks, arms, seeds,
  * budgets, parallel, baseline. Loading a config resolves the opencode config
  * (from explicit `opencodeConfig` / `opencodeConfigRef` fields, the
- * `BENCH_OPENCODE_CONFIG` env var, or the repo-local `configs/opencode*.json`
+ * `BENCH_OPENCODE_CONFIG` env var, or the repo-local `config/opencode*.json`
  * defaults),
  * looks up the effective model, and resolves the task selector + baseline
  * file paths.
@@ -108,8 +108,8 @@ export function resolvePathString(value: string, baseDir: string): string {
  *   1. `BENCH_OPENCODE_CONFIG` env var (absolute path).
  *   2. `opencodeConfig` inline in the config.
  *   3. `opencodeConfigRef` in the config (with tilde / env-var expansion).
- *   4. `configs/opencode.local.json`.
- *   5. `configs/opencode.json`.
+ *   4. `config/opencode.local.json`.
+ *   5. `config/opencode.json`.
  *   6. Throw — the caller is expected to map this to exit code 2.
  */
 export function resolveOpencodeConfig(config: BenchRunConfigFile, configDir: string): LoadedOpencodeConfig {
@@ -140,18 +140,18 @@ export function resolveOpencodeConfig(config: BenchRunConfigFile, configDir: str
   //    `discoverOpencodeConfig` checks. The gitignored `.local.json`
   //    overlay wins over the committed fixture so an operator's local
   //    overrides survive a `git pull` without needing a config edit.
-  const repoLocalPath = path.resolve(__dirname, "..", "configs", "opencode.local.json");
+  const repoLocalPath = path.resolve(__dirname, "..", "config", "opencode.local.json");
   if (fs.existsSync(repoLocalPath)) {
     return loadOpencodeConfig(repoLocalPath);
   }
-  const repoFixturePath = path.resolve(__dirname, "..", "configs", "opencode.json");
+  const repoFixturePath = path.resolve(__dirname, "..", "config", "opencode.json");
   if (fs.existsSync(repoFixturePath)) {
     return loadOpencodeConfig(repoFixturePath);
   }
 
   // 5. No config found.
   throw new BenchConfigError(
-    "bench run config: no opencode config found. Set `opencodeConfig` or `opencodeConfigRef` in the config, set BENCH_OPENCODE_CONFIG explicitly, or create configs/opencode.json.",
+    "bench run config: no opencode config found. Set `opencodeConfig` or `opencodeConfigRef` in the config, set BENCH_OPENCODE_CONFIG explicitly, or create config/opencode.json.",
     true,
   );
 }

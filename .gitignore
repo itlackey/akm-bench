@@ -2,6 +2,7 @@ node_modules
 dist/
 .DS_Store
 bench-results/
-configs/opencode.local.json
+config/opencode.local.json
 src/*.json
 **/__pycache__/
+results/bench-report-*.json

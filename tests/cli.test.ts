@@ -86,10 +86,10 @@ describe("bench CLI smoke", () => {
   );
 
   maybeTest(
-    "config-file dispatch loads configs/nano-quick.json end-to-end",
+    "config-file dispatch loads config/nano-quick.json end-to-end",
     () => {
       const r = run(
-        ["configs/nano-quick.json", "--tasks", "drillbit/backup-policy", "--seeds", "1", "--parallel", "1", "--json"],
+        ["config/nano-quick.json", "--tasks", "drillbit/backup-policy", "--seeds", "1", "--parallel", "1", "--json"],
         {
           BENCH_OPENCODE_MODEL: "anthropic/claude-opus-4-7",
         },

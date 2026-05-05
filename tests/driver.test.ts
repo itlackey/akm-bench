@@ -181,16 +181,32 @@ describe("runOne", () => {
     expect(result.tokens.output).toBe(5);
   });
 
-  test("tokenMeasurement: parsed when stdout reports camelCase usage fields", async () => {
+  test("tokenMeasurement: parsed when stdout is opencode JSON events", async () => {
     const { spawn } = scriptedSpawn({
       exitCode: 0,
-      stdout: '{"type":"result","usage":{"inputTokens":321,"outputTokens":123}}',
+      stdout:
+        '{"type":"step_start","part":{"type":"step-start"}}\n' +
+        '{"type":"text","part":{"type":"text","text":"ok"}}\n' +
+        '{"type":"step_finish","part":{"type":"step-finish","tokens":{"input":321,"output":123}}}',
     });
     const result = await runOne({ ...baseOptions, workspace, spawn });
     expect(result.outcome).toBe("pass");
     expect(result.tokenMeasurement).toBe("parsed");
     expect(result.tokens.input).toBe(321);
     expect(result.tokens.output).toBe(123);
+  });
+
+  test("regex verifier sees reconstructed text from JSON event output", async () => {
+    const { spawn } = scriptedSpawn({
+      exitCode: 0,
+      stdout:
+        '{"type":"step_start","part":{"type":"step-start"}}\n' +
+        '{"type":"text","part":{"type":"text","text":"ok"}}\n' +
+        '{"type":"step_finish","part":{"type":"step-finish","tokens":{"input":20,"output":1}}}',
+    });
+    const result = await runOne({ ...baseOptions, workspace, spawn, expectedMatch: "ok" });
+    expect(result.outcome).toBe("pass");
+    expect(result.tokenMeasurement).toBe("parsed");
   });
 
   test("tokenMeasurement: missing when stdout has no token line — and budget is NOT enforced", async () => {
@@ -579,21 +595,33 @@ describe("driver helpers", () => {
 
   test("parseTokenUsage extracts numbers when present, missing otherwise", () => {
     // No matchable token line at all → measurement is "missing", not a real zero (issue #252).
-    expect(parseTokenUsage("")).toEqual({ input: 0, output: 0, measurement: "missing" });
-    expect(parseTokenUsage("noise")).toEqual({ input: 0, output: 0, measurement: "missing" });
+    expect(parseTokenUsage("")).toEqual({ input: 0, output: 0, text: "", measurement: "missing" });
+    expect(parseTokenUsage("noise")).toEqual({ input: 0, output: 0, text: "noise", measurement: "missing" });
     // Both keys present → "parsed" with the actual numbers.
     expect(parseTokenUsage("input_tokens: 123 output_tokens: 456")).toEqual({
       input: 123,
       output: 456,
+      text: "input_tokens: 123 output_tokens: 456",
       measurement: "parsed",
     });
     // Only one key present → still "parsed", missing key defaults to 0.
-    expect(parseTokenUsage("input_tokens: 99")).toEqual({ input: 99, output: 0, measurement: "parsed" });
-    expect(parseTokenUsage("output_tokens: 55")).toEqual({ input: 0, output: 55, measurement: "parsed" });
+    expect(parseTokenUsage("input_tokens: 99")).toEqual({
+      input: 99,
+      output: 0,
+      text: "input_tokens: 99",
+      measurement: "parsed",
+    });
+    expect(parseTokenUsage("output_tokens: 55")).toEqual({
+      input: 0,
+      output: 55,
+      text: "output_tokens: 55",
+      measurement: "parsed",
+    });
     // Newer opencode versions surface usage with camelCase keys in JSON-ish output.
     expect(parseTokenUsage('{"usage":{"inputTokens":321,"outputTokens":123}}')).toEqual({
       input: 321,
       output: 123,
+      text: '{"usage":{"inputTokens":321,"outputTokens":123}}',
       measurement: "parsed",
     });
   });

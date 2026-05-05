@@ -108,7 +108,7 @@ export interface TrajectoryRecord {
  * token reporting (issue #252). Aggregations MUST skip runs where this is
  * not `"parsed"` rather than treating numeric zero as a measured value.
  *
- *   - `"parsed"`     — token usage was extracted from agent stdout.
+ *   - `"parsed"`     — token usage was extracted from the opencode run output.
  *   - `"missing"`    — agent emits token usage in some configurations but
  *                      we could not parse it on this run.
  *   - `"unsupported"`— the agent profile / harness does not report tokens
@@ -285,11 +285,9 @@ export function stripAkmStashDir(env: Record<string, string | undefined>): Recor
 }
 
 /**
- * Best-effort token-usage parser for opencode stdout. Returns numeric token
- * counts AND a measurement status so callers can distinguish a real zero
- * (`"parsed"`, both fields legitimately 0) from an unparseable / absent
- * report (`"missing"`, both fields default to 0 but downstream aggregation
- * MUST skip the run rather than treat that 0 as measured).
+ * Parse token usage and reconstructed text from `opencode run --format json`
+ * output. Returns numeric token counts, a measurement status, and the joined
+ * text blocks so callers can keep using agentStdout for regex verifiers.
  *
  * The harness never emits `"unsupported"` from this parser — that label is
  * stamped on results from arms that don't run a token-reporting agent
@@ -298,21 +296,58 @@ export function stripAkmStashDir(env: Record<string, string | undefined>): Recor
 export function parseTokenUsage(stdout: string): {
   input: number;
   output: number;
+  text: string;
   measurement: TokenMeasurementStatus;
 } {
-  // opencode has emitted token usage in multiple shapes over time: older
-  // plain-text summaries like `input_tokens: 123 output_tokens: 456`, and
-  // newer structured / JSON-ish forms that use camelCase keys like
-  // `inputTokens` / `outputTokens`. Accept both so report coverage remains
-  // stable across opencode upgrades.
+  let parsedInput = 0;
+  let parsedOutput = 0;
+  let sawTokenEvent = false;
+  const textParts: string[] = [];
+
+  for (const line of stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) continue;
+    try {
+      const event = JSON.parse(trimmed) as {
+        type?: string;
+        part?: {
+          type?: string;
+          text?: string;
+          tokens?: { input?: number; output?: number };
+        };
+      };
+      if (event.type === "text" && event.part?.type === "text" && typeof event.part.text === "string") {
+        textParts.push(event.part.text);
+      }
+      const tokens = event.part?.tokens;
+      if (typeof tokens?.input === "number" || typeof tokens?.output === "number") {
+        parsedInput = typeof tokens.input === "number" ? tokens.input : 0;
+        parsedOutput = typeof tokens.output === "number" ? tokens.output : 0;
+        sawTokenEvent = true;
+      }
+    } catch {
+      // Fall back to the legacy text parser below when stdout is not JSONL.
+    }
+  }
+
+  if (sawTokenEvent) {
+    return {
+      input: parsedInput,
+      output: parsedOutput,
+      text: textParts.join(""),
+      measurement: "parsed",
+    };
+  }
+
   const inputMatch = stdout.match(/(?:input(?:[_\s-]?tokens?)?|tokens?[_\s-]?input|inputTokens)["'\s:=]+(\d+)/i);
   const outputMatch = stdout.match(/(?:output(?:[_\s-]?tokens?)?|tokens?[_\s-]?output|outputTokens)["'\s:=]+(\d+)/i);
   if (!inputMatch && !outputMatch) {
-    return { input: 0, output: 0, measurement: "missing" };
+    return { input: 0, output: 0, text: stdout, measurement: "missing" };
   }
   return {
     input: inputMatch ? Number.parseInt(inputMatch[1], 10) : 0,
     output: outputMatch ? Number.parseInt(outputMatch[1], 10) : 0,
+    text: stdout,
     measurement: "parsed",
   };
 }
@@ -497,6 +532,7 @@ export async function runOne(options: RunOptions): Promise<RunResult> {
   try {
     result.startedAt = new Date().toISOString();
     const agentResult = await runAgent(profile, options.prompt ?? defaultPrompt(options), {
+      args: ["--format", "json"],
       env,
       // #271: scrub operator credentials + config-dir hints from the env
       // source BEFORE profile.envPassthrough copies them into the child.
@@ -548,7 +584,7 @@ export async function runOne(options: RunOptions): Promise<RunResult> {
     }
 
     const verifierResult = await runVerifier(options.taskDir, options.workspace, options.verifier, {
-      agentStdout: agentResult.stdout,
+      agentStdout: parsed.text,
       expectedMatch: options.expectedMatch,
       ...(options.spawn ? { spawn: options.spawn } : {}),
     });

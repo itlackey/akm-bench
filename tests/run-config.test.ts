@@ -172,7 +172,7 @@ describe("loadBenchRunConfig", () => {
   test("discoverOpencodeConfig auto-discovers the committed fixture", () => {
     const loaded = discoverOpencodeConfig();
     expect(loaded).toBeDefined();
-    expect(loaded?.source.startsWith(path.join(REPO_ROOT, "configs") + path.sep)).toBe(true);
+    expect(loaded?.source.startsWith(path.join(REPO_ROOT, "config") + path.sep)).toBe(true);
   });
 
   test("tasks array selects exactly the listed ids", () => {
@@ -211,9 +211,9 @@ describe("loadBenchRunConfig", () => {
   });
 
   test("committed configs load cleanly", () => {
-    const nano = loadBenchRunConfig(path.join(REPO_ROOT, "configs", "nano-quick.json"));
-    const full = loadBenchRunConfig(path.join(REPO_ROOT, "configs", "full.json"));
-    const curate = loadBenchRunConfig(path.join(REPO_ROOT, "configs", "curate-test.json"));
+    const nano = loadBenchRunConfig(path.join(REPO_ROOT, "config", "nano-quick.json"));
+    const full = loadBenchRunConfig(path.join(REPO_ROOT, "config", "full.json"));
+    const curate = loadBenchRunConfig(path.join(REPO_ROOT, "config", "curate-test.json"));
     expect(nano.name).toBe("nano-quick");
     expect(full.name).toBe("full");
     expect(curate.tasks.map((t) => t.id)).toEqual(["inkwell/configure-scaling"]);

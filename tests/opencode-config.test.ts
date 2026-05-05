@@ -14,7 +14,7 @@ import {
 } from "../src/opencode-config";
 import { benchMkdtemp } from "../src/tmp";
 
-const FIXTURE_PATH = path.resolve(__dirname, "..", "configs", "opencode.json");
+const FIXTURE_PATH = path.resolve(__dirname, "..", "config", "opencode.json");
 
 function writeTmp(dir: string, name: string, content: unknown): string {
   const p = path.join(dir, name);
