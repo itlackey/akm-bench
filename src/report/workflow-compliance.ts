@@ -155,10 +155,6 @@ export function buildWorkflowAggregate(checks: readonly WorkflowCheckResult[]): 
   // outcome that run produced — otherwise a run with one passing and one
   // failing spec gets double-counted across cross-tab rows. Reduce per-run.
   const runWorstOutcome = new Map<string, { taskOutcome: string; workflowOutcome: "pass" | "partial" | "fail" }>();
-  // Track which run keys have at least one applicable check; non-applicable
-  // runs do not contribute to the cross-tab.
-  const runHasApplicable = new Set<string>();
-
   for (const c of checks) {
     const bucket = bucketWorkflowStatus(c.status);
     const runKey = `${c.taskId}::${c.arm}::${c.seed}`;
@@ -187,8 +183,6 @@ export function buildWorkflowAggregate(checks: readonly WorkflowCheckResult[]): 
     applicable += 1;
     scoreSum += c.score;
     violationCount += c.violations.length;
-    runHasApplicable.add(runKey);
-
     if (bucket === "pass") strict += 1;
     else if (bucket === "partial") partial += 1;
     else fail += 1;
@@ -406,8 +400,8 @@ export function renderWorkflowComplianceSection(input: UtilityRunReport): string
   lines.push("");
   lines.push("### By workflow");
   lines.push("");
-  lines.push("| workflow_id | applicable | score | pass | partial | fail | violations |");
-  lines.push("|-------------|-----------:|------:|-----:|--------:|-----:|-----------:|");
+  lines.push("| workflow_id | checks | score | pass | partial | fail | violations |");
+  lines.push("|-------------|-------:|------:|-----:|--------:|-----:|-----------:|");
   const sortedSpecs = Object.values(agg.by_workflow).sort((a, b) => a.workflow_id.localeCompare(b.workflow_id));
   for (const spec of sortedSpecs) {
     lines.push(

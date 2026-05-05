@@ -153,6 +153,12 @@ export const AKM_TOOL_CALL_TYPES: ReadonlySet<WorkflowTraceEventType> = new Set<
   "akm_feedback",
 ]);
 
+const RAW_RUN_KEY_DELIMITER = "\u0000";
+
+function rawRunKey(taskId: string, arm: string, seed: number): string {
+  return `${taskId}${RAW_RUN_KEY_DELIMITER}${arm}${RAW_RUN_KEY_DELIMITER}${seed}`;
+}
+
 /**
  * Compute per-run AKM overhead records by replaying #254's normalised trace.
  *
@@ -330,7 +336,7 @@ export function aggregateAkmOverhead(
   // without forcing the caller to project tokens onto AkmOverheadPerRun.
   const rawByKey = new Map<string, RunResult>();
   for (const r of rawRuns) {
-    rawByKey.set(`${r.taskId} ${r.arm} ${r.seed}`, r);
+    rawByKey.set(rawRunKey(r.taskId, r.arm, r.seed), r);
   }
 
   let passingRuns = 0;
@@ -380,9 +386,9 @@ export function aggregateAkmOverhead(
 
     if (row.outcome === "pass") {
       passingRuns += 1;
-      const raw = rawByKey.get(`${row.taskId} ${row.arm} ${row.seed}`);
+      const raw = rawByKey.get(rawRunKey(row.taskId, row.arm, row.seed));
       // Treat absent tokenMeasurement as `parsed` for backward compat with
-      // older artefacts (mirrors `isMeasured` behaviour above).
+      // older artefacts, matching the canonical outcome/per-task aggregators.
       const measurement = raw?.tokenMeasurement ?? "parsed";
       if (raw && measurement === "parsed") {
         parsedPassTokenSum += raw.tokens.input + raw.tokens.output;
