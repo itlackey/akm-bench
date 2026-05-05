@@ -6,6 +6,13 @@ same task set with AKM enabled.
 This README is the fast path for running benchmarks. For the full reference,
 see `docs/operator-guide.md`.
 
+Part of the broader akm ecosystem:
+
+- [itlackey/akm](https://github.com/itlackey/akm) -- the core Agent Kit Manager CLI
+- [itlackey/akm-stash](https://github.com/itlackey/akm-stash) -- the official onboarding stash with ready-made skills, workflows, commands, and knowledge assets
+- [itlackey/akm-registry](https://github.com/itlackey/akm-registry) -- the official searchable registry index used for discovery
+- [itlackey/akm-plugins](https://github.com/itlackey/akm-plugins) -- optional editor and agent integrations, including OpenCode support
+
 ## What You Need
 
 - `bun`
@@ -38,6 +45,43 @@ bun run src/cli.ts config/nano-quick.json
 
 Start with `config/nano-quick.json`. It is the fastest way to verify that your
 setup works.
+
+## Docker Quick Start
+
+Run the benchmark in Docker and write reports to a host directory:
+
+```sh
+bash bin/akm-bench run config/nano-quick.json \
+  --results-dir ./bench-results \
+  --opencode-config ./config/opencode.local.json
+```
+
+Run against a specific published AKM version:
+
+```sh
+bash bin/akm-bench run config/nano-quick.json \
+  --results-dir ./bench-results/akm-0.7.1 \
+  --opencode-config ./config/opencode.local.json \
+  --akm-mode version \
+  --akm-version 0.7.1
+```
+
+Run against a local AKM checkout while contributing:
+
+```sh
+bash bin/akm-bench run config/nano-quick.json \
+  --results-dir ./bench-results/local-source \
+  --opencode-config ./config/opencode.local.json \
+  --akm-mode source \
+  --akm-source ../akm
+```
+
+Notes:
+
+- The wrapper defaults to `--network host`.
+- The image includes `opencode`, OpenAI support, and Antigravity auth support.
+- Use `--env OPENAI_API_KEY` or `--env-file <path>` when your provider config references host secrets.
+- Use `--opencode-home ~/.config/opencode` if you need to import Antigravity auth files into the container.
 
 ## Common Commands
 
@@ -159,43 +203,6 @@ The top-level `model` must match `<provider-key>/<model-key>`, for example
 Successful runs write a timestamped JSON report into `results/` by default.
 
 Override the output directory with `--results-dir <path>` or `BENCH_RESULTS_DIR`.
-
-## Docker
-
-Run the benchmark in Docker and write reports to a host directory:
-
-```sh
-bash bin/akm-bench run config/nano-quick.json \
-  --results-dir ./bench-results \
-  --opencode-config ./config/opencode.local.json
-```
-
-Run against a specific published AKM version:
-
-```sh
-bash bin/akm-bench run config/nano-quick.json \
-  --results-dir ./bench-results/akm-0.7.1 \
-  --opencode-config ./config/opencode.local.json \
-  --akm-mode version \
-  --akm-version 0.7.1
-```
-
-Run against a local AKM checkout while contributing:
-
-```sh
-bash bin/akm-bench run config/nano-quick.json \
-  --results-dir ./bench-results/local-source \
-  --opencode-config ./config/opencode.local.json \
-  --akm-mode source \
-  --akm-source ../akm
-```
-
-Notes:
-
-- The wrapper defaults to `--network host`.
-- The image includes `opencode`, OpenAI support, and Antigravity auth support.
-- Use `--env OPENAI_API_KEY` or `--env-file <path>` when your provider config references host secrets.
-- Use `--opencode-home ~/.config/opencode` if you need to import Antigravity auth files into the container.
 
 ## Custom Benchmarks
 
