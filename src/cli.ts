@@ -54,10 +54,22 @@ function writeReportArtifact(report: UtilityRunReport): string {
   return writeBenchReportJson(json);
 }
 
+function withBenchResultsDir<T>(resultsDir: string | undefined, fn: () => T): T {
+  if (!resultsDir) return fn();
+  const prior = process.env.BENCH_RESULTS_DIR;
+  process.env.BENCH_RESULTS_DIR = resultsDir;
+  try {
+    return fn();
+  } finally {
+    if (prior === undefined) delete process.env.BENCH_RESULTS_DIR;
+    else process.env.BENCH_RESULTS_DIR = prior;
+  }
+}
+
 const HELP = `akm-bench — agent-plus-akm evaluation framework
 
 Usage:
-  bun run src/cli.ts <config.json> [--json] [--seeds N] [--parallel N] [--tasks <list>]
+  bun run src/cli.ts <config.json> [--json] [--seeds N] [--parallel N] [--tasks <list>] [--results-dir <path>]
   bun run src/cli.ts <subcommand> [...flags]
 
 Config-file mode (recommended):
@@ -96,6 +108,8 @@ utility flags:
   --json                   suppress the markdown summary on stderr (machine-readable only).
                            Without --json, JSON still goes to stdout and the markdown
                            summary is also written to stderr for human-friendly reads.
+  --results-dir <path>     directory where persistent JSON reports are written.
+                           Overrides BENCH_RESULTS_DIR for this invocation.
   -h, --help               show this message.
 
 evolve flags:
@@ -109,6 +123,7 @@ evolve flags:
   --negative-threshold-ratio <R>  ratio of negatives to total feedback (default: 0.5)
   --opencode-config <path> path to a standard opencode JSON config file (same as utility).
   --json                   suppress the markdown summary on stderr.
+  --results-dir <path>     directory where persistent JSON reports are written.
 
 compare flags:
   --base <path>                 path to baseline UtilityRunReport JSON file. REQUIRED.
@@ -137,9 +152,11 @@ kill flags:
 
 Environment:
   BENCH_OPENCODE_MODEL      model id stamped into every RunResult. REQUIRED for utility/evolve
-                            unless the loaded opencode config supplies a model.
+                             unless the loaded opencode config supplies a model.
   BENCH_OPENCODE_CONFIG     path to the bench opencode JSON config file. Overrides the
-                            default fixture; overridden by --opencode-config flag.
+                             default fixture; overridden by --opencode-config flag.
+  BENCH_RESULTS_DIR         directory where persistent JSON reports are written. Overridden by
+                            --results-dir when the flag is present.
 
 Auto-discovery order for --opencode-config (first existing file wins):
   1. --opencode-config <path>  flag value
@@ -280,6 +297,7 @@ export interface UtilityCliOptions {
   timestamp?: string;
   /** Pre-loaded opencode provider config. Forwarded into `runUtility`. */
   opencodeProviders?: LoadedOpencodeConfig;
+  resultsDir?: string;
 }
 
 export interface UtilityCliResult {
@@ -328,7 +346,7 @@ export async function runUtilityCli(options: UtilityCliOptions): Promise<Utility
   const { json, markdown } = renderUtilityReport(report);
   const jsonText = `${JSON.stringify(json, null, 2)}\n`;
   const markdownText = `${markdown}\n`;
-  const reportPath = writeReportArtifact(report);
+  const reportPath = withBenchResultsDir(options.resultsDir, () => writeReportArtifact(report));
 
   // JSON ALWAYS goes to stdout. This is the bench's machine-readable
   // contract (matches `tests/benchmark-suite.ts` and the future `bench
@@ -864,6 +882,7 @@ export interface ConfigCliOptions {
   timestamp?: string;
   branch?: string;
   commit?: string;
+  resultsDir?: string;
 }
 
 /**
@@ -915,7 +934,7 @@ export async function runConfigCli(options: ConfigCliOptions): Promise<UtilityCl
   const { json, markdown } = renderUtilityReport(report);
   const stdout = `${JSON.stringify(json, null, 2)}\n`;
   let stderr = options.json ? "" : `${markdown}\n`;
-  const reportPath = writeReportArtifact(report);
+  const reportPath = withBenchResultsDir(options.resultsDir, () => writeReportArtifact(report));
   stderr += `bench: wrote report ${reportPath}\n`;
   stderr += `bench: config=${resolved.name} tasks=${resolved.tasks.length} arms=${resolved.arms.join(",")} model=${resolved.model}\n`;
   return { exitCode: 0, stdout, stderr };
@@ -939,6 +958,7 @@ export interface EvolveCliOptions {
   timestamp?: string;
   /** Pre-loaded opencode provider config. Forwarded into `runEvolve`. */
   opencodeProviders?: LoadedOpencodeConfig;
+  resultsDir?: string;
 }
 
 /**
@@ -975,7 +995,7 @@ export async function runEvolveCli(options: EvolveCliOptions): Promise<UtilityCl
   const { json, markdown } = renderEvolveReport(report);
   const stdout = `${JSON.stringify(json, null, 2)}\n`;
   let stderr = options.json ? "" : `${markdown}\n`;
-  stderr += `bench: wrote report ${writeBenchReportJson(json)}\n`;
+  stderr += `bench: wrote report ${withBenchResultsDir(options.resultsDir, () => writeBenchReportJson(json))}\n`;
   stderr += `tasks discovered: ${tasks.length} (domain=${options.domain})\n`;
   return { exitCode: 0, stdout, stderr };
 }
@@ -1011,6 +1031,7 @@ async function main(argv: string[]): Promise<number> {
         ...(tasksList ? { tasksList } : {}),
         ...(seedsRaw !== undefined ? { seedsPerArm: parseInt32(seedsRaw, 5) } : {}),
         ...(parallelRaw !== undefined ? { parallel: parseInt32(parallelRaw, 1) } : {}),
+        ...(parsed.flags.get("results-dir") !== undefined ? { resultsDir: parsed.flags.get("results-dir") } : {}),
       });
     } finally {
       removePid();
@@ -1069,6 +1090,7 @@ async function main(argv: string[]): Promise<number> {
           ...(parsed.bool.has("include-synthetic") ? { includeSynthetic: true } : {}),
           ...(parsed.bool.has("no-noakm") ? { includeNoakm: false } : {}),
           ...(opencodeProviders ? { opencodeProviders } : {}),
+          ...(parsed.flags.get("results-dir") !== undefined ? { resultsDir: parsed.flags.get("results-dir") } : {}),
         });
       } finally {
         removePid();
@@ -1118,6 +1140,7 @@ async function main(argv: string[]): Promise<number> {
             ratio: parseFloatArg(parsed.flags.get("negative-threshold-ratio"), 0.5),
           },
           ...(opencodeProvidersEvolve ? { opencodeProviders: opencodeProvidersEvolve } : {}),
+          ...(parsed.flags.get("results-dir") !== undefined ? { resultsDir: parsed.flags.get("results-dir") } : {}),
         });
       } finally {
         removePidEvolve();

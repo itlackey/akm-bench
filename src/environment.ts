@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveAkmCommand } from "./akm-command";
 import { buildIsolatedEnv, buildSanitizedEnvSource, createIsolationDirs, type IsolationDirs } from "./driver";
-import { BenchConfigError, type LoadedOpencodeConfig, selectProviderForModel } from "./opencode-config";
+import { BenchConfigError, collectEnvRefs, type LoadedOpencodeConfig, selectProviderForModel } from "./opencode-config";
 import { benchMkdtemp } from "./tmp";
 
 // ── Bench isolation invariants ───────────────────────────────────────────────
@@ -207,6 +207,18 @@ export function setupBenchEnvironment(params: BenchEnvParams): BenchEnvironment 
   // Write opencode.json with invariants + optional provider block.
   const result = writeOpencodeJson(dirs.opencodeConfig, model, providers);
   for (const w of result.warnings) warnings.push(w);
+
+  if (providers) {
+    try {
+      const selected = selectProviderForModel(providers, model);
+      for (const envName of collectEnvRefs(selected.entry)) {
+        const value = process.env[envName];
+        if (value !== undefined) env[envName] = value;
+      }
+    } catch (err) {
+      if (!(err instanceof BenchConfigError)) throw err;
+    }
+  }
 
   // Wire akm config and index only when a real stash is on disk.
   const stashOnDisk = stashDir ? fs.existsSync(stashDir) : false;

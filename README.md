@@ -59,6 +59,12 @@ Override seeds or parallelism:
 bun run src/cli.ts config/nano-quick.json --seeds 3 --parallel 2
 ```
 
+Write reports into a custom directory:
+
+```sh
+bun run src/cli.ts config/nano-quick.json --results-dir ./results/docker
+```
+
 Use a custom opencode config for one run:
 
 ```sh
@@ -150,7 +156,46 @@ The top-level `model` must match `<provider-key>/<model-key>`, for example
 
 ## Results
 
-Successful runs write a timestamped JSON report into `results/`.
+Successful runs write a timestamped JSON report into `results/` by default.
+
+Override the output directory with `--results-dir <path>` or `BENCH_RESULTS_DIR`.
+
+## Docker
+
+Run the benchmark in Docker and write reports to a host directory:
+
+```sh
+bash bin/akm-bench run config/nano-quick.json \
+  --results-dir ./bench-results \
+  --opencode-config ./config/opencode.local.json
+```
+
+Run against a specific published AKM version:
+
+```sh
+bash bin/akm-bench run config/nano-quick.json \
+  --results-dir ./bench-results/akm-0.7.1 \
+  --opencode-config ./config/opencode.local.json \
+  --akm-mode version \
+  --akm-version 0.7.1
+```
+
+Run against a local AKM checkout while contributing:
+
+```sh
+bash bin/akm-bench run config/nano-quick.json \
+  --results-dir ./bench-results/local-source \
+  --opencode-config ./config/opencode.local.json \
+  --akm-mode source \
+  --akm-source ../akm
+```
+
+Notes:
+
+- The wrapper defaults to `--network host`.
+- The image includes `opencode`, OpenAI support, and Antigravity auth support.
+- Use `--env OPENAI_API_KEY` or `--env-file <path>` when your provider config references host secrets.
+- Use `--opencode-home ~/.config/opencode` if you need to import Antigravity auth files into the container.
 
 Typical filename:
 

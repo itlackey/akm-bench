@@ -24,6 +24,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { resolveAkmRuntime } from "./akm-command";
 import { setupBenchEnvironment } from "./environment";
 import type { LoadedOpencodeConfig } from "./opencode-config";
 import { BUILTIN_AGENT_PROFILE_NAMES, getBuiltinAgentProfile, runAgent, type SpawnFn } from "./support/agent";
@@ -260,12 +261,18 @@ export function createIsolationDirs(stashDir?: string): IsolationDirs {
 
 /** Build the env passed to `runAgent`. The XDG/AKM/OPENCODE keys are pinned. */
 export function buildIsolatedEnv(dirs: IsolationDirs, model: string): Record<string, string> {
+  const akmRuntime = resolveAkmRuntime();
   const env: Record<string, string> = {
     XDG_CACHE_HOME: dirs.cacheHome,
     XDG_CONFIG_HOME: dirs.configHome,
     OPENCODE_CONFIG: path.join(dirs.opencodeConfig, "opencode.json"),
     BENCH_OPENCODE_MODEL: model,
+    AKM_BENCH_AKM_BIN: akmRuntime.binPath,
   };
+  if (akmRuntime.binDir) {
+    const existingPath = process.env.PATH?.trim();
+    env.PATH = existingPath ? `${akmRuntime.binDir}${path.delimiter}${existingPath}` : akmRuntime.binDir;
+  }
   if (dirs.akmStashDir) env.AKM_STASH_DIR = dirs.akmStashDir;
   return env;
 }

@@ -1,0 +1,275 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/akm-bench run <run-config> --results-dir <dir> [options] [-- <bench args>]
+
+Options:
+  --results-dir <dir>       Host directory for persistent reports. Required.
+  --opencode-config <file>  Host opencode config file to mount and use.
+  --opencode-home <dir>     Host ~/.config/opencode directory to import auth state from.
+  --akm-mode <mode>         installed | version | source. Default: installed.
+  --akm-version <ver>       AKM version to bake into the image when mode=version.
+  --akm-source <dir>        Local AKM source checkout when mode=source.
+  --cache-dir <dir>         Host cache directory. Default: ./.akm-bench-cache
+  --network <mode>          Docker network mode. Default: host.
+  --env-file <file>         Docker env-file to forward into the container.
+  --env <NAME>              Forward one host environment variable by name. Repeatable.
+  --image <name>            Override the Docker image tag to use.
+  --no-build                Fail instead of auto-building the image when missing.
+  -h, --help                Show this help.
+EOF
+}
+
+die() {
+  printf '%s\n' "$*" >&2
+  exit 2
+}
+
+abs_path() {
+  local value="$1"
+  if [[ "${value}" == /* ]]; then
+    printf '%s\n' "${value}"
+  else
+    printf '%s/%s\n' "$(pwd -P)" "${value#./}"
+  fi
+}
+
+sanitize_tag() {
+  printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '-'
+}
+
+ensure_image() {
+  local image="$1"
+  local akm_version="$2"
+  local no_build="$3"
+
+  if docker image inspect "${image}" >/dev/null 2>&1; then
+    return
+  fi
+  if [[ "${no_build}" == "1" ]]; then
+    die "docker image not found: ${image}"
+  fi
+
+  local build_args=(docker build -t "${image}")
+  if [[ -n "${akm_version}" ]]; then
+    build_args+=(--build-arg "AKM_CLI_VERSION=${akm_version}")
+  fi
+  if [[ -n "${BENCH_DOCKER_OPENCODE_AI_VERSION:-}" ]]; then
+    build_args+=(--build-arg "OPENCODE_AI_VERSION=${BENCH_DOCKER_OPENCODE_AI_VERSION}")
+  fi
+  build_args+=(.)
+  "${build_args[@]}"
+}
+
+subcommand="${1:-}"
+if [[ -z "${subcommand}" || "${subcommand}" == "-h" || "${subcommand}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+if [[ "${subcommand}" != "run" ]]; then
+  die "expected subcommand 'run'"
+fi
+shift
+
+run_config=""
+results_dir=""
+opencode_config=""
+opencode_home=""
+akm_mode="installed"
+akm_version=""
+akm_source=""
+cache_dir="$(pwd -P)/.akm-bench-cache"
+network_mode="host"
+env_file=""
+image_override=""
+no_build="0"
+declare -a env_names=()
+declare -a bench_args=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --results-dir)
+      results_dir="${2:-}"
+      shift 2
+      ;;
+    --opencode-config)
+      opencode_config="${2:-}"
+      shift 2
+      ;;
+    --opencode-home)
+      opencode_home="${2:-}"
+      shift 2
+      ;;
+    --akm-mode)
+      akm_mode="${2:-}"
+      shift 2
+      ;;
+    --akm-version)
+      akm_version="${2:-}"
+      shift 2
+      ;;
+    --akm-source)
+      akm_source="${2:-}"
+      shift 2
+      ;;
+    --cache-dir)
+      cache_dir="${2:-}"
+      shift 2
+      ;;
+    --network)
+      network_mode="${2:-}"
+      shift 2
+      ;;
+    --env-file)
+      env_file="${2:-}"
+      shift 2
+      ;;
+    --env)
+      env_names+=("${2:-}")
+      shift 2
+      ;;
+    --image)
+      image_override="${2:-}"
+      shift 2
+      ;;
+    --no-build)
+      no_build="1"
+      shift
+      ;;
+    --)
+      shift
+      bench_args+=("$@")
+      break
+      ;;
+    -* )
+      die "unknown option: $1"
+      ;;
+    *)
+      if [[ -z "${run_config}" ]]; then
+        run_config="$1"
+      else
+        bench_args+=("$1")
+      fi
+      shift
+      ;;
+  esac
+done
+
+[[ -n "${run_config}" ]] || die "run config path is required"
+[[ -n "${results_dir}" ]] || die "--results-dir is required"
+
+case "${akm_mode}" in
+  installed)
+    [[ -z "${akm_version}" ]] || die "--akm-version only applies when --akm-mode version"
+    [[ -z "${akm_source}" ]] || die "--akm-source only applies when --akm-mode source"
+    ;;
+  version)
+    [[ -n "${akm_version}" ]] || die "--akm-version is required when --akm-mode version"
+    [[ -z "${akm_source}" ]] || die "--akm-source only applies when --akm-mode source"
+    ;;
+  source)
+    [[ -n "${akm_source}" ]] || die "--akm-source is required when --akm-mode source"
+    [[ -z "${akm_version}" ]] || die "--akm-version only applies when --akm-mode version"
+    ;;
+  *)
+    die "--akm-mode must be one of: installed, version, source"
+    ;;
+esac
+
+run_config="$(abs_path "${run_config}")"
+results_dir="$(abs_path "${results_dir}")"
+cache_dir="$(abs_path "${cache_dir}")"
+
+[[ -f "${run_config}" ]] || die "run config not found: ${run_config}"
+mkdir -p "${results_dir}" "${cache_dir}"
+
+if [[ -n "${opencode_config}" ]]; then
+  opencode_config="$(abs_path "${opencode_config}")"
+  [[ -f "${opencode_config}" ]] || die "opencode config not found: ${opencode_config}"
+fi
+if [[ -n "${opencode_home}" ]]; then
+  opencode_home="$(abs_path "${opencode_home}")"
+  [[ -d "${opencode_home}" ]] || die "opencode home directory not found: ${opencode_home}"
+fi
+if [[ -n "${env_file}" ]]; then
+  env_file="$(abs_path "${env_file}")"
+  [[ -f "${env_file}" ]] || die "env file not found: ${env_file}"
+fi
+if [[ -n "${akm_source}" ]]; then
+  akm_source="$(abs_path "${akm_source}")"
+  [[ -d "${akm_source}" ]] || die "AKM source directory not found: ${akm_source}"
+  [[ -f "${akm_source}/package.json" ]] || die "AKM source directory must contain package.json: ${akm_source}"
+fi
+
+image="${image_override}"
+if [[ -z "${image}" ]]; then
+  case "${akm_mode}" in
+    installed|source)
+      image="akm-bench:installed"
+      ;;
+    version)
+      image="akm-bench:akm-$(sanitize_tag "${akm_version}")"
+      ;;
+  esac
+fi
+
+ensure_image "${image}" "${akm_version}" "${no_build}"
+
+run_config_dir="$(dirname "${run_config}")"
+run_config_base="$(basename "${run_config}")"
+
+docker_args=(
+  run
+  --rm
+  -it
+  --network "${network_mode}"
+  -w /opt/akm-bench
+  -e HOME=/cache/home
+  -e BENCH_DOCKER_AKM_MODE="${akm_mode}"
+  -e BENCH_RESULTS_DIR=/outputs
+  -v "${results_dir}:/outputs"
+  -v "${cache_dir}:/cache"
+  -v "${run_config_dir}:/inputs/run-config-dir:ro"
+)
+
+if command -v id >/dev/null 2>&1; then
+  docker_args+=(--user "$(id -u):$(id -g)")
+fi
+if [[ -n "${opencode_config}" ]]; then
+  docker_args+=(-e "BENCH_OPENCODE_CONFIG=/inputs/opencode-config-dir/$(basename "${opencode_config}")")
+  docker_args+=(-v "$(dirname "${opencode_config}"):/inputs/opencode-config-dir:ro")
+fi
+if [[ -n "${opencode_home}" ]]; then
+  docker_args+=(-e BENCH_DOCKER_IMPORT_OPENCODE_HOME=1)
+  docker_args+=(-v "${opencode_home}:/inputs/opencode-home:ro")
+fi
+if [[ -n "${env_file}" ]]; then
+  docker_args+=(--env-file "${env_file}")
+fi
+if [[ "${akm_mode}" == "source" ]]; then
+  docker_args+=(-v "${akm_source}:/inputs/akm-src:ro")
+fi
+
+for name in OPENAI_API_KEY OPENCODE_API_KEY; do
+  if [[ -n "${!name:-}" ]]; then
+    docker_args+=(--env "${name}")
+  fi
+done
+
+for name in "${env_names[@]}"; do
+  [[ -n "${name}" ]] || die "--env requires a variable name"
+  [[ -n "${!name:-}" ]] || die "host environment variable not set: ${name}"
+  docker_args+=(--env "${name}")
+done
+
+docker_args+=("${image}" bun run src/cli.ts "/inputs/run-config-dir/${run_config_base}" --results-dir /outputs)
+docker_args+=("${bench_args[@]}")
+
+"${docker_args[@]}"

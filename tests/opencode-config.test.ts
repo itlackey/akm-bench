@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  collectEnvRefs,
   BenchConfigError,
   loadOpencodeConfig,
   materializeOpencodeConfig,
@@ -169,6 +170,21 @@ describe("selectProviderForModel", () => {
 
   test("throws when provider key is missing", () => {
     expect(() => selectProviderForModel(loaded, "unknown/some-model")).toThrow(/provider key/);
+  });
+});
+
+describe("collectEnvRefs", () => {
+  test("collects unique env refs from nested provider entries", () => {
+    expect(
+      collectEnvRefs({
+        apiKey: "{env:OPENAI_API_KEY}",
+        nested: [{ token: "{env:AG_TOKEN}" }, { token: "{env:OPENAI_API_KEY}" }],
+      }),
+    ).toEqual(["AG_TOKEN", "OPENAI_API_KEY"]);
+  });
+
+  test("ignores non-env strings", () => {
+    expect(collectEnvRefs({ apiKey: "not-an-env-ref", baseURL: "http://localhost:1234/v1" })).toEqual([]);
   });
 });
 

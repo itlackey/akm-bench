@@ -45,6 +45,12 @@ Override seeds or parallelism:
 bun run src/cli.ts config/nano-quick.json --seeds 3 --parallel 2
 ```
 
+Write reports into a custom directory:
+
+```sh
+bun run src/cli.ts config/nano-quick.json --results-dir ./results/docker
+```
+
 Checked-in run configs:
 
 - `config/nano-quick.json`
@@ -82,6 +88,17 @@ BENCH_OPENCODE_CONFIG=config/opencode.local.json \
 BENCH_OPENCODE_MODEL=local/qwen/qwen3.5-9b \
 bun run src/cli.ts config/nano-quick.json
 ```
+
+You can also direct persistent report output with:
+
+```sh
+BENCH_RESULTS_DIR=./results/docker \
+bun run src/cli.ts config/nano-quick.json
+```
+
+For provider configs that use env refs such as `{env:OPENAI_API_KEY}`, the
+bench forwards the selected provider's referenced env vars into the isolated
+child process when those vars are present in the parent environment.
 
 The harness does not auto-discover a global opencode config. Use
 `BENCH_OPENCODE_CONFIG` or `--opencode-config` if you want to opt into a
@@ -192,6 +209,50 @@ Quick troubleshooting:
 ## Reports
 
 Persistent run artifacts are written under `results/` by default.
+
+Override the report destination with `--results-dir <path>` or `BENCH_RESULTS_DIR`.
+
+## Docker Workflow
+
+`bin/akm-bench` is the host-side wrapper for containerized runs.
+
+Supported AKM modes:
+
+- `installed`: use the AKM version baked into the default image.
+- `version`: build or reuse an image tagged for the requested `akm-cli` version.
+- `source`: mount a local AKM checkout read-only, copy it into `/cache`, run `bun install`, and benchmark that local source build.
+
+Examples:
+
+```sh
+bash bin/akm-bench run config/full.json \
+  --results-dir ./bench-results/full \
+  --opencode-config ./config/opencode.local.json
+```
+
+```sh
+bash bin/akm-bench run config/full.json \
+  --results-dir ./bench-results/akm-0.7.1 \
+  --opencode-config ./config/opencode.local.json \
+  --akm-mode version \
+  --akm-version 0.7.1
+```
+
+```sh
+bash bin/akm-bench run config/full.json \
+  --results-dir ./bench-results/local-source \
+  --opencode-config ./config/opencode.local.json \
+  --akm-mode source \
+  --akm-source ../akm
+```
+
+Operational notes:
+
+- The wrapper defaults to Docker host networking because that is the easiest path for local model endpoints.
+- The image includes `opencode`, OpenAI provider packages, and Antigravity auth package support. Anthropic is intentionally not preinstalled.
+- Use `--env OPENAI_API_KEY` or `--env-file <file>` when your mounted provider config references host env vars.
+- Use `--opencode-home ~/.config/opencode` when you need Antigravity auth state copied into the container cache home.
+- Contributor `source` mode is intended for local AKM development loops. Canonical published comparisons should clearly record whether they used `installed`, `version`, or `source` mode.
 
 Compare two saved reports:
 

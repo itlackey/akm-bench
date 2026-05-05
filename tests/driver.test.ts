@@ -588,6 +588,7 @@ describe("driver helpers", () => {
       expect(env.OPENCODE_CONFIG).toBe(path.join(dirs.opencodeConfig, "opencode.json"));
       expect(env.AKM_STASH_DIR).toBe("/tmp/stash");
       expect(env.BENCH_OPENCODE_MODEL).toBe("model-x");
+      expect(env.AKM_BENCH_AKM_BIN).toBeDefined();
     } finally {
       fs.rmSync(dirs.root, { recursive: true, force: true });
     }

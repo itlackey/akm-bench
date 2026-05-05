@@ -21,4 +21,19 @@ describe("bench report output", () => {
     const outPath = writeBenchReportJson(report);
     expect(outPath).toContain(`${path.sep}results${path.sep}`);
   });
+
+  test("uses BENCH_RESULTS_DIR when set", () => {
+    const prior = process.env.BENCH_RESULTS_DIR;
+    const customDir = path.resolve(import.meta.dir, "tmp-report-output");
+    process.env.BENCH_RESULTS_DIR = customDir;
+    try {
+      expect(benchReportRoot()).toBe(customDir);
+      expect(benchReportPath(report)).toContain(`${path.sep}tmp-report-output${path.sep}`);
+      const outPath = writeBenchReportJson(report);
+      expect(outPath).toContain(`${path.sep}tmp-report-output${path.sep}`);
+    } finally {
+      if (prior === undefined) delete process.env.BENCH_RESULTS_DIR;
+      else process.env.BENCH_RESULTS_DIR = prior;
+    }
+  });
 });

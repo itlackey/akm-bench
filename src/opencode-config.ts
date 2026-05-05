@@ -40,6 +40,30 @@ export interface LoadedOpencodeConfig {
   model?: string;
 }
 
+const ENV_REF_CAPTURE_RE = /^\{env:([A-Z_][A-Z0-9_]*)\}$/;
+
+export function collectEnvRefs(node: unknown): string[] {
+  const refs = new Set<string>();
+
+  const visit = (value: unknown): void => {
+    if (typeof value === "string") {
+      const match = value.match(ENV_REF_CAPTURE_RE);
+      if (match) refs.add(match[1]);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    if (value !== null && typeof value === "object") {
+      for (const child of Object.values(value as Record<string, unknown>)) visit(child);
+    }
+  };
+
+  visit(node);
+  return [...refs].sort();
+}
+
 /**
  * Top-level keys that belong in a full opencode user-config but are FORBIDDEN
  * in the bench source config. The bench reads only `model` + `provider` from

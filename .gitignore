@@ -2,7 +2,9 @@ node_modules
 dist/
 .DS_Store
 bench-results/
+.akm-bench-cache/
 config/opencode.local.json
 src/*.json
 **/__pycache__/
 results/bench-report-*.json
+tests/tmp-report-output/

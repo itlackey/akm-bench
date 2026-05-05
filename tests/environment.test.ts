@@ -239,6 +239,35 @@ describe("setupBenchEnvironment dryRun", () => {
     }
   });
 
+  test("forwards selected provider env refs into the isolated child env", () => {
+    const prior = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "test-openai-key";
+    try {
+      const env = setupBenchEnvironment({
+        model: "openai/gpt-4.1-mini",
+        arm: "akm",
+        dryRun: true,
+        providers: {
+          source: "/fake/providers.json",
+          provider: {
+            openai: {
+              npm: "@ai-sdk/openai",
+              apiKey: "{env:OPENAI_API_KEY}",
+            },
+          },
+        },
+      });
+      try {
+        expect(env.env.OPENAI_API_KEY).toBe("test-openai-key");
+      } finally {
+        env.teardown();
+      }
+    } finally {
+      if (prior === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = prior;
+    }
+  });
+
   test("teardown removes the isolation dirs", () => {
     const env = setupBenchEnvironment({
       model: "anthropic/claude-opus-4-7",
