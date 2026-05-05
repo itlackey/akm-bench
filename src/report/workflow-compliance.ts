@@ -503,6 +503,10 @@ export function renderWorkflowComplianceSection(input: UtilityRunReport): string
  * head 80 chars and append `…` when clamped.
  */
 function truncateCell(s: string): string {
-  if (s.length <= 80) return s.replace(/\|/g, "\\|");
-  return `${s.slice(0, 80).replace(/\|/g, "\\|")}…`;
+  if (s.length <= 80) return escapeMarkdownCell(s);
+  return `${escapeMarkdownCell(s.slice(0, 80))}…`;
+}
+
+function escapeMarkdownCell(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 }
