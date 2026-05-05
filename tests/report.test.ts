@@ -811,6 +811,7 @@ describe("renderUtilityReport workflow compliance (#257)", () => {
     expect(byWorkflow["wf-skips"].pass_rate).toBe(0);
     // Markdown still emits the section because at least one check is applicable.
     expect(markdown).toContain("## Workflow compliance");
+    expect(markdown).toContain("| workflow_id | checks | score | pass | partial | fail | violations |");
   });
 
   test("when every check is not_applicable, markdown surfaces the loaded-but-no-match sentence", () => {
