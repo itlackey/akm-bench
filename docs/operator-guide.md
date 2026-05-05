@@ -102,7 +102,7 @@ directory. The invariant is enforced by `tests/no-os-tmpdir-invariant.test.ts`.
 
 ## Reports
 
-Persistent run artifacts are written under `${AKM_CACHE_DIR}/bench-reports/`.
+Persistent run artifacts are written under `results/` by default.
 The report-stamping helpers live in `src/report.ts`, and `compare` / `attribute`
 operate on those JSON envelopes.
 
@@ -113,6 +113,9 @@ Compare two saved benchmark reports:
 ```sh
 bun run src/cli.ts compare --base results/baseline.json --current /tmp/current-report.json
 ```
+
+Fresh utility/evolve runs also write their JSON report into `results/` with a
+timestamped filename.
 
 Compute per-asset attribution from a saved utility report:
 

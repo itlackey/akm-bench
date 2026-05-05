@@ -44,9 +44,9 @@ export function benchMkdtemp(prefix: string): string {
   return fs.mkdtempSync(path.join(benchTmpRoot(), prefix));
 }
 
-/** Stable bench-report root under `${AKM_CACHE_DIR}/bench-reports/`. */
+/** Stable bench-report root under the repo `results/` directory. */
 export function benchReportRoot(): string {
-  const root = path.join(getCacheDir(), "bench-reports");
+  const root = path.resolve(import.meta.dir, "..", "results");
   fs.mkdirSync(root, { recursive: true });
   return root;
 }
@@ -69,7 +69,7 @@ export interface BenchReportJson {
 
 export type BenchReportEnvelope = BenchReportJson & Record<string, unknown>;
 
-/** Stable per-run report artifact path under `${AKM_CACHE_DIR}/bench/`. */
+/** Stable per-run report artifact path under `results/`. */
 export function benchReportPath(report: BenchReportJson): string {
   const filename = [
     "bench-report",

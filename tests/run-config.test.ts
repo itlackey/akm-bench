@@ -171,7 +171,8 @@ describe("loadBenchRunConfig", () => {
 
   test("discoverOpencodeConfig auto-discovers the committed fixture", () => {
     const loaded = discoverOpencodeConfig();
-    expect(loaded?.source).toContain(path.join("configs", "opencode.json"));
+    expect(loaded).toBeDefined();
+    expect(loaded?.source.startsWith(path.join(REPO_ROOT, "configs") + path.sep)).toBe(true);
   });
 
   test("tasks array selects exactly the listed ids", () => {

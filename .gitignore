@@ -4,3 +4,4 @@ dist/
 bench-results/
 configs/opencode.local.json
 src/*.json
+**/__pycache__/

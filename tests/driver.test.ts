@@ -181,6 +181,18 @@ describe("runOne", () => {
     expect(result.tokens.output).toBe(5);
   });
 
+  test("tokenMeasurement: parsed when stdout reports camelCase usage fields", async () => {
+    const { spawn } = scriptedSpawn({
+      exitCode: 0,
+      stdout: '{"type":"result","usage":{"inputTokens":321,"outputTokens":123}}',
+    });
+    const result = await runOne({ ...baseOptions, workspace, spawn });
+    expect(result.outcome).toBe("pass");
+    expect(result.tokenMeasurement).toBe("parsed");
+    expect(result.tokens.input).toBe(321);
+    expect(result.tokens.output).toBe(123);
+  });
+
   test("tokenMeasurement: missing when stdout has no token line — and budget is NOT enforced", async () => {
     // Agent never reports tokens. budgetTokens is 1, but the harness must not
     // mark this as budget_exceeded (issue #252) — measurement is missing.
@@ -578,6 +590,12 @@ describe("driver helpers", () => {
     // Only one key present → still "parsed", missing key defaults to 0.
     expect(parseTokenUsage("input_tokens: 99")).toEqual({ input: 99, output: 0, measurement: "parsed" });
     expect(parseTokenUsage("output_tokens: 55")).toEqual({ input: 0, output: 55, measurement: "parsed" });
+    // Newer opencode versions surface usage with camelCase keys in JSON-ish output.
+    expect(parseTokenUsage('{"usage":{"inputTokens":321,"outputTokens":123}}')).toEqual({
+      input: 321,
+      output: 123,
+      measurement: "parsed",
+    });
   });
 
   test("readRunEvents returns [] when events.jsonl is missing and parses lines when present", () => {

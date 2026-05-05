@@ -300,11 +300,13 @@ export function parseTokenUsage(stdout: string): {
   output: number;
   measurement: TokenMeasurementStatus;
 } {
-  // opencode prints lines like `tokens: input=1234 output=5678` in some
-  // configurations. We look for the keys defensively; absent values mean we
-  // could not measure (`measurement: "missing"`).
-  const inputMatch = stdout.match(/(?:input[_\s-]?tokens?|tokens?[_\s-]?input)[\s:=]+(\d+)/i);
-  const outputMatch = stdout.match(/(?:output[_\s-]?tokens?|tokens?[_\s-]?output)[\s:=]+(\d+)/i);
+  // opencode has emitted token usage in multiple shapes over time: older
+  // plain-text summaries like `input_tokens: 123 output_tokens: 456`, and
+  // newer structured / JSON-ish forms that use camelCase keys like
+  // `inputTokens` / `outputTokens`. Accept both so report coverage remains
+  // stable across opencode upgrades.
+  const inputMatch = stdout.match(/(?:input(?:[_\s-]?tokens?)?|tokens?[_\s-]?input|inputTokens)["'\s:=]+(\d+)/i);
+  const outputMatch = stdout.match(/(?:output(?:[_\s-]?tokens?)?|tokens?[_\s-]?output|outputTokens)["'\s:=]+(\d+)/i);
   if (!inputMatch && !outputMatch) {
     return { input: 0, output: 0, measurement: "missing" };
   }
