@@ -20,6 +20,19 @@
 import type { RunResult, TrajectoryRecord } from "./driver";
 
 /**
+ * Aggregate trajectory booleans across a bag of runs (§6.2).
+ */
+export interface TrajectoryAggregate {
+  /**
+   * Fraction of runs (with a known goldRef) where the agent loaded the
+   * correct asset. `null` when no run had a goldRef.
+   */
+  correctAssetLoaded: number | null;
+  /** Fraction of runs that emitted a `feedback` event. `0..1`. */
+  feedbackRecorded: number;
+}
+
+/**
  * Cap on the number of characters of `verifierStdout` we substring-scan for
  * the `akm show <ref>` heuristic. A runaway agent could emit GBs of stdout;
  * scanning all of it would OOM the bench. The first 16 MiB is plenty to
@@ -110,6 +123,27 @@ function computeCorrectAssetLoaded(
   if (haystack && containsAkmShow(haystack, ref)) return true;
 
   return false;
+}
+
+/** Aggregate trajectory booleans across a bag of runs. */
+export function aggregateTrajectory(results: RunResult[]): TrajectoryAggregate {
+  if (results.length === 0) {
+    return { correctAssetLoaded: null, feedbackRecorded: 0 };
+  }
+  let knownAsset = 0;
+  let assetLoaded = 0;
+  let feedback = 0;
+  for (const r of results) {
+    if (r.trajectory.correctAssetLoaded !== null) {
+      knownAsset += 1;
+      if (r.trajectory.correctAssetLoaded) assetLoaded += 1;
+    }
+    if (r.trajectory.feedbackRecorded === true) feedback += 1;
+  }
+  return {
+    correctAssetLoaded: knownAsset === 0 ? null : assetLoaded / knownAsset,
+    feedbackRecorded: feedback / results.length,
+  };
 }
 
 function matchesRef(candidate: string, gold: string): boolean {
