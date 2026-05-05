@@ -27,6 +27,7 @@ import { computeTaskCorpusHash, readTaskBody, type TaskMetadata, type TaskSlice 
 import { type RunOptions, type RunResult, runOne } from "./driver";
 import { validateFixtureCorpus } from "./environment";
 import { computeFixtureContentHash, type LoadedFixtureStash, loadFixtureStash } from "./fixture-stash";
+import { getWorkflowsRoot } from "./fixtures-root";
 import {
   aggregateCorpus,
   aggregateFailureModes,
@@ -132,14 +133,6 @@ function cleanupOldPartials(): void {
     /* swallow — cleanup is best-effort */
   }
 }
-
-/**
- * Default workflows directory. Can be overridden by callers (tests) via
- * `RunUtilityOptions.workflowsDir`. Specs in this directory are loaded ONCE
- * per `runUtility` call (not per run) — the evaluator filters via each spec's
- * `applies_to` so we don't I/O in the hot loop.
- */
-const DEFAULT_WORKFLOWS_DIR = path.resolve(__dirname, "..", "fixtures", "corpus", "workflows");
 
 export type Arm = "noakm" | "akm" | "synthetic";
 
@@ -345,7 +338,7 @@ export async function runUtility(options: RunUtilityOptions): Promise<UtilityRun
   // are surfaced as warnings — workflow evaluation is best-effort and a
   // missing/malformed spec must not abort the whole bench run.
   const workflowSpecs: WorkflowSpec[] = [];
-  const workflowsDir = options.workflowsDir ?? DEFAULT_WORKFLOWS_DIR;
+    const workflowsDir = options.workflowsDir ?? getWorkflowsRoot();
   if (workflowsDir.length > 0) {
     try {
       const loaded = loadAllWorkflowSpecs(workflowsDir);

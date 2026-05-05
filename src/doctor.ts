@@ -20,6 +20,7 @@ import path from "node:path";
 import process from "node:process";
 import { buildIsolatedEnv, buildSanitizedEnvSource, createIsolationDirs } from "./driver";
 import { validateFixtureCorpus, writeOpencodeJson } from "./environment";
+import { getStashesRoot } from "./fixtures-root";
 import { BenchConfigError, type LoadedOpencodeConfig, selectProviderForModel } from "./opencode-config";
 import { getBuiltinAgentProfile, runAgent } from "./support/agent";
 import { benchMkdtemp } from "./tmp";
@@ -52,7 +53,9 @@ export interface DoctorResult {
 const REPO_ROOT = path.resolve(__dirname, "..");
 
 /** Absolute path to the az-cli fixture stash. */
-const AZ_CLI_FIXTURE = path.join(REPO_ROOT, "fixtures", "stashes", "az-cli");
+function getAzCliFixture(): string {
+  return path.join(getStashesRoot(), "az-cli");
+}
 
 /** akm binary — the same one the bench would use in a real run. */
 function resolveAkmBin(): string {
@@ -344,12 +347,13 @@ async function checkStashFixtureLoadable(verbose: boolean): Promise<DoctorCheck>
   const name = "stash fixture loadable";
   log(verbose, `running check: ${name}`);
 
-  if (!fs.existsSync(AZ_CLI_FIXTURE)) {
+  const azCliFixture = getAzCliFixture();
+  if (!fs.existsSync(azCliFixture)) {
     return {
       name,
       ok: false,
       severity: "fail",
-      message: `az-cli fixture stash not found at: ${AZ_CLI_FIXTURE}`,
+      message: `az-cli fixture stash not found at: ${azCliFixture}`,
     };
   }
 
@@ -359,7 +363,7 @@ async function checkStashFixtureLoadable(verbose: boolean): Promise<DoctorCheck>
   try {
     const result = Bun.spawnSync({
       cmd: [akmBin, "search", "az", "cli"],
-      env: { ...process.env, AKM_STASH_DIR: AZ_CLI_FIXTURE },
+      env: { ...process.env, AKM_STASH_DIR: azCliFixture },
       stdout: "pipe",
       stderr: "pipe",
     });

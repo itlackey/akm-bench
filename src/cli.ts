@@ -66,10 +66,22 @@ function withBenchResultsDir<T>(resultsDir: string | undefined, fn: () => T): T 
   }
 }
 
+function withBenchFixturesDir<T>(fixturesDir: string | undefined, fn: () => T): T {
+  if (!fixturesDir) return fn();
+  const prior = process.env.BENCH_FIXTURES_DIR;
+  process.env.BENCH_FIXTURES_DIR = fixturesDir;
+  try {
+    return fn();
+  } finally {
+    if (prior === undefined) delete process.env.BENCH_FIXTURES_DIR;
+    else process.env.BENCH_FIXTURES_DIR = prior;
+  }
+}
+
 const HELP = `akm-bench — agent-plus-akm evaluation framework
 
 Usage:
-  bun run src/cli.ts <config.json> [--json] [--seeds N] [--parallel N] [--tasks <list>] [--results-dir <path>]
+  bun run src/cli.ts <config.json> [--json] [--seeds N] [--parallel N] [--tasks <list>] [--results-dir <path>] [--fixtures-dir <path>]
   bun run src/cli.ts <subcommand> [...flags]
 
 Config-file mode (recommended):
@@ -110,6 +122,8 @@ utility flags:
                            summary is also written to stderr for human-friendly reads.
   --results-dir <path>     directory where persistent JSON reports are written.
                            Overrides BENCH_RESULTS_DIR for this invocation.
+  --fixtures-dir <path>    fixtures root containing \`corpus/\` and \`stashes/\`.
+                           Overrides BENCH_FIXTURES_DIR for this invocation.
   -h, --help               show this message.
 
 evolve flags:
@@ -124,6 +138,7 @@ evolve flags:
   --opencode-config <path> path to a standard opencode JSON config file (same as utility).
   --json                   suppress the markdown summary on stderr.
   --results-dir <path>     directory where persistent JSON reports are written.
+  --fixtures-dir <path>    fixtures root containing \`corpus/\` and \`stashes/\`.
 
 compare flags:
   --base <path>                 path to baseline UtilityRunReport JSON file. REQUIRED.
@@ -157,6 +172,8 @@ Environment:
                              default fixture; overridden by --opencode-config flag.
   BENCH_RESULTS_DIR         directory where persistent JSON reports are written. Overridden by
                             --results-dir when the flag is present.
+  BENCH_FIXTURES_DIR        fixtures root containing \`corpus/\` and \`stashes/\`. Overridden by
+                            --fixtures-dir when the flag is present.
 
 Auto-discovery order for --opencode-config (first existing file wins):
   1. --opencode-config <path>  flag value
@@ -298,6 +315,7 @@ export interface UtilityCliOptions {
   /** Pre-loaded opencode provider config. Forwarded into `runUtility`. */
   opencodeProviders?: LoadedOpencodeConfig;
   resultsDir?: string;
+  fixturesDir?: string;
 }
 
 export interface UtilityCliResult {
@@ -315,7 +333,7 @@ export interface UtilityCliResult {
  */
 export async function runUtilityCli(options: UtilityCliOptions): Promise<UtilityCliResult> {
   const sliceFilter = options.slice === "all" ? undefined : options.slice;
-  const tasks = listTasks(sliceFilter ? { slice: sliceFilter } : {});
+  const tasks = withBenchFixturesDir(options.fixturesDir, () => listTasks(sliceFilter ? { slice: sliceFilter } : {}));
 
   // noakm arm is included by default: it is the control condition for the
   // primary utility metric (pass_rate(akm) − pass_rate(noakm), spec §4).
@@ -324,24 +342,24 @@ export async function runUtilityCli(options: UtilityCliOptions): Promise<Utility
 
   writeRunBanner(options.model);
 
-  const report = await runUtility({
-    tasks,
-    arms,
-    model: options.model,
-    seedsPerArm: options.seedsPerArm,
-    budgetTokens: options.budgetTokens,
-    budgetWallMs: options.budgetWallMs,
-    slice: options.slice,
-    // #261: thread the synthetic-arm gate. Default off — the envelope shape
-    // is byte-identical to the pre-#261 output unless the operator opts in.
-    ...(options.includeSynthetic ? { includeSynthetic: true } : {}),
-    ...(options.parallel !== undefined ? { parallel: options.parallel } : {}),
-    ...(options.forceParallel ? { forceParallel: true } : {}),
-    ...(options.branch !== undefined ? { branch: options.branch } : {}),
-    ...(options.commit !== undefined ? { commit: options.commit } : {}),
-    ...(options.timestamp !== undefined ? { timestamp: options.timestamp } : {}),
-    ...(options.opencodeProviders ? { opencodeProviders: options.opencodeProviders } : {}),
-  });
+  const report = await withBenchFixturesDir(options.fixturesDir, () =>
+    runUtility({
+      tasks,
+      arms,
+      model: options.model,
+      seedsPerArm: options.seedsPerArm,
+      budgetTokens: options.budgetTokens,
+      budgetWallMs: options.budgetWallMs,
+      slice: options.slice,
+      ...(options.includeSynthetic ? { includeSynthetic: true } : {}),
+      ...(options.parallel !== undefined ? { parallel: options.parallel } : {}),
+      ...(options.forceParallel ? { forceParallel: true } : {}),
+      ...(options.branch !== undefined ? { branch: options.branch } : {}),
+      ...(options.commit !== undefined ? { commit: options.commit } : {}),
+      ...(options.timestamp !== undefined ? { timestamp: options.timestamp } : {}),
+      ...(options.opencodeProviders ? { opencodeProviders: options.opencodeProviders } : {}),
+    }),
+  );
 
   const { json, markdown } = renderUtilityReport(report);
   const jsonText = `${JSON.stringify(json, null, 2)}\n`;
@@ -883,6 +901,7 @@ export interface ConfigCliOptions {
   branch?: string;
   commit?: string;
   resultsDir?: string;
+  fixturesDir?: string;
 }
 
 /**
@@ -900,7 +919,7 @@ export async function runConfigCli(options: ConfigCliOptions): Promise<UtilityCl
     if (options.tasksList) overrides.tasksList = options.tasksList;
     if (options.seedsPerArm !== undefined) overrides.seedsPerArm = options.seedsPerArm;
     if (options.parallel !== undefined) overrides.parallel = options.parallel;
-    resolved = loadBenchRunConfig(options.configPath, overrides);
+    resolved = withBenchFixturesDir(options.fixturesDir, () => loadBenchRunConfig(options.configPath, overrides));
   } catch (err) {
     const exitCode = err instanceof BenchConfigError && err.isUsageError ? 2 : 78;
     return {
@@ -912,24 +931,25 @@ export async function runConfigCli(options: ConfigCliOptions): Promise<UtilityCl
 
   writeRunBanner(resolved.model);
 
-  const report = await runUtility({
-    tasks: resolved.tasks,
-    arms: resolved.arms,
-    model: resolved.model,
-    slice: resolved.slice,
-    ...(resolved.seedsPerArm !== undefined ? { seedsPerArm: resolved.seedsPerArm } : {}),
-    ...(resolved.budgetTokens !== undefined ? { budgetTokens: resolved.budgetTokens } : {}),
-    ...(resolved.budgetWallMs !== undefined ? { budgetWallMs: resolved.budgetWallMs } : {}),
-    ...(resolved.parallel !== undefined ? { parallel: resolved.parallel } : {}),
-    ...(resolved.forceParallel ? { forceParallel: true } : {}),
-    ...(resolved.baselineByTaskId ? { baselineByTaskId: resolved.baselineByTaskId } : {}),
-    ...(options.timestamp !== undefined ? { timestamp: options.timestamp } : {}),
-    ...(options.branch !== undefined ? { branch: options.branch } : {}),
-    ...(options.commit !== undefined ? { commit: options.commit } : {}),
-    opencodeProviders: resolved.opencodeConfig,
-    // Synthetic arm follows from `arms` containing "synthetic".
-    ...(resolved.arms.includes("synthetic") ? { includeSynthetic: true } : {}),
-  });
+  const report = await withBenchFixturesDir(options.fixturesDir, () =>
+    runUtility({
+      tasks: resolved.tasks,
+      arms: resolved.arms,
+      model: resolved.model,
+      slice: resolved.slice,
+      ...(resolved.seedsPerArm !== undefined ? { seedsPerArm: resolved.seedsPerArm } : {}),
+      ...(resolved.budgetTokens !== undefined ? { budgetTokens: resolved.budgetTokens } : {}),
+      ...(resolved.budgetWallMs !== undefined ? { budgetWallMs: resolved.budgetWallMs } : {}),
+      ...(resolved.parallel !== undefined ? { parallel: resolved.parallel } : {}),
+      ...(resolved.forceParallel ? { forceParallel: true } : {}),
+      ...(resolved.baselineByTaskId ? { baselineByTaskId: resolved.baselineByTaskId } : {}),
+      ...(options.timestamp !== undefined ? { timestamp: options.timestamp } : {}),
+      ...(options.branch !== undefined ? { branch: options.branch } : {}),
+      ...(options.commit !== undefined ? { commit: options.commit } : {}),
+      opencodeProviders: resolved.opencodeConfig,
+      ...(resolved.arms.includes("synthetic") ? { includeSynthetic: true } : {}),
+    }),
+  );
 
   const { json, markdown } = renderUtilityReport(report);
   const stdout = `${JSON.stringify(json, null, 2)}\n`;
@@ -959,6 +979,7 @@ export interface EvolveCliOptions {
   /** Pre-loaded opencode provider config. Forwarded into `runEvolve`. */
   opencodeProviders?: LoadedOpencodeConfig;
   resultsDir?: string;
+  fixturesDir?: string;
 }
 
 /**
@@ -967,7 +988,7 @@ export interface EvolveCliOptions {
  */
 export async function runEvolveCli(options: EvolveCliOptions): Promise<UtilityCliResult> {
   // Discover all tasks then filter on domain.
-  const allTasks = listTasks();
+  const allTasks = withBenchFixturesDir(options.fixturesDir, () => listTasks());
   const tasks = options.domain === "all" ? allTasks : allTasks.filter((t) => t.domain === options.domain);
 
   if (tasks.length === 0) {
@@ -980,17 +1001,19 @@ export async function runEvolveCli(options: EvolveCliOptions): Promise<UtilityCl
 
   writeRunBanner(options.model);
 
-  const report = await runEvolve({
-    tasks,
-    model: options.model,
-    seedsPerArm: options.seedsPerArm,
-    budgetTokens: options.budgetTokens,
-    budgetWallMs: options.budgetWallMs,
-    negativeThreshold: options.negativeThreshold,
-    ...(options.branch !== undefined ? { branch: options.branch } : {}),
-    ...(options.commit !== undefined ? { commit: options.commit } : {}),
-    ...(options.timestamp !== undefined ? { timestamp: options.timestamp } : {}),
-  });
+  const report = await withBenchFixturesDir(options.fixturesDir, () =>
+    runEvolve({
+      tasks,
+      model: options.model,
+      seedsPerArm: options.seedsPerArm,
+      budgetTokens: options.budgetTokens,
+      budgetWallMs: options.budgetWallMs,
+      negativeThreshold: options.negativeThreshold,
+      ...(options.branch !== undefined ? { branch: options.branch } : {}),
+      ...(options.commit !== undefined ? { commit: options.commit } : {}),
+      ...(options.timestamp !== undefined ? { timestamp: options.timestamp } : {}),
+    }),
+  );
 
   const { json, markdown } = renderEvolveReport(report);
   const stdout = `${JSON.stringify(json, null, 2)}\n`;
@@ -1032,6 +1055,7 @@ async function main(argv: string[]): Promise<number> {
         ...(seedsRaw !== undefined ? { seedsPerArm: parseInt32(seedsRaw, 5) } : {}),
         ...(parallelRaw !== undefined ? { parallel: parseInt32(parallelRaw, 1) } : {}),
         ...(parsed.flags.get("results-dir") !== undefined ? { resultsDir: parsed.flags.get("results-dir") } : {}),
+        ...(parsed.flags.get("fixtures-dir") !== undefined ? { fixturesDir: parsed.flags.get("fixtures-dir") } : {}),
       });
     } finally {
       removePid();
@@ -1091,6 +1115,7 @@ async function main(argv: string[]): Promise<number> {
           ...(parsed.bool.has("no-noakm") ? { includeNoakm: false } : {}),
           ...(opencodeProviders ? { opencodeProviders } : {}),
           ...(parsed.flags.get("results-dir") !== undefined ? { resultsDir: parsed.flags.get("results-dir") } : {}),
+          ...(parsed.flags.get("fixtures-dir") !== undefined ? { fixturesDir: parsed.flags.get("fixtures-dir") } : {}),
         });
       } finally {
         removePid();
@@ -1141,6 +1166,7 @@ async function main(argv: string[]): Promise<number> {
           },
           ...(opencodeProvidersEvolve ? { opencodeProviders: opencodeProvidersEvolve } : {}),
           ...(parsed.flags.get("results-dir") !== undefined ? { resultsDir: parsed.flags.get("results-dir") } : {}),
+          ...(parsed.flags.get("fixtures-dir") !== undefined ? { fixturesDir: parsed.flags.get("fixtures-dir") } : {}),
         });
       } finally {
         removePidEvolve();

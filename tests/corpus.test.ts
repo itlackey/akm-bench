@@ -123,6 +123,41 @@ describe("loadTask", () => {
   test("throws on unknown id", () => {
     expect(() => loadTask("does/not/exist")).toThrow();
   });
+
+  test("uses BENCH_FIXTURES_DIR when set", () => {
+    const tmp = benchMkdtemp("akm-bench-custom-fixtures-");
+    const prior = process.env.BENCH_FIXTURES_DIR;
+    try {
+      const taskDir = path.join(tmp, "corpus", "tasks", "custom-domain", "custom-task");
+      fs.mkdirSync(taskDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(taskDir, "task.yaml"),
+        [
+          "id: custom-domain/custom-task",
+          'title: "Custom task"',
+          "domain: custom-domain",
+          "difficulty: easy",
+          "slice: train",
+          "stash: custom-stash",
+          "verifier: script",
+          "budget:",
+          "  tokens: 1000",
+          "  wallMs: 30000",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      process.env.BENCH_FIXTURES_DIR = tmp;
+      const tasks = listTasks();
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]?.id).toBe("custom-domain/custom-task");
+      expect(loadTask("custom-domain/custom-task").taskDir).toContain("custom-domain/custom-task");
+    } finally {
+      if (prior === undefined) delete process.env.BENCH_FIXTURES_DIR;
+      else process.env.BENCH_FIXTURES_DIR = prior;
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("partitionSlice", () => {

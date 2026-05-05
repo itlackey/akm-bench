@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { resolveAkmCommand } from "./akm-command";
 import { buildIsolatedEnv, buildSanitizedEnvSource, createIsolationDirs, type IsolationDirs } from "./driver";
+import { getStashesRoot } from "./fixtures-root";
 import { BenchConfigError, collectEnvRefs, type LoadedOpencodeConfig, selectProviderForModel } from "./opencode-config";
 import { benchMkdtemp } from "./tmp";
 
@@ -274,8 +275,6 @@ function _runAkmIndex(stashDir: string, env: Record<string, string>): void {
 
 // ── validateFixtureCorpus ────────────────────────────────────────────────────
 
-const FIXTURES_ROOT = path.resolve(__dirname, "..", "fixtures", "stashes");
-
 /**
  * Validate that all task stash references name fixtures that exist on disk
  * (i.e. have a MANIFEST.json). Returns the set of missing fixture names.
@@ -288,6 +287,7 @@ export function validateFixtureCorpus(tasks: ReadonlyArray<{ id: string; stash: 
   valid: Set<string>;
   missing: Map<string, string[]>;
 } {
+  const fixturesRoot = getStashesRoot();
   const byFixture = new Map<string, string[]>();
   for (const t of tasks) {
     if (!byFixture.has(t.stash)) byFixture.set(t.stash, []);
@@ -298,7 +298,7 @@ export function validateFixtureCorpus(tasks: ReadonlyArray<{ id: string; stash: 
   const missing = new Map<string, string[]>();
 
   for (const [fixture, taskIds] of byFixture) {
-    const manifestPath = path.join(FIXTURES_ROOT, fixture, "MANIFEST.json");
+    const manifestPath = path.join(fixturesRoot, fixture, "MANIFEST.json");
     if (fs.existsSync(manifestPath)) {
       valid.add(fixture);
     } else {

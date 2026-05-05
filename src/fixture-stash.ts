@@ -13,9 +13,8 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { resolveAkmCommand } from "./akm-command";
+import { getStashesRoot } from "./fixtures-root";
 import { benchMkdtemp } from "./tmp";
-
-const FIXTURES_ROOT = path.resolve(import.meta.dir, "..", "fixtures", "stashes");
 
 export interface LoadedFixtureStash {
   /** Absolute path to the materialised stash directory. */
@@ -39,11 +38,13 @@ export interface LoadedFixtureStash {
  * Returned names are sorted alphabetically.
  */
 export function listFixtures(): string[] {
-  const entries = fs.readdirSync(FIXTURES_ROOT, { withFileTypes: true });
+  const fixturesRoot = getStashesRoot();
+  if (!fs.existsSync(fixturesRoot)) return [];
+  const entries = fs.readdirSync(fixturesRoot, { withFileTypes: true });
   const names: string[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const manifest = path.join(FIXTURES_ROOT, entry.name, "MANIFEST.json");
+    const manifest = path.join(fixturesRoot, entry.name, "MANIFEST.json");
     if (fs.existsSync(manifest)) names.push(entry.name);
   }
   names.sort();
@@ -163,7 +164,7 @@ function fixtureSourceDir(name: string): string {
   if (!isSafeName(name)) {
     throw new Error(`invalid fixture name: ${JSON.stringify(name)}`);
   }
-  const dir = path.join(FIXTURES_ROOT, name);
+  const dir = path.join(getStashesRoot(), name);
   if (!fs.existsSync(path.join(dir, "MANIFEST.json"))) {
     throw new Error(`fixture not found: ${name} (expected ${dir}/MANIFEST.json)`);
   }

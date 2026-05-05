@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { getTasksRootFromFixtures } from "./fixtures-root";
 import { parse as parseYaml } from "yaml";
 
 export type TaskSlice = "train" | "eval";
@@ -142,11 +143,9 @@ export interface TaskMetadata {
   akmKeywords?: string;
 }
 
-const TASKS_ROOT = path.resolve(__dirname, "..", "fixtures", "corpus", "tasks");
-
 /** Public for tests; resolves the corpus root in case callers need to assert it. */
 export function getTasksRoot(): string {
-  return TASKS_ROOT;
+  return getTasksRootFromFixtures();
 }
 
 /**
@@ -213,10 +212,11 @@ function isExampleTaskDir(dir: string): boolean {
  * Throws if the corpus directory is missing or no task matches.
  */
 export function loadTask(taskId: string, options: { includeExamples?: boolean } = {}): TaskMetadata {
-  if (!fs.existsSync(TASKS_ROOT)) {
-    throw new Error(`bench corpus directory missing: ${TASKS_ROOT}`);
+  const tasksRoot = getTasksRoot();
+  if (!fs.existsSync(tasksRoot)) {
+    throw new Error(`bench corpus directory missing: ${tasksRoot}`);
   }
-  for (const candidate of walkTaskDirs(TASKS_ROOT)) {
+  for (const candidate of walkTaskDirs(tasksRoot)) {
     if (!options.includeExamples && isExampleTaskDir(candidate)) continue;
     const meta = readTask(candidate);
     if (meta && meta.id === taskId) return meta;
@@ -241,9 +241,10 @@ export interface ListTasksOptions {
  * them.
  */
 export function listTasks(options: ListTasksOptions = {}): TaskMetadata[] {
-  if (!fs.existsSync(TASKS_ROOT)) return [];
+  const tasksRoot = getTasksRoot();
+  if (!fs.existsSync(tasksRoot)) return [];
   const out: TaskMetadata[] = [];
-  for (const dir of walkTaskDirs(TASKS_ROOT)) {
+  for (const dir of walkTaskDirs(tasksRoot)) {
     if (!options.includeExamples && isExampleTaskDir(dir)) continue;
     const meta = readTask(dir);
     if (!meta) continue;

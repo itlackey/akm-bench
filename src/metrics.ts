@@ -17,6 +17,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { getStashesRoot } from "./fixtures-root";
 import { MEMORY_ABILITY_VALUES, type MemoryAbility, type TaskMetadata } from "./corpus";
 import type { RunResult } from "./driver";
 import type { RunRecordSerialized, UtilityRunReport } from "./report";
@@ -926,7 +927,7 @@ export type Arm = "noakm" | "akm";
  */
 export async function runMaskedCorpus(opts: RunMaskedCorpusOptions): Promise<MaskedCorpusResult> {
   const baseReport = opts.baseReport;
-  const fixturesRoot = opts.fixturesRoot ?? path.resolve(__dirname, "..", "fixtures", "stashes");
+  const fixturesRoot = opts.fixturesRoot ?? getStashesRoot();
 
   const attribution = computePerAssetAttribution(baseReport);
   const desired = Math.max(1, opts.topN ?? 5);

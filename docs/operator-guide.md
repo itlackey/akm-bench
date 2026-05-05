@@ -3,6 +3,9 @@
 This document is the detailed reference for running and operating `akm-bench`.
 The quickstart lives in `README.md`.
 
+For building a custom corpus and custom stash set, see
+`docs/custom-benchmarks.md`.
+
 ## Repo Layout
 
 | Path | Purpose |
@@ -99,6 +102,11 @@ bun run src/cli.ts config/nano-quick.json
 For provider configs that use env refs such as `{env:OPENAI_API_KEY}`, the
 bench forwards the selected provider's referenced env vars into the isolated
 child process when those vars are present in the parent environment.
+
+Use `--fixtures-dir <path>` or `BENCH_FIXTURES_DIR` to override the default
+repo `fixtures/` root. The override directory must contain both `corpus/` and
+`stashes/` so task discovery, workflow specs, and stash materialisation all
+resolve from the same root.
 
 The harness does not auto-discover a global opencode config. Use
 `BENCH_OPENCODE_CONFIG` or `--opencode-config` if you want to opt into a
@@ -252,6 +260,7 @@ Operational notes:
 - The image includes `opencode`, OpenAI provider packages, and Antigravity auth package support. Anthropic is intentionally not preinstalled.
 - Use `--env OPENAI_API_KEY` or `--env-file <file>` when your mounted provider config references host env vars.
 - Use `--opencode-home ~/.config/opencode` when you need Antigravity auth state copied into the container cache home.
+- Use `--fixtures-dir /path/to/custom-fixtures` when benchmarking against a custom corpus and custom stash set.
 - Contributor `source` mode is intended for local AKM development loops. Canonical published comparisons should clearly record whether they used `installed`, `version`, or `source` mode.
 
 Compare two saved reports:

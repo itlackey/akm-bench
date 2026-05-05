@@ -8,6 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
+import { benchMkdtemp } from "../src/tmp";
 import { computeFixtureContentHash, fixtureContentHash, listFixtures, loadFixtureStash } from "../src/fixture-stash";
 
 describe("loadFixtureStash", () => {
@@ -72,6 +73,27 @@ describe("loadFixtureStash", () => {
 
     if (priorAkmStashDir === undefined) delete process.env.AKM_STASH_DIR;
     else process.env.AKM_STASH_DIR = priorAkmStashDir;
+  });
+
+  test("uses BENCH_FIXTURES_DIR when set", () => {
+    const root = benchMkdtemp("akm-bench-custom-stashes-");
+    const priorFixturesDir = process.env.BENCH_FIXTURES_DIR;
+    const fixtureDir = path.join(root, "stashes", "custom-stash");
+    fs.mkdirSync(path.join(fixtureDir, "skills"), { recursive: true });
+    fs.writeFileSync(path.join(fixtureDir, "MANIFEST.json"), "{}\n", "utf8");
+    fs.writeFileSync(path.join(fixtureDir, "skills", "SKILL.md"), "# custom\n", "utf8");
+
+    process.env.BENCH_FIXTURES_DIR = root;
+    const { stashDir, cleanup } = loadFixtureStash("custom-stash", { skipIndex: true });
+    try {
+      expect(fs.existsSync(path.join(stashDir, "skills", "SKILL.md"))).toBe(true);
+      expect(listFixtures()).toEqual(["custom-stash"]);
+    } finally {
+      cleanup();
+      if (priorFixturesDir === undefined) delete process.env.BENCH_FIXTURES_DIR;
+      else process.env.BENCH_FIXTURES_DIR = priorFixturesDir;
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
