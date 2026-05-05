@@ -10,6 +10,7 @@ Options:
   --results-dir <dir>       Host directory for persistent reports. Required.
   --opencode-config <file>  Host opencode config file to mount and use.
   --opencode-home <dir>     Host ~/.config/opencode directory to import auth state from.
+  --fixtures-dir <dir>      Host fixtures root containing corpus/ and stashes/.
   --akm-mode <mode>         installed | version | source. Default: installed.
   --akm-version <ver>       AKM version to bake into the image when mode=version.
   --akm-source <dir>        Local AKM source checkout when mode=source.
@@ -78,6 +79,7 @@ run_config=""
 results_dir=""
 opencode_config=""
 opencode_home=""
+fixtures_dir=""
 akm_mode="installed"
 akm_version=""
 akm_source=""
@@ -105,6 +107,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --opencode-home)
       opencode_home="${2:-}"
+      shift 2
+      ;;
+    --fixtures-dir)
+      fixtures_dir="${2:-}"
       shift 2
       ;;
     --akm-mode)
@@ -198,6 +204,12 @@ if [[ -n "${opencode_home}" ]]; then
   opencode_home="$(abs_path "${opencode_home}")"
   [[ -d "${opencode_home}" ]] || die "opencode home directory not found: ${opencode_home}"
 fi
+if [[ -n "${fixtures_dir}" ]]; then
+  fixtures_dir="$(abs_path "${fixtures_dir}")"
+  [[ -d "${fixtures_dir}" ]] || die "fixtures directory not found: ${fixtures_dir}"
+  [[ -d "${fixtures_dir}/corpus" ]] || die "fixtures directory must contain corpus/: ${fixtures_dir}"
+  [[ -d "${fixtures_dir}/stashes" ]] || die "fixtures directory must contain stashes/: ${fixtures_dir}"
+fi
 if [[ -n "${env_file}" ]]; then
   env_file="$(abs_path "${env_file}")"
   [[ -f "${env_file}" ]] || die "env file not found: ${env_file}"
@@ -226,9 +238,9 @@ run_config_dir="$(dirname "${run_config}")"
 run_config_base="$(basename "${run_config}")"
 
 docker_args=(
+  docker
   run
   --rm
-  -it
   --network "${network_mode}"
   -w /opt/akm-bench
   -e HOME=/cache/home
@@ -238,6 +250,10 @@ docker_args=(
   -v "${cache_dir}:/cache"
   -v "${run_config_dir}:/inputs/run-config-dir:ro"
 )
+
+if [[ -t 0 && -t 1 ]]; then
+  docker_args+=(-it)
+fi
 
 if command -v id >/dev/null 2>&1; then
   docker_args+=(--user "$(id -u):$(id -g)")
@@ -249,6 +265,10 @@ fi
 if [[ -n "${opencode_home}" ]]; then
   docker_args+=(-e BENCH_DOCKER_IMPORT_OPENCODE_HOME=1)
   docker_args+=(-v "${opencode_home}:/inputs/opencode-home:ro")
+fi
+if [[ -n "${fixtures_dir}" ]]; then
+  docker_args+=(-e BENCH_FIXTURES_DIR=/inputs/fixtures)
+  docker_args+=(-v "${fixtures_dir}:/inputs/fixtures:ro")
 fi
 if [[ -n "${env_file}" ]]; then
   docker_args+=(--env-file "${env_file}")

@@ -197,6 +197,31 @@ Notes:
 - Use `--env OPENAI_API_KEY` or `--env-file <path>` when your provider config references host secrets.
 - Use `--opencode-home ~/.config/opencode` if you need to import Antigravity auth files into the container.
 
+## Custom Benchmarks
+
+Point the bench at a custom fixtures root that contains `corpus/` and
+`stashes/`.
+
+Local example:
+
+```sh
+bun run src/cli.ts /path/to/my-config.json \
+  --fixtures-dir /path/to/my-fixtures \
+  --opencode-config /path/to/opencode.json
+```
+
+Docker example:
+
+```sh
+bash bin/akm-bench run /path/to/my-config.json \
+  --fixtures-dir /path/to/my-fixtures \
+  --results-dir ./bench-results/custom \
+  --opencode-config /path/to/opencode.json
+```
+
+See `docs/custom-benchmarks.md` for the expected directory layout, task and
+stash examples, and authoring guidance.
+
 Typical filename:
 
 ```text
@@ -208,7 +233,11 @@ results/bench-report-utility-main-<commit>-<timestamp>-<model>.json
 See `docs/operator-guide.md` for:
 
 - config discovery order
+- custom benchmark authoring
 - local provider setup notes
 - repo layout
 - tmp directory behavior
 - test scope and verification commands
+
+See `docs/custom-benchmarks.md` for building a custom `fixtures/` root with
+your own tasks, stashes, workflows, and run configs.
