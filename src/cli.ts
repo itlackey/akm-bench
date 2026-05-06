@@ -6,7 +6,8 @@
  *   • `utility`    — paired noakm vs akm utility benchmark (Track A).
  *   • `compare`    — diff two report JSON files; refuses on hash/model mismatch.
  *   • `attribute`  — per-asset marginal contribution via leave-one-out masking.
- *   • `evolve`     — longitudinal evolution loop (Track B). Stub.
+ *   • `evolve`     — longitudinal evolution loop (Track B).
+ *   • `doctor`     — pre-flight harness smoke-test.
  *   • `kill`       — send SIGTERM to a running bench process (reads bench.pid).
  *
  * Implementation status and validity rules live in `docs/operator-guide.md`.
@@ -20,6 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { listTasks, type TaskMetadata } from "./corpus";
+import { renderDoctorReport, runDoctor } from "./doctor";
 import { runEvolve } from "./evolve";
 import {
   compareReports,
@@ -95,6 +97,7 @@ Subcommands (legacy; still supported):
   evolve        Track B: longitudinal feedback → distill → propose loop.
   compare       Diff two report JSON files (refuses cross-model diffs).
   attribute     Per-asset marginal pass-rate contribution.
+  doctor        Pre-flight harness smoke-test.
   kill          Send SIGTERM to a running bench process (reads bench.pid).
   clean         Remove all bench tmp dirs under \${AKM_CACHE_DIR}/bench/.
 
@@ -159,6 +162,11 @@ attribute flags:
   --top <N>                number of top-loaded assets to mask (default: 5; clamped).
   --opencode-config <path> path to a standard opencode JSON config file (same as utility).
   --json                   suppress the markdown summary on stderr.
+
+doctor flags:
+  --model <id>             model to test (required unless BENCH_OPENCODE_MODEL is set).
+  --opencode-config <path> path to a standard opencode JSON config file (same as utility).
+  --verbose                emit detailed diagnostic output to stderr.
 
 kill flags:
   (none)        Reads \${AKM_CACHE_DIR}/bench/bench.pid and sends SIGTERM.
@@ -1263,6 +1271,32 @@ async function main(argv: string[]): Promise<number> {
         return 1;
       }
       return 0;
+    }
+    case "doctor": {
+      // Load provider config for doctor checks.
+      let opencodeProvidersDoctor: LoadedOpencodeConfig | undefined;
+      try {
+        opencodeProvidersDoctor = discoverOpencodeConfig(parsed.flags.get("opencode-config"));
+      } catch (err) {
+        const exitCode = err instanceof BenchConfigError && err.isUsageError ? 2 : 78;
+        process.stderr.write(`bench doctor: ${err instanceof Error ? err.message : String(err)}\n`);
+        return exitCode;
+      }
+
+      const model = parsed.flags.get("model") ?? getEnv("BENCH_OPENCODE_MODEL") ?? opencodeProvidersDoctor?.model;
+      if (!model) {
+        process.stderr.write("bench doctor: --model <id> or BENCH_OPENCODE_MODEL is required.\n");
+        return 2;
+      }
+
+      const result = await runDoctor({
+        model,
+        ...(opencodeProvidersDoctor ? { opencodeProviders: opencodeProvidersDoctor } : {}),
+        ...(parsed.bool.has("verbose") ? { verbose: true } : {}),
+      });
+      process.stderr.write(renderDoctorReport(result));
+      process.stderr.write("\n");
+      return result.ok ? 0 : 1;
     }
     default:
       process.stderr.write(`unknown subcommand: ${parsed.subcommand}\n`);
