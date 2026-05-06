@@ -13,6 +13,7 @@ import {
   type EvolveReportInput,
   renderEvolveReport,
   renderLearningCurveSection,
+  renderLessonLineageSection,
   type UtilityRunReport,
 } from "../src/report";
 
@@ -128,8 +129,9 @@ describe("renderEvolveReport — learning block (#265)", () => {
 
   test("omits learning block when learningCurve absent (legacy path)", () => {
     const { json, markdown } = renderEvolveReport(baseEvolveInput());
-    const parsed = json as { learning?: object };
+    const parsed = json as { learning?: object; lesson_lineage?: object };
     expect(parsed.learning).toBeUndefined();
+    expect(parsed.lesson_lineage).toBeUndefined();
     expect(markdown).not.toContain("Learning curve");
   });
 
@@ -143,6 +145,38 @@ describe("renderEvolveReport — learning block (#265)", () => {
     expect(parsed.learning?.time_to_improvement).toBeNull();
     expect(markdown).toContain("time_to_improvement=n/a");
   });
+
+  test("emits lesson_lineage JSON and markdown when supplied", () => {
+    const lineage = {
+      post_tasks: [
+        {
+          task_id: "eval/task-a",
+          lessons: [
+            {
+              ref: "lesson:docker-healthchecks",
+              accepted: true,
+              fired_count: 2,
+              source_failures: ["train/task-a", "train/task-b"],
+            },
+          ],
+        },
+      ],
+    };
+    const { json, markdown } = renderEvolveReport(baseEvolveInput({ lessonLineage: lineage }));
+    const parsed = json as {
+      lesson_lineage?: {
+        post_tasks: Array<{
+          task_id: string;
+          lessons: Array<{ ref: string; accepted: boolean; fired_count: number; source_failures: string[] }>;
+        }>;
+      };
+    };
+    expect(parsed.lesson_lineage).toEqual(lineage);
+    expect(markdown).toContain("Lesson lineage");
+    expect(markdown).toContain("eval/task-a");
+    expect(markdown).toContain("lesson:docker-healthchecks");
+    expect(markdown).toContain("train/task-a, train/task-b");
+  });
 });
 
 describe("renderLearningCurveSection", () => {
@@ -154,5 +188,12 @@ describe("renderLearningCurveSection", () => {
       time_to_improvement: null,
     });
     expect(md).toContain("No episodes recorded");
+  });
+});
+
+describe("renderLessonLineageSection", () => {
+  test("emits the empty-state message when no lineage rows are recorded", () => {
+    const md = renderLessonLineageSection({ post_tasks: [] });
+    expect(md).toContain("No generated lessons fired on post-arm tasks");
   });
 });

@@ -22,3 +22,6 @@ jobs:
 
       - name: Run baseline checks
         run: bun run check
+
+      - name: Run deterministic benchmark CLI smoke
+        run: AKM_BENCH_RUN_CLI_TESTS=1 bun test ./tests/cli.test.ts

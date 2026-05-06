@@ -78,6 +78,12 @@ This repo ships a versioned reference-suite definition in
 Exact commands for static utility, attribution, and temporal evolve runs are in
 `docs/reference-workflow.md`.
 
+CI note: GitHub Actions runs a deterministic spawned-CLI smoke against
+`config/reference-suite-v1.json`, narrowed to one canonical task. That smoke
+validates config dispatch and report generation, but it intentionally does not
+require a live model or `opencode` binary, so it is not a true live benchmark
+run.
+
 ## Docker Quick Start
 
 Run the benchmark in Docker and write reports to a host directory:

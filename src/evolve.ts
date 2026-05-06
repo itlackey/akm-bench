@@ -36,7 +36,12 @@
 import { resolveAkmCommand } from "./akm-command";
 import { registerCleanup } from "./cleanup";
 import type { TaskMetadata, TaskSlice } from "./corpus";
-import { computeLessonMetrics, type LessonMetrics } from "./evolve-metrics";
+import {
+  computeLessonMetrics,
+  computePostTaskLessonLineage,
+  type LessonMetrics,
+  type PostTaskLessonLineage,
+} from "./evolve-metrics";
 import { type LoadedFixtureStash, loadFixtureStash } from "./fixture-stash";
 import {
   computeFeedbackIntegrity,
@@ -139,6 +144,8 @@ export interface EvolveRunReport {
    * `lessons.lessons` is `[]` when no lesson-kind proposals were generated.
    */
   lessons: LessonMetrics;
+  /** Minimal warm/post task lineage for generated lessons that fired. */
+  lessonLineage: PostTaskLessonLineage;
   /** Aggregate longitudinal metrics. */
   longitudinal: LongitudinalMetrics;
   /**
@@ -590,6 +597,10 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     preRuns: preReport.akmRuns ?? [],
     postRuns: postReport.akmRuns ?? [],
   });
+  const lessonLineage = computePostTaskLessonLineage({
+    lessons,
+    postRuns: postReport.akmRuns ?? [],
+  });
 
   return {
     timestamp: options.timestamp ?? new Date().toISOString(),
@@ -602,6 +613,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     proposalLog,
     proposals: proposalsMetrics,
     lessons,
+    lessonLineage,
     longitudinal,
     feedbackIntegrity,
     phase1: phase1Report,

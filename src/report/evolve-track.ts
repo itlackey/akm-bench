@@ -2,7 +2,7 @@
  * akm-bench evolve-track report renderer (§6.3 + §6.4).
  */
 
-import type { LessonMetrics, LessonRecord } from "../evolve-metrics";
+import type { LessonMetrics, LessonRecord, PostTaskLessonLineage } from "../evolve-metrics";
 import type { FeedbackIntegrityMetrics } from "../metrics/feedback-integrity";
 import type { LearningCurve } from "../metrics/learning-curve";
 import type { LongitudinalMetrics } from "../metrics/longitudinal";
@@ -38,6 +38,8 @@ export interface EvolveReportInput {
    * the markdown summary skips the lessons section entirely.
    */
   lessons?: LessonMetrics;
+  /** Minimal warm/post task lineage for lessons that fired. */
+  lessonLineage?: PostTaskLessonLineage;
   longitudinal: LongitudinalMetrics;
   /**
    * Feedback-signal integrity 2x2 confusion matrix (§6.8). When omitted,
@@ -124,6 +126,7 @@ function buildEvolveJson(input: EvolveReportInput): EvolveReportJson {
       })),
     },
     ...(input.lessons ? { lessons: serialiseLessons(input.lessons) } : {}),
+    ...(input.lessonLineage ? { lesson_lineage: serialiseLessonLineage(input.lessonLineage) } : {}),
     longitudinal: {
       improvement_slope: input.longitudinal.improvementSlope,
       pre_pass_rate_stdev: input.longitudinal.prePassRateStdev,
@@ -195,6 +198,20 @@ function serialiseLessons(metrics: LessonMetrics): object {
       reuse_pass_rate: l.reuse_pass_rate,
       negative_transfer_count: l.negative_transfer_count,
       leakage_risk: l.leakage_risk,
+    })),
+  };
+}
+
+function serialiseLessonLineage(lineage: PostTaskLessonLineage): object {
+  return {
+    post_tasks: lineage.post_tasks.map((task) => ({
+      task_id: task.task_id,
+      lessons: task.lessons.map((lesson) => ({
+        ref: lesson.ref,
+        accepted: lesson.accepted,
+        fired_count: lesson.fired_count,
+        source_failures: lesson.source_failures,
+      })),
     })),
   };
 }
@@ -317,6 +334,27 @@ export function renderLessonsTable(metrics: LessonMetrics): string {
     lines.push(
       `| \`${l.ref}\` | ${l.accepted ? "yes" : "no"} | ${l.lint_pass ? "pass" : "fail"} | ${l.reuse_count} | ${l.reuse_pass_rate.toFixed(2)} | ${l.first_reused_on ?? "n/a"} | ${l.negative_transfer_count} | ${l.leakage_risk} |`,
     );
+  }
+  return lines.join("\n");
+}
+
+export function renderLessonLineageSection(lineage: PostTaskLessonLineage): string {
+  const lines: string[] = [];
+  lines.push("## Lesson lineage");
+  lines.push("");
+  if (lineage.post_tasks.length === 0) {
+    lines.push("_No generated lessons fired on post-arm tasks._");
+    return lines.join("\n");
+  }
+
+  lines.push("| post_task | lesson_ref | accepted | fired | phase1_source_failures |");
+  lines.push("|-----------|------------|----------|-------|------------------------|");
+  for (const task of lineage.post_tasks) {
+    for (const lesson of task.lessons) {
+      lines.push(
+        `| ${task.task_id} | \`${lesson.ref}\` | ${lesson.accepted ? "yes" : "no"} | ${lesson.fired_count} | ${lesson.source_failures.length > 0 ? lesson.source_failures.join(", ") : "n/a"} |`,
+      );
+    }
   }
   return lines.join("\n");
 }
@@ -449,6 +487,11 @@ function buildEvolveMarkdown(input: EvolveReportInput): string {
 
   if (input.lessons) {
     lines.push(renderLessonsTable(input.lessons));
+    lines.push("");
+  }
+
+  if (input.lessonLineage) {
+    lines.push(renderLessonLineageSection(input.lessonLineage));
     lines.push("");
   }
 

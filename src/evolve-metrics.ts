@@ -102,6 +102,26 @@ export interface LessonMetrics {
   lesson_negative_transfer_count: number;
 }
 
+/** One generated lesson that fired on a post-arm task. */
+export interface PostTaskLessonLineageLesson {
+  ref: string;
+  accepted: boolean;
+  source_failures: string[];
+  /** Number of post-arm seeds/runs for this task that loaded the lesson. */
+  fired_count: number;
+}
+
+/** Task-level lineage row for the warm/post arm. */
+export interface PostTaskLessonLineageRecord {
+  task_id: string;
+  lessons: PostTaskLessonLineageLesson[];
+}
+
+/** Minimal warm/post lineage block exposed on the evolve report. */
+export interface PostTaskLessonLineage {
+  post_tasks: PostTaskLessonLineageRecord[];
+}
+
 /**
  * Inputs to `computeLessonMetrics`. All non-`proposalLog` fields are
  * optional so callers can compute partial metrics from mocked inputs in
@@ -236,6 +256,60 @@ export function computeLessonMetrics(input: ComputeLessonMetricsInput): LessonMe
     lesson_reuse_rate: accepted.length === 0 ? 0 : reusedAccepted.length / accepted.length,
     lesson_reuse_success_rate: reusedAccepted.length === 0 ? 0 : reusePassRateSum / reusedAccepted.length,
     lesson_negative_transfer_count: negativeTransferTotal,
+  };
+}
+
+/**
+ * Join post-arm task runs back to generated lessons so the evolve report can
+ * show, per warm/post task, which generated lessons actually fired and which
+ * Phase-1 source failures contributed to each lesson.
+ */
+export function computePostTaskLessonLineage(input: {
+  lessons: LessonMetrics;
+  postRuns?: RunResult[];
+}): PostTaskLessonLineage {
+  const postRuns = input.postRuns ?? [];
+  const lessonsByRef = new Map(input.lessons.lessons.map((lesson) => [lesson.ref, lesson]));
+  const countsByTask = new Map<string, Map<string, number>>();
+
+  for (const run of postRuns) {
+    let perTask = countsByTask.get(run.taskId);
+    if (!perTask) {
+      perTask = new Map();
+      countsByTask.set(run.taskId, perTask);
+    }
+
+    for (const ref of new Set(run.assetsLoaded ?? [])) {
+      if (!lessonsByRef.has(ref)) continue;
+      perTask.set(ref, (perTask.get(ref) ?? 0) + 1);
+    }
+  }
+
+  return {
+    post_tasks: [...countsByTask.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([taskId, counts]) => {
+        const lessons = [...counts.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([ref, firedCount]) => {
+            const lesson = lessonsByRef.get(ref);
+            if (!lesson) {
+              throw new Error(`missing lesson lineage record for ref ${ref}`);
+            }
+            return {
+              ref,
+              accepted: lesson.accepted,
+              source_failures: [...lesson.source_failures],
+              fired_count: firedCount,
+            };
+          });
+
+        return {
+          task_id: taskId,
+          lessons,
+        };
+      })
+      .filter((task) => task.lessons.length > 0),
   };
 }
 

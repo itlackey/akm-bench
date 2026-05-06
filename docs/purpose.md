@@ -25,13 +25,16 @@ This makes akm-bench the higher-stakes repo of the two. akm-eval's headline numb
 - `attribute` subcommand for per-asset attribution — which akm assets contributed to which outcomes
 - `evolve` subcommand implementing the longitudinal feedback/distill/reflect/re-evaluate loop
 - Built-in first-party corpus under `fixtures/corpus/tasks/` spanning multiple domains, plus custom fixtures via `--fixtures-dir`
+- Versioned reference-suite definition in `fixtures/reference/v1/README.md` plus canonical config at `config/reference-suite-v1.json`
 - Workflow-compliance, failure-mode, search-bridge, overhead, token-coverage, and negative-transfer reporting in the utility report envelope
 - Multi-seed and parallelism support
 - Sample configs (`config/nano-quick.json`, `config/full.json`, `config/failing-tasks.json`, `config/curate-test.json`)
+- Reference workflow, attribution schema, and lesson lifecycle docs in `docs/`
+- CI on every push and PR via `.github/workflows/ci.yml`
 - Local model support (LM Studio, Ollama)
 
 **Repository status:**
-- 21 commits, 0 stars, non-empty `results/`
+- 22 commits, 0 stars, non-empty `results/`
 - MPL-2.0 license
 - opencode is the only supported agent runner
 
@@ -39,7 +42,7 @@ This makes akm-bench the higher-stakes repo of the two. akm-eval's headline numb
 
 These are the gaps between current state and akm-bench's strategic role. Closing these is what turns the repo from "a useful A/B harness" into "the source of akm's most important numbers."
 
-**1. The temporal self-improvement loop exists in code but isn't surfaced as a first-class documented workflow.**
+**1. The temporal self-improvement loop exists in code and is now documented, but it still lacks published reference outputs.**
 
 This is the single most important gap. The akm-bench differentiator — the number nothing else can produce — is the delta across this protocol:
 
@@ -50,14 +53,14 @@ This is the single most important gap. The akm-bench differentiator — the numb
 
 What's currently in the repo is both *static utility benchmarking* and an implemented `evolve` track, but the temporal track is still strategically underexposed:
 
-- It is not mentioned in `README.md`, so the highest-value capability is easy to miss.
-- It does not yet have dedicated protocol documentation or published reference outputs, so outsiders still cannot cite or reproduce the headline number.
+- It is now surfaced in `README.md` and backed by `docs/reference-workflow.md` and `docs/lesson-lifecycle.md`.
+- It still does not have published reference outputs, so outsiders still cannot cite or reproduce the headline number.
 
-It exists, but it still is not visible enough or documented enough to carry the repo's strategic story.
+The visibility problem is largely solved. The remaining strategic gap is publication and reproducibility of the headline temporal result.
 
-**2. No versioned canonical reference suite checked in.**
+**2. The repo now has a versioned reference-suite definition, but not published reference scores.**
 
-The repo already ships a substantial first-party corpus in `fixtures/corpus/tasks/`, which is good for development and internal benchmarking. What is still missing is a frozen, versioned reference suite in `fixtures/reference/` with a documented score so "akm-bench reference suite v1, model X, score Y" becomes a stable thing people can cite. 10-20 tasks is enough to start; the suite can grow over time but must be versioned.
+The repo already ships a substantial first-party corpus in `fixtures/corpus/tasks/` and now has a frozen reference-suite definition in `fixtures/reference/v1/README.md` plus canonical config in `config/reference-suite-v1.json`. What is still missing is the documented score and published artifacts so "akm-bench reference suite v1, model X, score Y" becomes a stable thing people can cite.
 
 Without a canonical suite, any number akm-bench produces is unverifiable and any claim built on it is suspect.
 
@@ -68,10 +71,9 @@ Same concern as akm-eval. If akm's pitch is runner-agnostic, the benchmark shoul
 ### Tactical gaps
 
 - No published reference results for a versioned canonical suite
-- `attribute` output schema isn't documented; consumers can't easily build dashboards or analysis on top of it
+- The exact protocol-doc set in the DoD (`docs/protocol-static-ab.md`, `docs/protocol-attribution.md`, `docs/protocol-temporal.md`) still does not exist
 - Result schema may not match akm-eval's, blocking cross-repo aggregation
-- No CI smoke test
-- `README.md` does not mention the `evolve` track at all
+- CI currently runs `bun run check`, but not a true benchmark smoke run of the canonical suite
 - Same MPL-2.0 license question as akm-eval
 
 ### Cross-repo gaps (shared with akm-eval)
@@ -83,7 +85,7 @@ Same concern as akm-eval. If akm's pitch is runner-agnostic, the benchmark shoul
 ### Priority order
 
 1. **Surface and document the temporal self-improvement loop.** Highest leverage by a wide margin. The code exists, but without first-class docs and reference outputs, akm-bench still undersells its most important differentiator.
-2. **Check in a canonical fixture set with a documented reference score.** Required before any number this repo produces can be cited.
+2. **Publish reference results for the canonical suite.** The reference-suite definition now exists; what is missing is the documented score and checked-in artifacts.
 3. Publish first reference run on the canonical suite.
 4. Add a second agent runner.
 5. Document the `attribute` output schema as a public contract.
@@ -102,11 +104,11 @@ Three protocols, each with documented output:
 
 With-akm vs without-akm on a fixed corpus, same model, same time. Output: delta + per-seed variance. Useful as a baseline and as a sanity check.
 
-**2. Per-asset attribution** ✅ (shipped, undocumented)
+**2. Per-asset attribution** ✅ (shipped, now documented)
 
 For each successful task, which akm assets fired and contributed to the outcome. Output schema must be documented in `docs/attribution-schema.md` so consumers can build on it.
 
-**3. Temporal self-improvement** (implemented, but not yet adequately documented or published)
+**3. Temporal self-improvement** (implemented, documented, but not yet published as a reference result)
 
 Two-run protocol with a self-improvement step in between, as described in the gap analysis. Specific requirements:
 
@@ -117,7 +119,7 @@ Two-run protocol with a self-improvement step in between, as described in the ga
 
 ### Required canonical fixture set
 
-- Minimum 20 tasks in `fixtures/reference/v1/`, checked into the repo
+- Versioned reference-suite definition in `fixtures/reference/v1/`, with a documented canonical task list and settings
 - Tasks span at least three categories (file manipulation, shell automation, simple code transforms — the exact categories matter less than the diversity)
 - Each task has documented success criteria and an **automated evaluator** — no LLM-judge for the canonical suite. LLM judges are appropriate for akm-eval where they match third-party protocol; akm-bench's reference suite needs deterministic grading because the temporal protocol's statistical guard depends on it.
 - Versioned (`fixtures/reference/v1/`, `v2/`, etc.) so future expansions don't invalidate published comparisons
@@ -128,12 +130,12 @@ Two-run protocol with a self-improvement step in between, as described in the ga
 - At least two supported agent runners (opencode + one other)
 - Documented output schema for all three protocols, in `docs/`
 - Where applicable, schema-compatible output with akm-eval — at minimum, shared model/seed/commit-SHA fields so cross-repo dashboards become possible
-- CI smoke test running the smallest canonical fixture against a cheap model, on every PR
+- CI running on every PR, with a benchmark smoke path for the canonical suite still to be added
 - Reproducible Docker image with version-pinned akm and runner versions
 
 ### Required documentation
 
-- Protocol guide for each of the three benchmarks (`docs/protocol-static-ab.md`, `docs/protocol-attribution.md`, `docs/protocol-temporal.md`)
+- First-class benchmark docs in `README.md`, `docs/reference-workflow.md`, and protocol-specific docs for each benchmark
 - Fixture authoring guide (`docs/custom-benchmarks.md` already exists — keep current)
 - Lesson lifecycle documentation: what `feedback/reflect/propose/distill` actually does to the stash, with worked examples (`docs/lesson-lifecycle.md`)
 - Reference-suite README at `fixtures/reference/v1/README.md` documenting the canonical scores, the model used, and the conditions

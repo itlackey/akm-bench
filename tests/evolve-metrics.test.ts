@@ -16,7 +16,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunResult } from "../src/driver";
 import type { FeedbackLogEntry } from "../src/evolve";
-import { classifyLeakageRisk, computeLessonMetrics } from "../src/evolve-metrics";
+import { classifyLeakageRisk, computeLessonMetrics, computePostTaskLessonLineage } from "../src/evolve-metrics";
 import type { ProposalLogEntry } from "../src/metrics";
 
 function fakeRun(overrides: Partial<RunResult>): RunResult {
@@ -207,5 +207,72 @@ describe("classifyLeakageRisk", () => {
     const verifier = "alpha beta is required";
     const body = "alpha beta gamma never appears verbatim from the verifier";
     expect(classifyLeakageRisk(body, [verifier])).toBe("low");
+  });
+});
+
+describe("computePostTaskLessonLineage", () => {
+  test("groups post-arm lesson fires by task and carries Phase-1 source failures", () => {
+    const lessons = computeLessonMetrics({
+      proposalLog: [
+        { proposalId: "p1", assetRef: "lesson:a", kind: "lesson", lintPass: true, decision: "accept" },
+        { proposalId: "p2", assetRef: "lesson:b", kind: "lesson", lintPass: true, decision: "accept" },
+      ],
+      feedbackLog: [
+        { taskId: "train/fail-a", seed: 0, goldRef: "lesson:a", signal: "negative", ok: true },
+        { taskId: "train/fail-b", seed: 0, goldRef: "lesson:b", signal: "negative", ok: true },
+        { taskId: "train/fail-b-2", seed: 1, goldRef: "lesson:b", signal: "negative", ok: true },
+      ],
+    });
+
+    const lineage = computePostTaskLessonLineage({
+      lessons,
+      postRuns: [
+        fakeRun({ taskId: "eval/task-a", seed: 0, assetsLoaded: ["lesson:b", "lesson:a", "lesson:a"] }),
+        fakeRun({ taskId: "eval/task-a", seed: 1, assetsLoaded: ["lesson:a", "skill:ignore"] }),
+        fakeRun({ taskId: "eval/task-b", seed: 0, assetsLoaded: ["lesson:b"] }),
+      ],
+    });
+
+    expect(lineage).toEqual({
+      post_tasks: [
+        {
+          task_id: "eval/task-a",
+          lessons: [
+            { ref: "lesson:a", accepted: true, source_failures: ["train/fail-a"], fired_count: 2 },
+            {
+              ref: "lesson:b",
+              accepted: true,
+              source_failures: ["train/fail-b", "train/fail-b-2"],
+              fired_count: 1,
+            },
+          ],
+        },
+        {
+          task_id: "eval/task-b",
+          lessons: [
+            {
+              ref: "lesson:b",
+              accepted: true,
+              source_failures: ["train/fail-b", "train/fail-b-2"],
+              fired_count: 1,
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test("emits an empty lineage block when no generated lessons fired", () => {
+    const lessons = computeLessonMetrics({
+      proposalLog: [{ proposalId: "p1", assetRef: "lesson:a", kind: "lesson", lintPass: true, decision: "accept" }],
+    });
+    expect(
+      computePostTaskLessonLineage({
+        lessons,
+        postRuns: [fakeRun({ taskId: "eval/task-a", assetsLoaded: ["skill:other"] })],
+      }),
+    ).toEqual({
+      post_tasks: [],
+    });
   });
 });
