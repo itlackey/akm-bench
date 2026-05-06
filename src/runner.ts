@@ -338,7 +338,7 @@ export async function runUtility(options: RunUtilityOptions): Promise<UtilityRun
   // are surfaced as warnings — workflow evaluation is best-effort and a
   // missing/malformed spec must not abort the whole bench run.
   const workflowSpecs: WorkflowSpec[] = [];
-    const workflowsDir = options.workflowsDir ?? getWorkflowsRoot();
+  const workflowsDir = options.workflowsDir ?? getWorkflowsRoot();
   if (workflowsDir.length > 0) {
     try {
       const loaded = loadAllWorkflowSpecs(workflowsDir);

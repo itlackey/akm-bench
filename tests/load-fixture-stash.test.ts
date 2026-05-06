@@ -8,8 +8,8 @@
 import { describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { benchMkdtemp } from "../src/tmp";
 import { computeFixtureContentHash, fixtureContentHash, listFixtures, loadFixtureStash } from "../src/fixture-stash";
+import { benchMkdtemp } from "../src/tmp";
 
 describe("loadFixtureStash", () => {
   test("materialises the minimal fixture and cleanup removes it", () => {

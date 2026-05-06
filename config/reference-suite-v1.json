@@ -1,0 +1,23 @@
+{
+  "$schema": "./bench-run-config.schema.json",
+  "schemaVersion": 1,
+  "name": "reference-suite-v1",
+  "description": "Canonical 10-task reference suite v1, reusing the built-in deterministic corpus by task ID.",
+  "tasks": [
+    "az-cli/create-resource-group",
+    "az-cli/keyvault-secret-set",
+    "docker-homelab/env-from-file",
+    "docker-homelab/named-volume",
+    "drillbit/backup-policy",
+    "drillbit/canary-enable",
+    "inkwell/add-healthcheck",
+    "inkwell/configure-scaling",
+    "opencode/select-correct-skill",
+    "opencode/tool-allowlist"
+  ],
+  "arms": ["akm"],
+  "seeds": 5,
+  "budgetTokens": 25000,
+  "budgetWallMs": 360000,
+  "parallel": 3
+}

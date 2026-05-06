@@ -47,9 +47,7 @@ export function benchMkdtemp(prefix: string): string {
 /** Stable bench-report root under the repo `results/` directory. */
 export function benchReportRoot(): string {
   const override = process.env.BENCH_RESULTS_DIR?.trim();
-  const root = override
-    ? path.resolve(override)
-    : path.resolve(import.meta.dir, "..", "results");
+  const root = override ? path.resolve(override) : path.resolve(import.meta.dir, "..", "results");
   fs.mkdirSync(root, { recursive: true });
   return root;
 }

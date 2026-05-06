@@ -3,6 +3,12 @@
 `akm-bench` is a benchmark harness for measuring how an agent performs on the
 same task set with AKM enabled.
 
+It has three workflows:
+
+- `utility`: static benchmark runs over a fixed task set
+- `attribute`: per-asset attribution and leave-one-out masking on a saved utility report
+- `evolve`: a longitudinal workflow that records feedback, accepts lint-clean proposals, and re-runs the eval slice to measure lesson reuse
+
 This README is the fast path for running benchmarks. For the full reference,
 see `docs/operator-guide.md`.
 
@@ -45,6 +51,32 @@ bun run src/cli.ts config/nano-quick.json
 
 Start with `config/nano-quick.json`. It is the fastest way to verify that your
 setup works.
+
+## Benchmark Workflows
+
+`akm-bench` currently exposes one baseline workflow and two analysis workflows:
+
+1. `utility` runs a fixed corpus and writes the canonical benchmark artifact.
+2. `attribute` starts from a saved utility artifact and explains which AKM assets were loaded, then estimates marginal contribution by masking the top loaded assets one at a time.
+3. `evolve` runs the train slice, records `akm feedback`, runs `akm distill` and `akm reflect`, accepts lint-clean proposals, re-indexes the stash, and re-runs the eval slice in `pre`, `post`, and `synthetic` conditions.
+
+The saved report from `utility` is the input to `attribute`. The saved report
+from `evolve` contains full utility-style envelopes for the `pre`, `post`, and
+`synthetic` arms plus proposal, lesson, and feedback-integrity summaries.
+
+## Reference Suite
+
+This repo ships a versioned reference-suite definition in
+`fixtures/reference/v1/README.md` plus a canonical run config at
+`config/reference-suite-v1.json`.
+
+- For the canonical reference suite, use `config/reference-suite-v1.json`.
+- For a smaller smoke-style pinned suite, use `config/nano-quick.json`.
+- For a broader pinned suite, use `config/full.json`.
+- For temporal `evolve` runs, use one domain that already has both `train` and `eval` tasks. `drillbit` and `inkwell` are the clearest first-party examples.
+
+Exact commands for static utility, attribution, and temporal evolve runs are in
+`docs/reference-workflow.md`.
 
 ## Docker Quick Start
 
@@ -127,6 +159,16 @@ Compute per-asset attribution:
 bun run src/cli.ts attribute --base results/current.json --top 5
 ```
 
+Run the evolve workflow for one domain:
+
+```sh
+bun run src/cli.ts evolve --tasks drillbit --seeds 5
+```
+
+This requires a domain with both `train` and `eval` tasks. The runner uses the
+train slice to accumulate feedback and generate proposals, then evaluates the
+`pre`, `post`, and `synthetic` arms on the eval slice.
+
 ## Local Models
 
 If you want to benchmark against a local model, use `config/opencode.local.json`.
@@ -203,6 +245,18 @@ The top-level `model` must match `<provider-key>/<model-key>`, for example
 Successful runs write a timestamped JSON report into `results/` by default.
 
 Override the output directory with `--results-dir <path>` or `BENCH_RESULTS_DIR`.
+
+Report tracks written by the current CLI:
+
+- `utility`: top-level aggregate, per-task metrics, `runs[]`, `perAsset`, and diagnostic blocks such as workflow, search-bridge, failure-modes, token coverage, and AKM overhead
+- `attribute`: the saved `perAsset` table from the base utility report plus leave-one-out marginal contribution rows
+- `evolve`: proposal-quality metrics, lesson metrics, feedback-integrity metrics, and embedded utility-style envelopes for `arms.pre`, `arms.post`, and `arms.synthetic`
+
+Public documentation for these contracts lives in:
+
+- `docs/reference-workflow.md`
+- `docs/attribution-schema.md`
+- `docs/lesson-lifecycle.md`
 
 ## Custom Benchmarks
 

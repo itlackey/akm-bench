@@ -344,6 +344,10 @@ function evolveInputWith(metrics: FeedbackIntegrityMetrics | undefined) {
     proposals: { rows: [], totalProposals: 0, totalAccepted: 0, acceptanceRate: 0, lintPassRate: 0 },
     longitudinal: {
       improvementSlope: 0.1,
+      prePassRateStdev: 0,
+      postPassRateStdev: 0,
+      significanceThreshold: 0,
+      interpretation: "improvement_detected" as "improvement_detected" | "no_improvement_detected",
       overSyntheticLift: 0.05,
       degradationCount: 0,
       degradations: [],
@@ -414,11 +418,44 @@ describe("renderEvolveReport — feedback_agreement headline + warning marker", 
     expect(slopeIdx).toBeGreaterThanOrEqual(0);
     expect(agreementIdx).toBeGreaterThan(slopeIdx);
     expect(markdown).toContain("feedback_agreement: 1.00");
+    expect(markdown).toContain("improvement_detected");
     expect(markdown).not.toContain("pending (#244)");
     // JSON envelope carries `feedback_integrity` as a top-level key.
     const parsed = json as { feedback_integrity?: object; warnings: string[] };
     expect(parsed.feedback_integrity).toBeDefined();
     expect(parsed.warnings.some((w) => w.startsWith("feedback_agreement_below_threshold"))).toBe(false);
+  });
+
+  test("renders longitudinal interpretation + machine-readable fields", () => {
+    const metrics = computeFeedbackIntegrity({
+      phase1: { akmRuns: [fakeRun({ taskId: "t", seed: 0, outcome: "pass" })] },
+      feedbackLog: [fb({ taskId: "t", seed: 0, goldRef: "skill:a", signal: "positive" })],
+    });
+    const input = evolveInputWith(metrics);
+    input.longitudinal = {
+      ...input.longitudinal,
+      improvementSlope: 0.05,
+      prePassRateStdev: 0.04,
+      postPassRateStdev: 0.02,
+      significanceThreshold: 0.08,
+      interpretation: "no_improvement_detected",
+    };
+
+    const { markdown, json } = renderEvolveReport(input);
+    expect(markdown).toContain("no_improvement_detected");
+    expect(markdown).toContain("threshold 0.08");
+    const parsed = json as unknown as {
+      longitudinal: {
+        interpretation: string;
+        pre_pass_rate_stdev: number;
+        post_pass_rate_stdev: number;
+        significance_threshold: number;
+      };
+    };
+    expect(parsed.longitudinal.interpretation).toBe("no_improvement_detected");
+    expect(parsed.longitudinal.pre_pass_rate_stdev).toBeCloseTo(0.04);
+    expect(parsed.longitudinal.post_pass_rate_stdev).toBeCloseTo(0.02);
+    expect(parsed.longitudinal.significance_threshold).toBeCloseTo(0.08);
   });
 
   test("placeholder remains when metrics omitted (legacy path)", () => {

@@ -67,6 +67,10 @@ function baseEvolveInput(extra: Partial<EvolveReportInput> = {}): EvolveReportIn
     proposals: { rows: [], totalProposals: 0, totalAccepted: 0, acceptanceRate: 0, lintPassRate: 0 },
     longitudinal: {
       improvementSlope: 0.1,
+      prePassRateStdev: 0,
+      postPassRateStdev: 0,
+      significanceThreshold: 0,
+      interpretation: "improvement_detected",
       overSyntheticLift: 0.05,
       degradationCount: 0,
       degradations: [],

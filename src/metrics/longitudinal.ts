@@ -21,6 +21,14 @@ export interface DegradationRow {
 export interface LongitudinalMetrics {
   /** `pass_rate(post) - pass_rate(pre)`, akm arm of each report. */
   improvementSlope: number;
+  /** Mean within-condition pass-rate stdev across pre-arm tasks. */
+  prePassRateStdev: number;
+  /** Mean within-condition pass-rate stdev across post-arm tasks. */
+  postPassRateStdev: number;
+  /** `2 × max(prePassRateStdev, postPassRateStdev)`. */
+  significanceThreshold: number;
+  /** Machine-readable temporal interpretation required by purpose.md. */
+  interpretation: "improvement_detected" | "no_improvement_detected";
   /** `pass_rate(post) - pass_rate(synthetic)`. */
   overSyntheticLift: number;
   /**
@@ -55,6 +63,10 @@ export function computeLongitudinalMetrics(
   const prePassRate = preReport.aggregateAkm.passRate;
   const postPassRate = postReport.aggregateAkm.passRate;
   const syntheticPassRate = syntheticReport.aggregateAkm.passRate;
+  const prePassRateStdev = meanTaskPassRateStdev(preReport);
+  const postPassRateStdev = meanTaskPassRateStdev(postReport);
+  const significanceThreshold = 2 * Math.max(prePassRateStdev, postPassRateStdev);
+  const improvementSlope = postPassRate - prePassRate;
 
   const seedsPerArm = Math.max(1, postReport.corpus.seedsPerArm);
   const oneSeedFraction = 1 / seedsPerArm;
@@ -97,7 +109,11 @@ export function computeLongitudinalMetrics(
   }
 
   return {
-    improvementSlope: postPassRate - prePassRate,
+    improvementSlope,
+    prePassRateStdev,
+    postPassRateStdev,
+    significanceThreshold,
+    interpretation: improvementSlope > significanceThreshold ? "improvement_detected" : "no_improvement_detected",
     overSyntheticLift: postPassRate - syntheticPassRate,
     degradationCount: degradations.length,
     degradations,
@@ -105,4 +121,9 @@ export function computeLongitudinalMetrics(
     postPassRate,
     syntheticPassRate,
   };
+}
+
+function meanTaskPassRateStdev(report: UtilityRunReport): number {
+  if (report.tasks.length === 0) return 0;
+  return report.tasks.reduce((sum, task) => sum + task.akm.passRateStdev, 0) / report.tasks.length;
 }

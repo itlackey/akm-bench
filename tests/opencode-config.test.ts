@@ -7,8 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
-  collectEnvRefs,
   BenchConfigError,
+  collectEnvRefs,
   loadOpencodeConfig,
   materializeOpencodeConfig,
   selectProviderForModel,

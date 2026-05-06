@@ -13,9 +13,9 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { parse as parseYaml } from "yaml";
 
 import { getTasksRootFromFixtures } from "./fixtures-root";
-import { parse as parseYaml } from "yaml";
 
 export type TaskSlice = "train" | "eval";
 export type TaskDifficulty = "easy" | "medium" | "hard";

@@ -126,6 +126,10 @@ function buildEvolveJson(input: EvolveReportInput): EvolveReportJson {
     ...(input.lessons ? { lessons: serialiseLessons(input.lessons) } : {}),
     longitudinal: {
       improvement_slope: input.longitudinal.improvementSlope,
+      pre_pass_rate_stdev: input.longitudinal.prePassRateStdev,
+      post_pass_rate_stdev: input.longitudinal.postPassRateStdev,
+      significance_threshold: input.longitudinal.significanceThreshold,
+      interpretation: input.longitudinal.interpretation,
       over_synthetic_lift: input.longitudinal.overSyntheticLift,
       degradation_count: input.longitudinal.degradationCount,
       pre_pass_rate: input.longitudinal.prePassRate,
@@ -382,6 +386,9 @@ function buildEvolveMarkdown(input: EvolveReportInput): string {
   lines.push(
     `**improvement_slope: ${signedFixed(input.longitudinal.improvementSlope, 2)}** (post=${input.longitudinal.postPassRate.toFixed(2)}, pre=${input.longitudinal.prePassRate.toFixed(2)})`,
   );
+  lines.push(
+    `**${input.longitudinal.interpretation}** (delta ${signedFixed(input.longitudinal.improvementSlope, 2)} vs threshold ${input.longitudinal.significanceThreshold.toFixed(2)}; pre_stdev=${input.longitudinal.prePassRateStdev.toFixed(2)}, post_stdev=${input.longitudinal.postPassRateStdev.toFixed(2)})`,
+  );
   // Second line: real feedback_agreement (per #244), or placeholder when
   // metrics not supplied.
   if (input.feedbackIntegrity) {
@@ -398,6 +405,10 @@ function buildEvolveMarkdown(input: EvolveReportInput): string {
   lines.push("| metric | value |");
   lines.push("|--------|-------|");
   lines.push(`| improvement_slope | ${signedFixed(input.longitudinal.improvementSlope, 2)} |`);
+  lines.push(`| interpretation | ${input.longitudinal.interpretation} |`);
+  lines.push(`| pre_pass_rate_stdev | ${input.longitudinal.prePassRateStdev.toFixed(2)} |`);
+  lines.push(`| post_pass_rate_stdev | ${input.longitudinal.postPassRateStdev.toFixed(2)} |`);
+  lines.push(`| significance_threshold | ${input.longitudinal.significanceThreshold.toFixed(2)} |`);
   lines.push(`| over_synthetic_lift | ${signedFixed(input.longitudinal.overSyntheticLift, 2)} |`);
   lines.push(`| degradation_count | ${input.longitudinal.degradationCount} |`);
   lines.push(`| pre_pass_rate | ${input.longitudinal.prePassRate.toFixed(2)} |`);

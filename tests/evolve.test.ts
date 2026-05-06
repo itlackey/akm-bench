@@ -612,6 +612,10 @@ describe("computeLongitudinalMetrics", () => {
     const synthetic = makeReport("t", 0.2);
     const longi = computeLongitudinalMetrics(pre, post, synthetic);
     expect(longi.improvementSlope).toBeCloseTo(0.3, 2);
+    expect(longi.prePassRateStdev).toBe(0);
+    expect(longi.postPassRateStdev).toBe(0);
+    expect(longi.significanceThreshold).toBe(0);
+    expect(longi.interpretation).toBe("improvement_detected");
     expect(longi.overSyntheticLift).toBeCloseTo(0.5, 2);
     expect(longi.degradationCount).toBe(0);
   });
@@ -633,6 +637,25 @@ describe("computeLongitudinalMetrics", () => {
     const longi = computeLongitudinalMetrics(pre, post, synthetic);
     // 1/5 = 0.2; drop of 0.1 is below threshold. No degradation.
     expect(longi.degradationCount).toBe(0);
+    expect(longi.interpretation).toBe("no_improvement_detected");
+  });
+
+  test("requires warm-cold delta to exceed 2x within-condition stdev", () => {
+    const pre = makeReport("t", 0.5);
+    const preTask = pre.tasks[0];
+    if (!preTask) throw new Error("expected pre task");
+    preTask.akm.passRateStdev = 0.08;
+    const post = makeReport("t", 0.62);
+    const postTask = post.tasks[0];
+    if (!postTask) throw new Error("expected post task");
+    postTask.akm.passRateStdev = 0.07;
+    const synthetic = makeReport("t", 0.3);
+    const longi = computeLongitudinalMetrics(pre, post, synthetic);
+    expect(longi.improvementSlope).toBeCloseTo(0.12, 2);
+    expect(longi.prePassRateStdev).toBeCloseTo(0.08, 2);
+    expect(longi.postPassRateStdev).toBeCloseTo(0.07, 2);
+    expect(longi.significanceThreshold).toBeCloseTo(0.16, 2);
+    expect(longi.interpretation).toBe("no_improvement_detected");
   });
 });
 

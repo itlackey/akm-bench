@@ -49,9 +49,6 @@ export interface DoctorResult {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Absolute path to the repo root (one directory above src/). */
-const REPO_ROOT = path.resolve(__dirname, "..");
-
 /** Absolute path to the az-cli fixture stash. */
 function getAzCliFixture(): string {
   return path.join(getStashesRoot(), "az-cli");
