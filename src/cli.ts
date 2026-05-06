@@ -1009,6 +1009,7 @@ export async function runEvolveCli(options: EvolveCliOptions): Promise<UtilityCl
       budgetTokens: options.budgetTokens,
       budgetWallMs: options.budgetWallMs,
       negativeThreshold: options.negativeThreshold,
+      ...(options.opencodeProviders ? { opencodeProviders: options.opencodeProviders } : {}),
       ...(options.branch !== undefined ? { branch: options.branch } : {}),
       ...(options.commit !== undefined ? { commit: options.commit } : {}),
       ...(options.timestamp !== undefined ? { timestamp: options.timestamp } : {}),

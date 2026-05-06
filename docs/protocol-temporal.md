@@ -186,9 +186,8 @@ when that agreement falls below `0.8`.
   corpus by domain name.
 - The help text advertises `--parallel`, but the current `runEvolveCli` path
   does not forward the parsed parallel value into `runEvolve`.
-- The help text advertises `--opencode-config`, and the CLI resolves it for
-  model discovery, but the current `runEvolveCli` path does not forward the
-  loaded provider config into `runEvolve`.
+- `--opencode-config` is resolved at CLI startup and forwarded into
+  `runEvolve` for provider/model execution.
 - The `pre`, `post`, and `synthetic` Phase 3 runs are all emitted as AKM-arm
   utility reports; the distinction is the stash condition, not a different
   top-level utility track.
