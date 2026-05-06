@@ -7,4 +7,5 @@ config/opencode.local.json
 src/*.json
 **/__pycache__/
 results/bench-report-*.json
+!results/reference/
 tests/tmp-report-output/

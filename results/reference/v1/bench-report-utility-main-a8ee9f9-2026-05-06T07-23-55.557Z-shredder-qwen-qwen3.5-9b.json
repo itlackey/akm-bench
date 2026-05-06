@@ -1,0 +1,6733 @@
+{
+  "schemaVersion": 1,
+  "track": "utility",
+  "branch": "main",
+  "commit": "a8ee9f9",
+  "timestamp": "2026-05-06T07:23:55.557Z",
+  "agent": {
+    "harness": "opencode",
+    "model": "shredder/qwen/qwen3.5-9b"
+  },
+  "corpus": {
+    "domains": 5,
+    "tasks": 26,
+    "slice": "all",
+    "seedsPerArm": 5,
+    "selectedTaskIds": [
+      "az-cli/assign-managed-identity",
+      "az-cli/create-resource-group",
+      "az-cli/keyvault-secret-set",
+      "az-cli/query-by-tag",
+      "az-cli/storage-account-create",
+      "docker-homelab/bridge-network",
+      "docker-homelab/compose-version-upgrade",
+      "docker-homelab/env-from-file",
+      "docker-homelab/named-volume",
+      "docker-homelab/redis-healthcheck",
+      "docker-homelab/restart-policy",
+      "drillbit/backup-policy",
+      "drillbit/canary-enable",
+      "drillbit/provision-edge",
+      "drillbit/rotate-secret",
+      "drillbit/scale-replicas",
+      "inkwell/add-healthcheck",
+      "inkwell/configure-scaling",
+      "inkwell/cpu-scaling",
+      "inkwell/full-config",
+      "inkwell/new-service",
+      "inkwell/set-rate-limit",
+      "opencode/agents-md-akm-snippet",
+      "opencode/provider-akm-feedback",
+      "opencode/select-correct-skill",
+      "opencode/tool-allowlist"
+    ],
+    "taskCorpusHash": "cfeaefe318bd871a9faf3d80130bc5701f9dc1115298b1e76440f73e1d502af0",
+    "fixtures": {
+      "az-cli": "f4cfa4d4080455ecaa9c4e846d372a27a85d69ab8caeccf4463de1e8f3f9716f",
+      "docker-homelab": "c10fb0e30fd5aa5d48c14b5bc1ef2bb78c3d4c9365ea6bd593ef00b517f7cf1b",
+      "drillbit": "5971f2a92c62625e78a340553ff739ed5c38b95762ec2c2c5515c606899675f2",
+      "inkwell": "82293d6f70d17db628b74803de85bd7e988d460bc11c9d5ff0a6fdf456c9bc03",
+      "multi-domain": "32de8eed42c8fe293dd6994c19263f998ad3f1e3d35907b79beb5aed4b99fdab"
+    },
+    "fixtureContentHash": "dc0e23c95f9b170504b484ef8133a759fee7885bbafe90755b7b9704e4a34cc1"
+  },
+  "aggregate": {
+    "noakm": {
+      "pass_rate": 0,
+      "tokens_per_pass": null,
+      "tokens_per_run": null,
+      "wallclock_ms": 0
+    },
+    "akm": {
+      "pass_rate": 0.8076923076923077,
+      "tokens_per_pass": 23575.744,
+      "tokens_per_run": 23661.699999999997,
+      "wallclock_ms": 45037.23846153845
+    },
+    "delta": {
+      "pass_rate": 0.8076923076923077,
+      "tokens_per_pass": null,
+      "tokens_per_run": null,
+      "wallclock_ms": 45037.23846153845
+    }
+  },
+  "trajectory": {
+    "akm": {
+      "correct_asset_loaded": 0.9923076923076923,
+      "feedback_recorded": 0.9307692307692308
+    }
+  },
+  "failure_modes": {
+    "by_label": {
+      "loaded_ignored": 25
+    },
+    "by_task": {
+      "docker-homelab/bridge-network": {
+        "loaded_ignored": 3
+      },
+      "docker-homelab/compose-version-upgrade": {
+        "loaded_ignored": 2
+      },
+      "docker-homelab/env-from-file": {
+        "loaded_ignored": 2
+      },
+      "docker-homelab/named-volume": {
+        "loaded_ignored": 3
+      },
+      "docker-homelab/redis-healthcheck": {
+        "loaded_ignored": 3
+      },
+      "docker-homelab/restart-policy": {
+        "loaded_ignored": 1
+      },
+      "inkwell/add-healthcheck": {
+        "loaded_ignored": 2
+      },
+      "inkwell/configure-scaling": {
+        "loaded_ignored": 2
+      },
+      "inkwell/full-config": {
+        "loaded_ignored": 5
+      },
+      "inkwell/new-service": {
+        "loaded_ignored": 1
+      },
+      "inkwell/set-rate-limit": {
+        "loaded_ignored": 1
+      }
+    }
+  },
+  "token_measurement": {
+    "total_runs": 130,
+    "runs_with_measured_tokens": 130,
+    "runs_missing_measurement": 0,
+    "runs_unsupported_measurement": 0,
+    "coverage": 1,
+    "reliable": true
+  },
+  "tasks": [
+    {
+      "id": "az-cli/assign-managed-identity",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23644.4,
+        "tokens_per_run": 23644.4,
+        "wallclock_ms": 36174.8,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 36174.8
+      }
+    },
+    {
+      "id": "az-cli/create-resource-group",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23616,
+        "tokens_per_run": 23616,
+        "wallclock_ms": 39359.2,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 39359.2
+      }
+    },
+    {
+      "id": "az-cli/keyvault-secret-set",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23802.8,
+        "tokens_per_run": 23802.8,
+        "wallclock_ms": 34396.8,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 34396.8
+      }
+    },
+    {
+      "id": "az-cli/query-by-tag",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23622.4,
+        "tokens_per_run": 23622.4,
+        "wallclock_ms": 45008.2,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 45008.2
+      }
+    },
+    {
+      "id": "az-cli/storage-account-create",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23680,
+        "tokens_per_run": 23680,
+        "wallclock_ms": 43058.4,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 43058.4
+      }
+    },
+    {
+      "id": "docker-homelab/bridge-network",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0.4,
+        "pass_at_1": 0,
+        "tokens_per_pass": 22232.5,
+        "tokens_per_run": 23278.8,
+        "wallclock_ms": 62586.2,
+        "pass_rate_stdev": 0.5477225575051662,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0.4,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 62586.2
+      }
+    },
+    {
+      "id": "docker-homelab/compose-version-upgrade",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0.6,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23091.666666666668,
+        "tokens_per_run": 23115.8,
+        "wallclock_ms": 78414.2,
+        "pass_rate_stdev": 0.5477225575051662,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0.6,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 78414.2
+      }
+    },
+    {
+      "id": "docker-homelab/env-from-file",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0.6,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23564,
+        "tokens_per_run": 23815.4,
+        "wallclock_ms": 59838.4,
+        "pass_rate_stdev": 0.5477225575051662,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0.6,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 59838.4
+      }
+    },
+    {
+      "id": "docker-homelab/named-volume",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0.4,
+        "pass_at_1": 0,
+        "tokens_per_pass": 23965.5,
+        "tokens_per_run": 23798,
+        "wallclock_ms": 35099.2,
+        "pass_rate_stdev": 0.5477225575051662,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0.4,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 35099.2
+      }
+    },
+    {
+      "id": "docker-homelab/redis-healthcheck",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0.4,
+        "pass_at_1": 0,
+        "tokens_per_pass": 23429,
+        "tokens_per_run": 23867.6,
+        "wallclock_ms": 56476.8,
+        "pass_rate_stdev": 0.5477225575051662,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0.4,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 56476.8
+      }
+    },
+    {
+      "id": "docker-homelab/restart-policy",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0.8,
+        "pass_at_1": 0,
+        "tokens_per_pass": 24142.25,
+        "tokens_per_run": 24166.4,
+        "wallclock_ms": 52074,
+        "pass_rate_stdev": 0.44721359549995804,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0.8,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 52074
+      }
+    },
+    {
+      "id": "drillbit/backup-policy",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23422.2,
+        "tokens_per_run": 23422.2,
+        "wallclock_ms": 36020.6,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 36020.6
+      }
+    },
+    {
+      "id": "drillbit/canary-enable",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23551.2,
+        "tokens_per_run": 23551.2,
+        "wallclock_ms": 39726.2,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 39726.2
+      }
+    },
+    {
+      "id": "drillbit/provision-edge",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23522.2,
+        "tokens_per_run": 23522.2,
+        "wallclock_ms": 37209,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 37209
+      }
+    },
+    {
+      "id": "drillbit/rotate-secret",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23807,
+        "tokens_per_run": 23807,
+        "wallclock_ms": 37919,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 37919
+      }
+    },
+    {
+      "id": "drillbit/scale-replicas",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23317.6,
+        "tokens_per_run": 23317.6,
+        "wallclock_ms": 41067.2,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 41067.2
+      }
+    },
+    {
+      "id": "inkwell/add-healthcheck",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0.6,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23480.333333333332,
+        "tokens_per_run": 23607,
+        "wallclock_ms": 38856.8,
+        "pass_rate_stdev": 0.5477225575051662,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0.6,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 38856.8
+      }
+    },
+    {
+      "id": "inkwell/configure-scaling",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0.6,
+        "pass_at_1": 1,
+        "tokens_per_pass": 24253,
+        "tokens_per_run": 24085.4,
+        "wallclock_ms": 40452.6,
+        "pass_rate_stdev": 0.5477225575051662,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0.6,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 40452.6
+      }
+    },
+    {
+      "id": "inkwell/cpu-scaling",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 24086.4,
+        "tokens_per_run": 24086.4,
+        "wallclock_ms": 39716.6,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 39716.6
+      }
+    },
+    {
+      "id": "inkwell/full-config",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": 24204,
+        "wallclock_ms": 43703.6,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 43703.6
+      }
+    },
+    {
+      "id": "inkwell/new-service",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0.8,
+        "pass_at_1": 0,
+        "tokens_per_pass": 23854.75,
+        "tokens_per_run": 23839.6,
+        "wallclock_ms": 38856.6,
+        "pass_rate_stdev": 0.44721359549995804,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0.8,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 38856.6
+      }
+    },
+    {
+      "id": "inkwell/set-rate-limit",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 0.8,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23835,
+        "tokens_per_run": 23880.6,
+        "wallclock_ms": 52989.2,
+        "pass_rate_stdev": 0.44721359549995804,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 0.8,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 52989.2
+      }
+    },
+    {
+      "id": "opencode/agents-md-akm-snippet",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23526.8,
+        "tokens_per_run": 23526.8,
+        "wallclock_ms": 59031,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 59031
+      }
+    },
+    {
+      "id": "opencode/provider-akm-feedback",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23290.2,
+        "tokens_per_run": 23290.2,
+        "wallclock_ms": 45833.2,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 45833.2
+      }
+    },
+    {
+      "id": "opencode/select-correct-skill",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23059.8,
+        "tokens_per_run": 23059.8,
+        "wallclock_ms": 39358,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 39358
+      }
+    },
+    {
+      "id": "opencode/tool-allowlist",
+      "noakm": {
+        "pass_rate": 0,
+        "pass_at_1": 0,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 0,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 0,
+        "runs_with_measured_tokens": 0
+      },
+      "akm": {
+        "pass_rate": 1,
+        "pass_at_1": 1,
+        "tokens_per_pass": 23596.6,
+        "tokens_per_run": 23596.6,
+        "wallclock_ms": 37742.4,
+        "pass_rate_stdev": 0,
+        "budget_exceeded_count": 0,
+        "harness_error_count": 0,
+        "count": 5,
+        "runs_with_measured_tokens": 5
+      },
+      "delta": {
+        "pass_rate": 1,
+        "tokens_per_pass": null,
+        "tokens_per_run": null,
+        "wallclock_ms": 37742.4
+      }
+    }
+  ],
+  "negative_transfer_count": 0,
+  "negative_transfer_severity": 0,
+  "top_regressed_tasks": [],
+  "domain_level_deltas": [
+    {
+      "domain": "az-cli",
+      "task_count": 5,
+      "regression_count": 0,
+      "pass_rate_noakm": 0,
+      "pass_rate_akm": 1,
+      "pass_rate_delta": 1,
+      "tokens_per_pass_delta": null,
+      "wallclock_ms_delta": 39599.479999999996
+    },
+    {
+      "domain": "docker-homelab",
+      "task_count": 6,
+      "regression_count": 0,
+      "pass_rate_noakm": 0,
+      "pass_rate_akm": 0.5333333333333333,
+      "pass_rate_delta": 0.5333333333333333,
+      "tokens_per_pass_delta": null,
+      "wallclock_ms_delta": 57414.799999999996
+    },
+    {
+      "domain": "drillbit",
+      "task_count": 5,
+      "regression_count": 0,
+      "pass_rate_noakm": 0,
+      "pass_rate_akm": 1,
+      "pass_rate_delta": 1,
+      "tokens_per_pass_delta": null,
+      "wallclock_ms_delta": 38388.4
+    },
+    {
+      "domain": "inkwell",
+      "task_count": 6,
+      "regression_count": 0,
+      "pass_rate_noakm": 0,
+      "pass_rate_akm": 0.6333333333333333,
+      "pass_rate_delta": 0.6333333333333333,
+      "tokens_per_pass_delta": null,
+      "wallclock_ms_delta": 42429.23333333334
+    },
+    {
+      "domain": "opencode",
+      "task_count": 4,
+      "regression_count": 0,
+      "pass_rate_noakm": 0,
+      "pass_rate_akm": 1,
+      "pass_rate_delta": 1,
+      "tokens_per_pass_delta": null,
+      "wallclock_ms_delta": 45491.15
+    }
+  ],
+  "asset_regression_candidates": [],
+  "corpus_coverage": {
+    "coverage": {
+      "totalTasks": 26,
+      "memoryAbilityCounts": {
+        "untagged": 0,
+        "procedural_lookup": 24,
+        "multi_asset_composition": 1,
+        "temporal_update": 0,
+        "conflict_resolution": 1,
+        "abstention": 0,
+        "noisy_retrieval": 0
+      },
+      "taskFamilyCounts": {
+        "az-cli/commands": 5,
+        "docker-homelab/compose-basics": 6,
+        "drillbit/backup": 1,
+        "drillbit/canary": 1,
+        "drillbit/provision": 1,
+        "drillbit/secret": 1,
+        "drillbit/scale": 1,
+        "inkwell/healthcheck": 1,
+        "inkwell/scaling": 2,
+        "inkwell/full-config": 1,
+        "inkwell/service": 1,
+        "inkwell/limits": 1,
+        "opencode/config-basics": 3,
+        "opencode/agents-md": 1
+      }
+    },
+    "by_memory_ability": [
+      {
+        "category": "conflict_resolution",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 1,
+        "pass_rate_delta": 1,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.61
+      },
+      {
+        "category": "multi_asset_composition",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 0,
+        "pass_rate_delta": 0,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.7441666666666664
+      },
+      {
+        "category": "procedural_lookup",
+        "task_count": 24,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 0.8333333333333334,
+        "pass_rate_delta": 0.8333333333333334,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.6833796296296296
+      }
+    ],
+    "by_task_family": [
+      {
+        "category": "az-cli/commands",
+        "task_count": 5,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 1,
+        "pass_rate_delta": 1,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.6558333333333333
+      },
+      {
+        "category": "docker-homelab/compose-basics",
+        "task_count": 6,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 0.5333333333333333,
+        "pass_rate_delta": 0.5333333333333333,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.6899999999999998
+      },
+      {
+        "category": "drillbit/backup",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 1,
+        "pass_rate_delta": 1,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.6722222222222222
+      },
+      {
+        "category": "drillbit/canary",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 1,
+        "pass_rate_delta": 1,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.7055555555555555
+      },
+      {
+        "category": "drillbit/provision",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 1,
+        "pass_rate_delta": 1,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.6722222222222222
+      },
+      {
+        "category": "drillbit/scale",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 1,
+        "pass_rate_delta": 1,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.6722222222222222
+      },
+      {
+        "category": "drillbit/secret",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 1,
+        "pass_rate_delta": 1,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.7055555555555555
+      },
+      {
+        "category": "inkwell/full-config",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 0,
+        "pass_rate_delta": 0,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.7441666666666664
+      },
+      {
+        "category": "inkwell/healthcheck",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 0.6,
+        "pass_rate_delta": 0.6,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.7091666666666665
+      },
+      {
+        "category": "inkwell/limits",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 0.8,
+        "pass_rate_delta": 0.8,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.7241666666666665
+      },
+      {
+        "category": "inkwell/scaling",
+        "task_count": 2,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 0.8,
+        "pass_rate_delta": 0.8,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.6974999999999999
+      },
+      {
+        "category": "inkwell/service",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 0.8,
+        "pass_rate_delta": 0.8,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.6974999999999999
+      },
+      {
+        "category": "opencode/agents-md",
+        "task_count": 1,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 1,
+        "pass_rate_delta": 1,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.61
+      },
+      {
+        "category": "opencode/config-basics",
+        "task_count": 3,
+        "pass_rate_noakm": 0,
+        "pass_rate_akm": 1,
+        "pass_rate_delta": 1,
+        "negative_transfer_count": 0,
+        "workflow_compliance": 0.6761111111111111
+      }
+    ]
+  },
+  "workflow": {
+    "total_checks": 780,
+    "applicable_checks": 495,
+    "overall_compliance": 0.6827609427609428,
+    "strict_pass_rate": 0,
+    "partial_pass_rate": 1,
+    "fail_rate": 0,
+    "violation_count": 1364,
+    "by_workflow": {
+      "akm-correct-asset-use": {
+        "workflow_id": "akm-correct-asset-use",
+        "count": 130,
+        "score": 0.7812820512820496,
+        "pass_rate": 0,
+        "partial_rate": 1,
+        "fail_rate": 0,
+        "violation_count": 258
+      },
+      "akm-feedback-after-use": {
+        "workflow_id": "akm-feedback-after-use",
+        "count": 130,
+        "score": 0.5238095238095236,
+        "pass_rate": 0,
+        "partial_rate": 1,
+        "fail_rate": 0,
+        "violation_count": 399
+      },
+      "akm-lookup-before-edit": {
+        "workflow_id": "akm-lookup-before-edit",
+        "count": 130,
+        "score": 0.7346153846153852,
+        "pass_rate": 0,
+        "partial_rate": 1,
+        "fail_rate": 0,
+        "violation_count": 251
+      },
+      "akm-negative-feedback-on-failure": {
+        "workflow_id": "akm-negative-feedback-on-failure",
+        "count": 130,
+        "score": 0.7399999999999998,
+        "pass_rate": 0,
+        "partial_rate": 1,
+        "fail_rate": 0,
+        "violation_count": 73
+      },
+      "akm-reflect-after-repeated-failure": {
+        "workflow_id": "akm-reflect-after-repeated-failure",
+        "count": 130,
+        "score": 0.6075555555555557,
+        "pass_rate": 0,
+        "partial_rate": 1,
+        "fail_rate": 0,
+        "violation_count": 294
+      },
+      "akm-workflow-followed": {
+        "workflow_id": "akm-workflow-followed",
+        "count": 130,
+        "score": 0.7277777777777777,
+        "pass_rate": 0,
+        "partial_rate": 1,
+        "fail_rate": 0,
+        "violation_count": 89
+      }
+    },
+    "top_violations": [
+      {
+        "code": "missing_required_event",
+        "count": 681,
+        "evidence": [
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-correct-asset-use",
+            "message": "expected ≥1 first_workspace_write event(s), observed 0",
+            "expected": "first_workspace_write x1",
+            "observed": "0"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected ≥1 akm_feedback event(s) with polarity=positive, observed 0",
+            "expected": "akm_feedback(positive) x1",
+            "observed": "0"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-lookup-before-edit",
+            "message": "expected ≥1 first_workspace_write event(s), observed 0",
+            "expected": "first_workspace_write x1",
+            "observed": "0"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-reflect-after-repeated-failure",
+            "message": "expected ≥2 akm_feedback event(s) with polarity=negative, observed 0",
+            "expected": "akm_feedback(negative) x2",
+            "observed": "0"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-reflect-after-repeated-failure",
+            "message": "expected ≥1 akm_reflect event(s), observed 0",
+            "expected": "akm_reflect x1",
+            "observed": "0"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-reflect-after-repeated-failure",
+            "message": "expected ≥1 akm_distill event(s), observed 0",
+            "expected": "akm_distill x1",
+            "observed": "0"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-correct-asset-use",
+            "message": "expected ≥1 first_workspace_write event(s), observed 0",
+            "expected": "first_workspace_write x1",
+            "observed": "0"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected ≥1 akm_feedback event(s) with polarity=positive, observed 0",
+            "expected": "akm_feedback(positive) x1",
+            "observed": "0"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-lookup-before-edit",
+            "message": "expected ≥1 first_workspace_write event(s), observed 0",
+            "expected": "first_workspace_write x1",
+            "observed": "0"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-reflect-after-repeated-failure",
+            "message": "expected ≥2 akm_feedback event(s) with polarity=negative, observed 0",
+            "expected": "akm_feedback(negative) x2",
+            "observed": "0"
+          }
+        ]
+      },
+      {
+        "code": "wrong_feedback_polarity",
+        "count": 461,
+        "evidence": [
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-correct-asset-use",
+            "message": "verifier passed but agent recorded no positive feedback",
+            "expected": "positive",
+            "observed": "unknown"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "verifier passed but agent recorded no positive feedback",
+            "expected": "positive",
+            "observed": "unknown"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-lookup-before-edit",
+            "message": "verifier passed but agent recorded no positive feedback",
+            "expected": "positive",
+            "observed": "unknown"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-reflect-after-repeated-failure",
+            "message": "verifier passed but agent recorded no positive feedback",
+            "expected": "positive",
+            "observed": "unknown"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-correct-asset-use",
+            "message": "verifier passed but agent recorded no positive feedback",
+            "expected": "positive",
+            "observed": "unknown"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "verifier passed but agent recorded no positive feedback",
+            "expected": "positive",
+            "observed": "unknown"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-lookup-before-edit",
+            "message": "verifier passed but agent recorded no positive feedback",
+            "expected": "positive",
+            "observed": "unknown"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-reflect-after-repeated-failure",
+            "message": "verifier passed but agent recorded no positive feedback",
+            "expected": "positive",
+            "observed": "unknown"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 1,
+            "workflow_id": "akm-correct-asset-use",
+            "message": "verifier passed but agent recorded no positive feedback",
+            "expected": "positive",
+            "observed": "unknown"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 1,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "verifier passed but agent recorded no positive feedback",
+            "expected": "positive",
+            "observed": "unknown"
+          }
+        ]
+      },
+      {
+        "code": "wrong_order",
+        "count": 121,
+        "evidence": [
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+            "expected": "verifier_run < akm_feedback",
+            "observed": "akm_feedback < verifier_run"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+            "expected": "verifier_run < akm_feedback",
+            "observed": "akm_feedback < verifier_run"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 1,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+            "expected": "verifier_run < akm_feedback",
+            "observed": "akm_feedback < verifier_run"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 4,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+            "expected": "verifier_run < akm_feedback",
+            "observed": "akm_feedback < verifier_run"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 3,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+            "expected": "verifier_run < akm_feedback",
+            "observed": "akm_feedback < verifier_run"
+          },
+          {
+            "task_id": "az-cli/create-resource-group",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+            "expected": "verifier_run < akm_feedback",
+            "observed": "akm_feedback < verifier_run"
+          },
+          {
+            "task_id": "az-cli/create-resource-group",
+            "arm": "akm",
+            "seed": 1,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+            "expected": "verifier_run < akm_feedback",
+            "observed": "akm_feedback < verifier_run"
+          },
+          {
+            "task_id": "az-cli/create-resource-group",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+            "expected": "verifier_run < akm_feedback",
+            "observed": "akm_feedback < verifier_run"
+          },
+          {
+            "task_id": "az-cli/create-resource-group",
+            "arm": "akm",
+            "seed": 4,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+            "expected": "verifier_run < akm_feedback",
+            "observed": "akm_feedback < verifier_run"
+          },
+          {
+            "task_id": "az-cli/create-resource-group",
+            "arm": "akm",
+            "seed": 3,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+            "expected": "verifier_run < akm_feedback",
+            "observed": "akm_feedback < verifier_run"
+          }
+        ]
+      },
+      {
+        "code": "late_feedback",
+        "count": 97,
+        "evidence": [
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "akm_feedback occurred before verifier_run",
+            "expected": "akm_feedback after verifier_run",
+            "observed": "akm_feedback before verifier_run"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "akm_feedback occurred before verifier_run",
+            "expected": "akm_feedback after verifier_run",
+            "observed": "akm_feedback before verifier_run"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 1,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "akm_feedback occurred before verifier_run",
+            "expected": "akm_feedback after verifier_run",
+            "observed": "akm_feedback before verifier_run"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 4,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "akm_feedback occurred before verifier_run",
+            "expected": "akm_feedback after verifier_run",
+            "observed": "akm_feedback before verifier_run"
+          },
+          {
+            "task_id": "az-cli/assign-managed-identity",
+            "arm": "akm",
+            "seed": 3,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "akm_feedback occurred before verifier_run",
+            "expected": "akm_feedback after verifier_run",
+            "observed": "akm_feedback before verifier_run"
+          },
+          {
+            "task_id": "az-cli/create-resource-group",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "akm_feedback occurred before verifier_run",
+            "expected": "akm_feedback after verifier_run",
+            "observed": "akm_feedback before verifier_run"
+          },
+          {
+            "task_id": "az-cli/create-resource-group",
+            "arm": "akm",
+            "seed": 1,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "akm_feedback occurred before verifier_run",
+            "expected": "akm_feedback after verifier_run",
+            "observed": "akm_feedback before verifier_run"
+          },
+          {
+            "task_id": "az-cli/create-resource-group",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "akm_feedback occurred before verifier_run",
+            "expected": "akm_feedback after verifier_run",
+            "observed": "akm_feedback before verifier_run"
+          },
+          {
+            "task_id": "az-cli/create-resource-group",
+            "arm": "akm",
+            "seed": 4,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "akm_feedback occurred before verifier_run",
+            "expected": "akm_feedback after verifier_run",
+            "observed": "akm_feedback before verifier_run"
+          },
+          {
+            "task_id": "az-cli/create-resource-group",
+            "arm": "akm",
+            "seed": 3,
+            "workflow_id": "akm-feedback-after-use",
+            "message": "akm_feedback occurred before verifier_run",
+            "expected": "akm_feedback after verifier_run",
+            "observed": "akm_feedback before verifier_run"
+          }
+        ]
+      },
+      {
+        "code": "irrelevant_asset_loaded",
+        "count": 4,
+        "evidence": [
+          {
+            "task_id": "opencode/select-correct-skill",
+            "arm": "akm",
+            "seed": 2,
+            "workflow_id": "akm-correct-asset-use",
+            "message": "gold asset skill:opencode was never loaded via akm_show",
+            "expected": "skill:opencode"
+          },
+          {
+            "task_id": "opencode/select-correct-skill",
+            "arm": "akm",
+            "seed": 0,
+            "workflow_id": "akm-correct-asset-use",
+            "message": "gold asset skill:opencode was never loaded via akm_show",
+            "expected": "skill:opencode"
+          },
+          {
+            "task_id": "opencode/select-correct-skill",
+            "arm": "akm",
+            "seed": 3,
+            "workflow_id": "akm-correct-asset-use",
+            "message": "gold asset skill:opencode was never loaded via akm_show",
+            "expected": "skill:opencode"
+          },
+          {
+            "task_id": "opencode/tool-allowlist",
+            "arm": "akm",
+            "seed": 4,
+            "workflow_id": "akm-correct-asset-use",
+            "message": "akm_show did not load gold_ref=skill:opencode",
+            "expected": "skill:opencode",
+            "observed": "knowledge:opencode-config"
+          }
+        ]
+      }
+    ],
+    "cross_tab": [
+      {
+        "task_outcome": "pass",
+        "pass": 0,
+        "partial": 105,
+        "fail": 0,
+        "total": 105
+      },
+      {
+        "task_outcome": "fail",
+        "pass": 0,
+        "partial": 25,
+        "fail": 0,
+        "total": 25
+      }
+    ],
+    "reliability": {
+      "by_workflow": {
+        "akm-correct-asset-use": {
+          "workflow_id": "akm-correct-asset-use",
+          "pass_at_k": 0,
+          "pass_all_k": 0,
+          "tasks": 26,
+          "k": 5
+        },
+        "akm-feedback-after-use": {
+          "workflow_id": "akm-feedback-after-use",
+          "pass_at_k": 0,
+          "pass_all_k": 0,
+          "tasks": 25,
+          "k": 5
+        },
+        "akm-lookup-before-edit": {
+          "workflow_id": "akm-lookup-before-edit",
+          "pass_at_k": 0,
+          "pass_all_k": 0,
+          "tasks": 26,
+          "k": 5
+        },
+        "akm-reflect-after-repeated-failure": {
+          "workflow_id": "akm-reflect-after-repeated-failure",
+          "pass_at_k": 0,
+          "pass_all_k": 0,
+          "tasks": 15,
+          "k": 5
+        },
+        "akm-negative-feedback-on-failure": {
+          "workflow_id": "akm-negative-feedback-on-failure",
+          "pass_at_k": 0,
+          "pass_all_k": 0,
+          "tasks": 11,
+          "k": 5
+        },
+        "akm-workflow-followed": {
+          "workflow_id": "akm-workflow-followed",
+          "pass_at_k": 0,
+          "pass_all_k": 0,
+          "tasks": 6,
+          "k": 5
+        }
+      },
+      "corpus": {
+        "pass_at_k": 0,
+        "pass_all_k": 0,
+        "groups": 109,
+        "tasks": 26
+      }
+    }
+  },
+  "warnings": [],
+  "searchBridge": {
+    "runs_observed": 130,
+    "searches_observed": 0,
+    "gold_rank_distribution": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "6": 0,
+      "7": 0,
+      "8": 0,
+      "9": 0,
+      "10": 0,
+      "missing": 0
+    },
+    "gold_rank_p50": null,
+    "gold_rank_p90": null,
+    "gold_at_rank_1": 0,
+    "gold_missing": 0,
+    "pass_rate_by_rank": []
+  },
+  "runs": [
+    {
+      "task_id": "az-cli/assign-managed-identity",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23560,
+        "output": 27
+      },
+      "wallclock_ms": 39469,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/assign-managed-identity",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23626,
+        "output": 28
+      },
+      "wallclock_ms": 40706,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/assign-managed-identity",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23672,
+        "output": 37
+      },
+      "wallclock_ms": 41553,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/assign-managed-identity",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23577,
+        "output": 29
+      },
+      "wallclock_ms": 29463,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/assign-managed-identity",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23608,
+        "output": 58
+      },
+      "wallclock_ms": 29683,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/create-resource-group",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23566,
+        "output": 31
+      },
+      "wallclock_ms": 49883,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/create-resource-group",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23567,
+        "output": 42
+      },
+      "wallclock_ms": 50029,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/create-resource-group",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23633,
+        "output": 28
+      },
+      "wallclock_ms": 51352,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/create-resource-group",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23572,
+        "output": 26
+      },
+      "wallclock_ms": 22169,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/create-resource-group",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23590,
+        "output": 25
+      },
+      "wallclock_ms": 23363,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/keyvault-secret-set",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23653,
+        "output": 39
+      },
+      "wallclock_ms": 38279,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/keyvault-secret-set",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23676,
+        "output": 93
+      },
+      "wallclock_ms": 38874,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/keyvault-secret-set",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23947,
+        "output": 54
+      },
+      "wallclock_ms": 41068,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/keyvault-secret-set",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23688,
+        "output": 22
+      },
+      "wallclock_ms": 26770,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/keyvault-secret-set",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23782,
+        "output": 60
+      },
+      "wallclock_ms": 26993,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/query-by-tag",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23544,
+        "output": 36
+      },
+      "wallclock_ms": 53968,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/query-by-tag",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23546,
+        "output": 80
+      },
+      "wallclock_ms": 54377,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/query-by-tag",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23540,
+        "output": 132
+      },
+      "wallclock_ms": 54795,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/query-by-tag",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23545,
+        "output": 49
+      },
+      "wallclock_ms": 30817,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/query-by-tag",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23555,
+        "output": 85
+      },
+      "wallclock_ms": 31084,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/storage-account-create",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23571,
+        "output": 56
+      },
+      "wallclock_ms": 50444,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/storage-account-create",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23642,
+        "output": 40
+      },
+      "wallclock_ms": 51491,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/storage-account-create",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23625,
+        "output": 141
+      },
+      "wallclock_ms": 51596,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/storage-account-create",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23614,
+        "output": 43
+      },
+      "wallclock_ms": 30759,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "az-cli/storage-account-create",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23595,
+        "output": 73
+      },
+      "wallclock_ms": 31002,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:az-cli"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/bridge-network",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23833,
+        "output": 152
+      },
+      "wallclock_ms": 73972,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/bridge-network",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23758,
+        "output": 180
+      },
+      "wallclock_ms": 74316,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/bridge-network",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 22284,
+        "output": 21
+      },
+      "wallclock_ms": 80633,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab", "knowledge:networking"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/bridge-network",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23889,
+        "output": 117
+      },
+      "wallclock_ms": 38585,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/bridge-network",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 22075,
+        "output": 85
+      },
+      "wallclock_ms": 45425,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab", "knowledge:networking"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/compose-version-upgrade",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 22872,
+        "output": 71
+      },
+      "wallclock_ms": 85432,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab", "knowledge:compose-migration"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/compose-version-upgrade",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23634,
+        "output": 223
+      },
+      "wallclock_ms": 100124,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab", "knowledge:compose-migration"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/compose-version-upgrade",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23907,
+        "output": 217
+      },
+      "wallclock_ms": 104564,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab", "knowledge:compose-migration"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/compose-version-upgrade",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 22146,
+        "output": 62
+      },
+      "wallclock_ms": 48983,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab", "knowledge:compose-migration"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/compose-version-upgrade",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 22345,
+        "output": 102
+      },
+      "wallclock_ms": 52968,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": false
+      },
+      "assets_loaded": ["skill:docker-homelab", "knowledge:compose-migration"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/env-from-file",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 24112,
+        "output": 39
+      },
+      "wallclock_ms": 74164,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/env-from-file",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 24191,
+        "output": 43
+      },
+      "wallclock_ms": 74207,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/env-from-file",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24380,
+        "output": 170
+      },
+      "wallclock_ms": 76397,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/env-from-file",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23876,
+        "output": 25
+      },
+      "wallclock_ms": 32593,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/env-from-file",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 22192,
+        "output": 49
+      },
+      "wallclock_ms": 41831,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": false
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/named-volume",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23519,
+        "output": 84
+      },
+      "wallclock_ms": 39491,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/named-volume",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23808,
+        "output": 109
+      },
+      "wallclock_ms": 40538,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/named-volume",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24131,
+        "output": 156
+      },
+      "wallclock_ms": 43793,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/named-volume",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23440,
+        "output": 99
+      },
+      "wallclock_ms": 25420,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/named-volume",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23583,
+        "output": 61
+      },
+      "wallclock_ms": 26254,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/redis-healthcheck",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24437,
+        "output": 56
+      },
+      "wallclock_ms": 64434,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab", "knowledge:healthcheck-patterns"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/redis-healthcheck",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 24224,
+        "output": 73
+      },
+      "wallclock_ms": 65985,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/redis-healthcheck",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 22280,
+        "output": 85
+      },
+      "wallclock_ms": 70132,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab", "knowledge:healthcheck-patterns"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/redis-healthcheck",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 24310,
+        "output": 37
+      },
+      "wallclock_ms": 40840,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab", "knowledge:healthcheck-patterns"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/redis-healthcheck",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23777,
+        "output": 59
+      },
+      "wallclock_ms": 40993,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/restart-policy",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23525,
+        "output": 40
+      },
+      "wallclock_ms": 52652,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/restart-policy",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 24131,
+        "output": 132
+      },
+      "wallclock_ms": 57142,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "docker-homelab/restart-policy",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24334,
+        "output": 67
+      },
+      "wallclock_ms": 73139,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/restart-policy",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24140,
+        "output": 32
+      },
+      "wallclock_ms": 38458,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "docker-homelab/restart-policy",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24324,
+        "output": 107
+      },
+      "wallclock_ms": 38979,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:docker-homelab"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/backup-policy",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23303,
+        "output": 27
+      },
+      "wallclock_ms": 38165,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/backup-policy",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23288,
+        "output": 37
+      },
+      "wallclock_ms": 40264,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/backup-policy",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23664,
+        "output": 99
+      },
+      "wallclock_ms": 43646,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/backup-policy",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23274,
+        "output": 29
+      },
+      "wallclock_ms": 28503,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/backup-policy",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23360,
+        "output": 30
+      },
+      "wallclock_ms": 29525,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/canary-enable",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23253,
+        "output": 37
+      },
+      "wallclock_ms": 48298,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/canary-enable",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23273,
+        "output": 36
+      },
+      "wallclock_ms": 48302,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/canary-enable",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23301,
+        "output": 108
+      },
+      "wallclock_ms": 48775,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/canary-enable",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23308,
+        "output": 42
+      },
+      "wallclock_ms": 26551,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/canary-enable",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24245,
+        "output": 153
+      },
+      "wallclock_ms": 26705,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": false
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/provision-edge",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23327,
+        "output": 23
+      },
+      "wallclock_ms": 44251,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/provision-edge",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23995,
+        "output": 71
+      },
+      "wallclock_ms": 48233,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/provision-edge",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23401,
+        "output": 62
+      },
+      "wallclock_ms": 52243,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/provision-edge",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23267,
+        "output": 137
+      },
+      "wallclock_ms": 20621,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/provision-edge",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23286,
+        "output": 42
+      },
+      "wallclock_ms": 20697,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/rotate-secret",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24249,
+        "output": 88
+      },
+      "wallclock_ms": 41747,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": false
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/rotate-secret",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23255,
+        "output": 148
+      },
+      "wallclock_ms": 42676,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/rotate-secret",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23407,
+        "output": 115
+      },
+      "wallclock_ms": 44368,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/rotate-secret",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23240,
+        "output": 69
+      },
+      "wallclock_ms": 29769,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/rotate-secret",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24361,
+        "output": 103
+      },
+      "wallclock_ms": 31035,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/scale-replicas",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23237,
+        "output": 34
+      },
+      "wallclock_ms": 45485,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/scale-replicas",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23235,
+        "output": 42
+      },
+      "wallclock_ms": 45583,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/scale-replicas",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23237,
+        "output": 110
+      },
+      "wallclock_ms": 46045,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/scale-replicas",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23299,
+        "output": 32
+      },
+      "wallclock_ms": 34111,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "drillbit/scale-replicas",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23228,
+        "output": 134
+      },
+      "wallclock_ms": 34112,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:drillbit"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/add-healthcheck",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23734,
+        "output": 46
+      },
+      "wallclock_ms": 43170,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/add-healthcheck",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23734,
+        "output": 61
+      },
+      "wallclock_ms": 43659,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/add-healthcheck",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 22267,
+        "output": 10
+      },
+      "wallclock_ms": 51844,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell", "memory:healthcheck-test-cmd"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/add-healthcheck",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23668,
+        "output": 131
+      },
+      "wallclock_ms": 26478,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/add-healthcheck",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24338,
+        "output": 46
+      },
+      "wallclock_ms": 29133,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/configure-scaling",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23683,
+        "output": 56
+      },
+      "wallclock_ms": 43898,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/configure-scaling",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23751,
+        "output": 105
+      },
+      "wallclock_ms": 44768,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/configure-scaling",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24452,
+        "output": 70
+      },
+      "wallclock_ms": 48461,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/configure-scaling",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23793,
+        "output": 136
+      },
+      "wallclock_ms": 31363,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/configure-scaling",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24319,
+        "output": 62
+      },
+      "wallclock_ms": 33773,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/cpu-scaling",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23838,
+        "output": 74
+      },
+      "wallclock_ms": 39900,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/cpu-scaling",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24275,
+        "output": 52
+      },
+      "wallclock_ms": 46314,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/cpu-scaling",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24129,
+        "output": 85
+      },
+      "wallclock_ms": 47690,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/cpu-scaling",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23968,
+        "output": 62
+      },
+      "wallclock_ms": 31856,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/cpu-scaling",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23907,
+        "output": 42
+      },
+      "wallclock_ms": 32823,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/full-config",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 24055,
+        "output": 76
+      },
+      "wallclock_ms": 48095,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/full-config",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 24186,
+        "output": 112
+      },
+      "wallclock_ms": 51335,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/full-config",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 24212,
+        "output": 45
+      },
+      "wallclock_ms": 51620,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/full-config",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23758,
+        "output": 104
+      },
+      "wallclock_ms": 31878,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/full-config",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 24322,
+        "output": 150
+      },
+      "wallclock_ms": 35590,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/new-service",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23641,
+        "output": 49
+      },
+      "wallclock_ms": 34155,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/new-service",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23751,
+        "output": 28
+      },
+      "wallclock_ms": 39333,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/new-service",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23861,
+        "output": 98
+      },
+      "wallclock_ms": 39841,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/new-service",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23762,
+        "output": 86
+      },
+      "wallclock_ms": 40242,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/new-service",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23772,
+        "output": 150
+      },
+      "wallclock_ms": 40712,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/set-rate-limit",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "fail",
+      "tokens": {
+        "input": 23970,
+        "output": 93
+      },
+      "wallclock_ms": 58060,
+      "verifier_exit_code": 1,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": "loaded_ignored"
+    },
+    {
+      "task_id": "inkwell/set-rate-limit",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24179,
+        "output": 53
+      },
+      "wallclock_ms": 65947,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/set-rate-limit",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 22534,
+        "output": 92
+      },
+      "wallclock_ms": 74463,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": false
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/set-rate-limit",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24001,
+        "output": 57
+      },
+      "wallclock_ms": 32261,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "inkwell/set-rate-limit",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24369,
+        "output": 55
+      },
+      "wallclock_ms": 34215,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:inkwell"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/agents-md-akm-snippet",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23881,
+        "output": 148
+      },
+      "wallclock_ms": 65735,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode", "knowledge:opencode-config", "knowledge:opencode-agents"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/agents-md-akm-snippet",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24008,
+        "output": 159
+      },
+      "wallclock_ms": 72628,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["knowledge:opencode-agents", "skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/agents-md-akm-snippet",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 22226,
+        "output": 51
+      },
+      "wallclock_ms": 92366,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/agents-md-akm-snippet",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23766,
+        "output": 60
+      },
+      "wallclock_ms": 31733,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/agents-md-akm-snippet",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23293,
+        "output": 42
+      },
+      "wallclock_ms": 32693,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/provider-akm-feedback",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23355,
+        "output": 94
+      },
+      "wallclock_ms": 47179,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": false
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/provider-akm-feedback",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23474,
+        "output": 43
+      },
+      "wallclock_ms": 47407,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": false
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/provider-akm-feedback",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23569,
+        "output": 87
+      },
+      "wallclock_ms": 49236,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/provider-akm-feedback",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23654,
+        "output": 47
+      },
+      "wallclock_ms": 37819,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/provider-akm-feedback",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 22075,
+        "output": 53
+      },
+      "wallclock_ms": 47525,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": false
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/select-correct-skill",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23422,
+        "output": 38
+      },
+      "wallclock_ms": 34870,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": [],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/select-correct-skill",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23613,
+        "output": 172
+      },
+      "wallclock_ms": 36282,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": [],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/select-correct-skill",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 21882,
+        "output": 15
+      },
+      "wallclock_ms": 40116,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": false
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/select-correct-skill",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 24070,
+        "output": 45
+      },
+      "wallclock_ms": 40052,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/select-correct-skill",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 21983,
+        "output": 59
+      },
+      "wallclock_ms": 45470,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": [],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/tool-allowlist",
+      "arm": "akm",
+      "seed": 2,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23379,
+        "output": 39
+      },
+      "wallclock_ms": 42770,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/tool-allowlist",
+      "arm": "akm",
+      "seed": 1,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23707,
+        "output": 91
+      },
+      "wallclock_ms": 50257,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/tool-allowlist",
+      "arm": "akm",
+      "seed": 0,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23899,
+        "output": 92
+      },
+      "wallclock_ms": 52225,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/tool-allowlist",
+      "arm": "akm",
+      "seed": 4,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23172,
+        "output": 59
+      },
+      "wallclock_ms": 20446,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": false,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["knowledge:opencode-config"],
+      "failure_mode": null
+    },
+    {
+      "task_id": "opencode/tool-allowlist",
+      "arm": "akm",
+      "seed": 3,
+      "model": "shredder/qwen/qwen3.5-9b",
+      "outcome": "pass",
+      "tokens": {
+        "input": 23416,
+        "output": 129
+      },
+      "wallclock_ms": 23014,
+      "verifier_exit_code": 0,
+      "trajectory": {
+        "correct_asset_loaded": true,
+        "feedback_recorded": true
+      },
+      "assets_loaded": ["skill:opencode"],
+      "failure_mode": null
+    }
+  ],
+  "perAsset": {
+    "total_akm_runs": 130,
+    "rows": [
+      {
+        "asset_ref": "skill:inkwell",
+        "load_count": 30,
+        "load_count_passing": 19,
+        "load_count_failing": 11,
+        "load_pass_rate": 0.6333333333333333
+      },
+      {
+        "asset_ref": "skill:docker-homelab",
+        "load_count": 30,
+        "load_count_passing": 16,
+        "load_count_failing": 14,
+        "load_pass_rate": 0.5333333333333333
+      },
+      {
+        "asset_ref": "skill:az-cli",
+        "load_count": 25,
+        "load_count_passing": 25,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "skill:drillbit",
+        "load_count": 25,
+        "load_count_passing": 25,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "skill:opencode",
+        "load_count": 16,
+        "load_count_passing": 16,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "knowledge:compose-migration",
+        "load_count": 5,
+        "load_count_passing": 3,
+        "load_count_failing": 2,
+        "load_pass_rate": 0.6
+      },
+      {
+        "asset_ref": "knowledge:healthcheck-patterns",
+        "load_count": 3,
+        "load_count_passing": 2,
+        "load_count_failing": 1,
+        "load_pass_rate": 0.6666666666666666
+      },
+      {
+        "asset_ref": "knowledge:networking",
+        "load_count": 2,
+        "load_count_passing": 2,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "knowledge:opencode-agents",
+        "load_count": 2,
+        "load_count_passing": 2,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "knowledge:opencode-config",
+        "load_count": 2,
+        "load_count_passing": 2,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "memory:healthcheck-test-cmd",
+        "load_count": 1,
+        "load_count_passing": 1,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      }
+    ]
+  },
+  "akm_overhead": {
+    "per_run": [
+      {
+        "task_id": "az-cli/assign-managed-identity",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 10197,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/assign-managed-identity",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 10204,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/assign-managed-identity",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9786,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/assign-managed-identity",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5170,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/assign-managed-identity",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5246,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/create-resource-group",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9367,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/create-resource-group",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9134,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/create-resource-group",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9531,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/create-resource-group",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5193,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/create-resource-group",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5238,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/keyvault-secret-set",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5649,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/keyvault-secret-set",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5683,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/keyvault-secret-set",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5397,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/keyvault-secret-set",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 6220,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/keyvault-secret-set",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5890,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/query-by-tag",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9459,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/query-by-tag",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9421,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/query-by-tag",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9672,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/query-by-tag",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5157,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/query-by-tag",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5131,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/storage-account-create",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9571,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/storage-account-create",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9762,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/storage-account-create",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9772,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/storage-account-create",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5067,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "az-cli/storage-account-create",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4976,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/bridge-network",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9940,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/bridge-network",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9786,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/bridge-network",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9964,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/bridge-network",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5143,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/bridge-network",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5229,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/compose-version-upgrade",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 2,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 5,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9389,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/compose-version-upgrade",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "fail",
+        "search_count": 2,
+        "show_count": 3,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 6,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9277,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/compose-version-upgrade",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 2,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 5,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9217,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/compose-version-upgrade",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 2,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 5,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4925,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/compose-version-upgrade",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "fail",
+        "search_count": 2,
+        "show_count": 2,
+        "feedback_count": 0,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5111,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/env-from-file",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9426,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/env-from-file",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9664,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/env-from-file",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9611,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/env-from-file",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5100,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/env-from-file",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 0,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 2,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4980,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/named-volume",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9444,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/named-volume",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9171,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/named-volume",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9268,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/named-volume",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5190,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/named-volume",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5093,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/redis-healthcheck",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9481,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/redis-healthcheck",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "fail",
+        "search_count": 2,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9588,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/redis-healthcheck",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9665,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/redis-healthcheck",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5102,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/redis-healthcheck",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5221,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/restart-policy",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9410,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/restart-policy",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9596,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/restart-policy",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 2,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 10066,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/restart-policy",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5311,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "docker-homelab/restart-policy",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 2,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5228,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/backup-policy",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9092,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/backup-policy",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9239,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/backup-policy",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9065,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/backup-policy",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4824,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/backup-policy",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4971,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/canary-enable",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9053,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/canary-enable",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9233,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/canary-enable",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9161,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/canary-enable",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4893,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/canary-enable",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 2,
+        "feedback_count": 0,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5002,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/provision-edge",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9169,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/provision-edge",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9356,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/provision-edge",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 2,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 5,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9121,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/provision-edge",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5075,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/provision-edge",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4981,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/rotate-secret",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 2,
+        "feedback_count": 0,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9063,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/rotate-secret",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9130,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/rotate-secret",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 8863,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/rotate-secret",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4913,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/rotate-secret",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5051,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/scale-replicas",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9263,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/scale-replicas",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9054,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/scale-replicas",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9129,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/scale-replicas",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4904,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "drillbit/scale-replicas",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4919,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/add-healthcheck",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9303,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/add-healthcheck",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9163,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/add-healthcheck",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9132,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/add-healthcheck",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5086,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/add-healthcheck",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5086,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/configure-scaling",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5689,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/configure-scaling",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5752,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/configure-scaling",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5590,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/configure-scaling",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5071,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/configure-scaling",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4883,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/cpu-scaling",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9499,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/cpu-scaling",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9467,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/cpu-scaling",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9687,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/cpu-scaling",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5008,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/cpu-scaling",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4961,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/full-config",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 8936,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/full-config",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "fail",
+        "search_count": 2,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 14984,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/full-config",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 8721,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/full-config",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5031,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/full-config",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 4787,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/new-service",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9411,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/new-service",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9488,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/new-service",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9370,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/new-service",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5079,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/new-service",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5007,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/set-rate-limit",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "fail",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9347,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/set-rate-limit",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9186,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/set-rate-limit",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 0,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 2,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9244,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/set-rate-limit",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5093,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "inkwell/set-rate-limit",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5104,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/agents-md-akm-snippet",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 3,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 5,
+        "assets_loaded_count": 3,
+        "irrelevant_assets_loaded_count": 2,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9224,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/agents-md-akm-snippet",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 2,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 2,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9657,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/agents-md-akm-snippet",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9139,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/agents-md-akm-snippet",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5483,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/agents-md-akm-snippet",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5459,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/provider-akm-feedback",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 0,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 2,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9418,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/provider-akm-feedback",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 0,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 2,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9449,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/provider-akm-feedback",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 2,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 4,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9547,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/provider-akm-feedback",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 3,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 5,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5174,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/provider-akm-feedback",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 2,
+        "show_count": 1,
+        "feedback_count": 0,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5228,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/select-correct-skill",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 0,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 2,
+        "assets_loaded_count": 0,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": null,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/select-correct-skill",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 0,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 2,
+        "assets_loaded_count": 0,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": null,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/select-correct-skill",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 2,
+        "show_count": 1,
+        "feedback_count": 0,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9718,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/select-correct-skill",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5504,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/select-correct-skill",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 2,
+        "show_count": 0,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 0,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": null,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/tool-allowlist",
+        "arm": "akm",
+        "seed": 2,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9526,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/tool-allowlist",
+        "arm": "akm",
+        "seed": 1,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9651,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/tool-allowlist",
+        "arm": "akm",
+        "seed": 0,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 9483,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/tool-allowlist",
+        "arm": "akm",
+        "seed": 4,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 1,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": null,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      },
+      {
+        "task_id": "opencode/tool-allowlist",
+        "arm": "akm",
+        "seed": 3,
+        "outcome": "pass",
+        "search_count": 1,
+        "show_count": 1,
+        "feedback_count": 1,
+        "positive_feedback_count": 0,
+        "negative_feedback_count": 0,
+        "total_tool_calls": 3,
+        "assets_loaded_count": 1,
+        "irrelevant_assets_loaded_count": 0,
+        "time_to_first_search_ms": 0,
+        "time_to_first_correct_asset_ms": 5064,
+        "context_bytes_loaded": null,
+        "asset_bytes_loaded": null
+      }
+    ],
+    "aggregate": {
+      "total_runs": 130,
+      "passing_runs": 105,
+      "mean_search_count": 1.1,
+      "mean_show_count": 1.123076923076923,
+      "mean_feedback_count": 0.9538461538461539,
+      "mean_tool_calls": 3.1769230769230767,
+      "mean_assets_loaded": 1.0846153846153845,
+      "mean_irrelevant_assets_loaded": 0.11538461538461539,
+      "mean_time_to_first_search_ms": 0,
+      "mean_time_to_first_correct_asset_ms": 7578.587301587301,
+      "mean_context_bytes_loaded": null,
+      "mean_asset_bytes_loaded": null,
+      "total_tool_calls": 413,
+      "tool_calls_per_success": 3.933333333333333,
+      "cost_per_success": 23595.019047619047,
+      "search_engagement_rate": 1,
+      "show_engagement_rate": 0.9769230769230769,
+      "feedback_engagement_rate": 0.9307692307692308,
+      "search_to_show_ratio": 1.020979020979021,
+      "mean_positive_feedback_count": 0,
+      "mean_negative_feedback_count": 0
+    }
+  }
+}

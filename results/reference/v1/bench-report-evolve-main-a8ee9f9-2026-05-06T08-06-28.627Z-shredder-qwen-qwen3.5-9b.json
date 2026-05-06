@@ -1,0 +1,5402 @@
+{
+  "schemaVersion": 1,
+  "track": "evolve",
+  "branch": "main",
+  "commit": "a8ee9f9",
+  "timestamp": "2026-05-06T08:06:28.627Z",
+  "agent": {
+    "harness": "opencode",
+    "model": "shredder/qwen/qwen3.5-9b"
+  },
+  "corpus": {
+    "domain": "drillbit",
+    "seedsPerArm": 5
+  },
+  "proposals": {
+    "total_proposals": 0,
+    "total_accepted": 0,
+    "acceptance_rate": 0,
+    "lint_pass_rate": 0,
+    "rows": []
+  },
+  "lessons": {
+    "lessons_created_count": 0,
+    "lessons_accepted_count": 0,
+    "proposal_lint_pass_rate": 0,
+    "proposal_acceptance_rate": 0,
+    "lesson_reuse_rate": 0,
+    "lesson_reuse_success_rate": 0,
+    "lesson_negative_transfer_count": 0,
+    "lessons": []
+  },
+  "lesson_lineage": {
+    "post_tasks": []
+  },
+  "longitudinal": {
+    "improvement_slope": -0.040000000000000036,
+    "pre_pass_rate_stdev": 0,
+    "post_pass_rate_stdev": 0.08944271909999159,
+    "significance_threshold": 0.17888543819998318,
+    "interpretation": "no_improvement_detected",
+    "over_synthetic_lift": 0.64,
+    "degradation_count": 0,
+    "pre_pass_rate": 1,
+    "post_pass_rate": 0.96,
+    "synthetic_pass_rate": 0.31999999999999995,
+    "degradations": []
+  },
+  "arms": {
+    "pre": {
+      "schemaVersion": 1,
+      "track": "utility",
+      "branch": "main",
+      "commit": "a8ee9f9",
+      "timestamp": "2026-05-06T07:50:25.231Z",
+      "agent": {
+        "harness": "opencode",
+        "model": "shredder/qwen/qwen3.5-9b"
+      },
+      "corpus": {
+        "domains": 1,
+        "tasks": 5,
+        "slice": "eval",
+        "seedsPerArm": 5,
+        "selectedTaskIds": [
+          "drillbit/backup-policy",
+          "drillbit/canary-enable",
+          "drillbit/provision-edge",
+          "drillbit/rotate-secret",
+          "drillbit/scale-replicas"
+        ],
+        "taskCorpusHash": "1d8a7359737ec01b82f5e228f872dc67598837bc3e6187030bf1359c37d6ad31",
+        "fixtures": {
+          "drillbit": "5971f2a92c62625e78a340553ff739ed5c38b95762ec2c2c5515c606899675f2"
+        },
+        "fixtureContentHash": "51e955977c4a789d70044f1591e941e2d84195a52dbb0382c731aa3bb19ef6a7"
+      },
+      "aggregate": {
+        "noakm": {
+          "pass_rate": 0,
+          "tokens_per_pass": null,
+          "tokens_per_run": null,
+          "wallclock_ms": 0
+        },
+        "akm": {
+          "pass_rate": 1,
+          "tokens_per_pass": 23442.56,
+          "tokens_per_run": 23442.56,
+          "wallclock_ms": 10945.599999999999
+        },
+        "delta": {
+          "pass_rate": 1,
+          "tokens_per_pass": null,
+          "tokens_per_run": null,
+          "wallclock_ms": 10945.599999999999
+        }
+      },
+      "trajectory": {
+        "akm": {
+          "correct_asset_loaded": 1,
+          "feedback_recorded": 0.92
+        }
+      },
+      "failure_modes": {
+        "by_label": {},
+        "by_task": {}
+      },
+      "token_measurement": {
+        "total_runs": 25,
+        "runs_with_measured_tokens": 25,
+        "runs_missing_measurement": 0,
+        "runs_unsupported_measurement": 0,
+        "coverage": 1,
+        "reliable": true
+      },
+      "tasks": [
+        {
+          "id": "drillbit/backup-policy",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 1,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23410.6,
+            "tokens_per_run": 23410.6,
+            "wallclock_ms": 11507.4,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 1,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 11507.4
+          }
+        },
+        {
+          "id": "drillbit/canary-enable",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 1,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23537.4,
+            "tokens_per_run": 23537.4,
+            "wallclock_ms": 10020.8,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 1,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 10020.8
+          }
+        },
+        {
+          "id": "drillbit/provision-edge",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 1,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23394,
+            "tokens_per_run": 23394,
+            "wallclock_ms": 11042.4,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 1,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 11042.4
+          }
+        },
+        {
+          "id": "drillbit/rotate-secret",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 1,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23556,
+            "tokens_per_run": 23556,
+            "wallclock_ms": 11993.8,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 1,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 11993.8
+          }
+        },
+        {
+          "id": "drillbit/scale-replicas",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 1,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23314.8,
+            "tokens_per_run": 23314.8,
+            "wallclock_ms": 10163.6,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 1,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 10163.6
+          }
+        }
+      ],
+      "negative_transfer_count": 0,
+      "negative_transfer_severity": 0,
+      "top_regressed_tasks": [],
+      "domain_level_deltas": [
+        {
+          "domain": "drillbit",
+          "task_count": 5,
+          "regression_count": 0,
+          "pass_rate_noakm": 0,
+          "pass_rate_akm": 1,
+          "pass_rate_delta": 1,
+          "tokens_per_pass_delta": null,
+          "wallclock_ms_delta": 10945.599999999999
+        }
+      ],
+      "asset_regression_candidates": [],
+      "corpus_coverage": {
+        "coverage": {
+          "totalTasks": 5,
+          "memoryAbilityCounts": {
+            "untagged": 0,
+            "procedural_lookup": 5,
+            "multi_asset_composition": 0,
+            "temporal_update": 0,
+            "conflict_resolution": 0,
+            "abstention": 0,
+            "noisy_retrieval": 0
+          },
+          "taskFamilyCounts": {
+            "drillbit/backup": 1,
+            "drillbit/canary": 1,
+            "drillbit/provision": 1,
+            "drillbit/secret": 1,
+            "drillbit/scale": 1
+          }
+        },
+        "by_memory_ability": [
+          {
+            "category": "procedural_lookup",
+            "task_count": 5,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 1,
+            "pass_rate_delta": 1,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.6855555555555555
+          }
+        ],
+        "by_task_family": [
+          {
+            "category": "drillbit/backup",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 1,
+            "pass_rate_delta": 1,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.6722222222222222
+          },
+          {
+            "category": "drillbit/canary",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 1,
+            "pass_rate_delta": 1,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.7055555555555555
+          },
+          {
+            "category": "drillbit/provision",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 1,
+            "pass_rate_delta": 1,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.6722222222222222
+          },
+          {
+            "category": "drillbit/scale",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 1,
+            "pass_rate_delta": 1,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.6722222222222222
+          },
+          {
+            "category": "drillbit/secret",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 1,
+            "pass_rate_delta": 1,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.7055555555555555
+          }
+        ]
+      },
+      "workflow": {
+        "total_checks": 150,
+        "applicable_checks": 75,
+        "overall_compliance": 0.6855555555555554,
+        "strict_pass_rate": 0,
+        "partial_pass_rate": 1,
+        "fail_rate": 0,
+        "violation_count": 190,
+        "by_workflow": {
+          "akm-correct-asset-use": {
+            "workflow_id": "akm-correct-asset-use",
+            "count": 25,
+            "score": 0.7886666666666662,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 48
+          },
+          "akm-feedback-after-use": {
+            "workflow_id": "akm-feedback-after-use",
+            "count": 25,
+            "score": 0.532,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 94
+          },
+          "akm-lookup-before-edit": {
+            "workflow_id": "akm-lookup-before-edit",
+            "count": 25,
+            "score": 0.7359999999999998,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 48
+          },
+          "akm-negative-feedback-on-failure": {
+            "workflow_id": "akm-negative-feedback-on-failure",
+            "count": 25,
+            "score": 0,
+            "pass_rate": 0,
+            "partial_rate": 0,
+            "fail_rate": 0,
+            "violation_count": 0
+          },
+          "akm-reflect-after-repeated-failure": {
+            "workflow_id": "akm-reflect-after-repeated-failure",
+            "count": 25,
+            "score": 0,
+            "pass_rate": 0,
+            "partial_rate": 0,
+            "fail_rate": 0,
+            "violation_count": 0
+          },
+          "akm-workflow-followed": {
+            "workflow_id": "akm-workflow-followed",
+            "count": 25,
+            "score": 0,
+            "pass_rate": 0,
+            "partial_rate": 0,
+            "fail_rate": 0,
+            "violation_count": 0
+          }
+        },
+        "top_violations": [
+          {
+            "code": "missing_required_event",
+            "count": 75,
+            "evidence": [
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected ≥1 akm_feedback event(s) with polarity=positive, observed 0",
+                "expected": "akm_feedback(positive) x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected ≥1 akm_feedback event(s) with polarity=positive, observed 0",
+                "expected": "akm_feedback(positive) x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected ≥1 akm_feedback event(s) with polarity=positive, observed 0",
+                "expected": "akm_feedback(positive) x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              }
+            ]
+          },
+          {
+            "code": "wrong_feedback_polarity",
+            "count": 69,
+            "evidence": [
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              }
+            ]
+          },
+          {
+            "code": "late_feedback",
+            "count": 23,
+            "evidence": [
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 4,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/provision-edge",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              }
+            ]
+          },
+          {
+            "code": "wrong_order",
+            "count": 23,
+            "evidence": [
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 4,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/provision-edge",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              }
+            ]
+          }
+        ],
+        "cross_tab": [
+          {
+            "task_outcome": "pass",
+            "pass": 0,
+            "partial": 25,
+            "fail": 0,
+            "total": 25
+          },
+          {
+            "task_outcome": "fail",
+            "pass": 0,
+            "partial": 0,
+            "fail": 0,
+            "total": 0
+          }
+        ],
+        "reliability": {
+          "by_workflow": {
+            "akm-correct-asset-use": {
+              "workflow_id": "akm-correct-asset-use",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 5,
+              "k": 5
+            },
+            "akm-feedback-after-use": {
+              "workflow_id": "akm-feedback-after-use",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 5,
+              "k": 5
+            },
+            "akm-lookup-before-edit": {
+              "workflow_id": "akm-lookup-before-edit",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 5,
+              "k": 5
+            }
+          },
+          "corpus": {
+            "pass_at_k": 0,
+            "pass_all_k": 0,
+            "groups": 15,
+            "tasks": 5
+          }
+        }
+      },
+      "warnings": [],
+      "searchBridge": {
+        "runs_observed": 25,
+        "searches_observed": 0,
+        "gold_rank_distribution": {
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0,
+          "7": 0,
+          "8": 0,
+          "9": 0,
+          "10": 0,
+          "missing": 0
+        },
+        "gold_rank_p50": null,
+        "gold_rank_p90": null,
+        "gold_at_rank_1": 0,
+        "gold_missing": 0,
+        "pass_rate_by_rank": []
+      },
+      "runs": [
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23271,
+            "output": 56
+          },
+          "wallclock_ms": 14037,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23264,
+            "output": 79
+          },
+          "wallclock_ms": 10391,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23256,
+            "output": 68
+          },
+          "wallclock_ms": 11362,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23419,
+            "output": 90
+          },
+          "wallclock_ms": 10753,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23470,
+            "output": 80
+          },
+          "wallclock_ms": 10994,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23254,
+            "output": 101
+          },
+          "wallclock_ms": 10147,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23305,
+            "output": 42
+          },
+          "wallclock_ms": 9570,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23259,
+            "output": 63
+          },
+          "wallclock_ms": 10049,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23268,
+            "output": 36
+          },
+          "wallclock_ms": 9951,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 24264,
+            "output": 95
+          },
+          "wallclock_ms": 10387,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": false
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23267,
+            "output": 123
+          },
+          "wallclock_ms": 11086,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23309,
+            "output": 54
+          },
+          "wallclock_ms": 10806,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23270,
+            "output": 102
+          },
+          "wallclock_ms": 10429,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23379,
+            "output": 39
+          },
+          "wallclock_ms": 10692,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23313,
+            "output": 114
+          },
+          "wallclock_ms": 12199,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 24231,
+            "output": 154
+          },
+          "wallclock_ms": 10935,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": false
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23268,
+            "output": 56
+          },
+          "wallclock_ms": 10228,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23269,
+            "output": 58
+          },
+          "wallclock_ms": 10292,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23376,
+            "output": 57
+          },
+          "wallclock_ms": 10781,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23198,
+            "output": 113
+          },
+          "wallclock_ms": 17733,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23308,
+            "output": 83
+          },
+          "wallclock_ms": 10604,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23230,
+            "output": 115
+          },
+          "wallclock_ms": 10510,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23232,
+            "output": 26
+          },
+          "wallclock_ms": 9951,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23238,
+            "output": 99
+          },
+          "wallclock_ms": 10332,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23213,
+            "output": 30
+          },
+          "wallclock_ms": 9421,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        }
+      ],
+      "perAsset": {
+        "total_akm_runs": 25,
+        "rows": [
+          {
+            "asset_ref": "skill:drillbit",
+            "load_count": 25,
+            "load_count_passing": 25,
+            "load_count_failing": 0,
+            "load_pass_rate": 1
+          }
+        ]
+      },
+      "akm_overhead": {
+        "per_run": [
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 884,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 818,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 944,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 839,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 863,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 801,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 853,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 877,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 796,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 2,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 790,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 809,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 854,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 820,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 821,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 856,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 2,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 811,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 793,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 805,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 829,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 2,
+            "show_count": 2,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 5,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 899,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 813,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 835,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 858,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 848,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 1272,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          }
+        ],
+        "aggregate": {
+          "total_runs": 25,
+          "passing_runs": 25,
+          "mean_search_count": 1.04,
+          "mean_show_count": 1.12,
+          "mean_feedback_count": 0.92,
+          "mean_tool_calls": 3.08,
+          "mean_assets_loaded": 1,
+          "mean_irrelevant_assets_loaded": 0,
+          "mean_time_to_first_search_ms": 0,
+          "mean_time_to_first_correct_asset_ms": 855.52,
+          "mean_context_bytes_loaded": null,
+          "mean_asset_bytes_loaded": null,
+          "total_tool_calls": 77,
+          "tool_calls_per_success": 3.08,
+          "cost_per_success": 23442.56,
+          "search_engagement_rate": 1,
+          "show_engagement_rate": 1,
+          "feedback_engagement_rate": 0.92,
+          "search_to_show_ratio": 1.0769230769230769,
+          "mean_positive_feedback_count": 0,
+          "mean_negative_feedback_count": 0
+        }
+      }
+    },
+    "post": {
+      "schemaVersion": 1,
+      "track": "utility",
+      "branch": "main",
+      "commit": "a8ee9f9",
+      "timestamp": "2026-05-06T07:55:04.357Z",
+      "agent": {
+        "harness": "opencode",
+        "model": "shredder/qwen/qwen3.5-9b"
+      },
+      "corpus": {
+        "domains": 1,
+        "tasks": 5,
+        "slice": "eval",
+        "seedsPerArm": 5,
+        "selectedTaskIds": [
+          "drillbit/backup-policy",
+          "drillbit/canary-enable",
+          "drillbit/provision-edge",
+          "drillbit/rotate-secret",
+          "drillbit/scale-replicas"
+        ],
+        "taskCorpusHash": "1d8a7359737ec01b82f5e228f872dc67598837bc3e6187030bf1359c37d6ad31",
+        "fixtures": {
+          "drillbit": "5971f2a92c62625e78a340553ff739ed5c38b95762ec2c2c5515c606899675f2"
+        },
+        "fixtureContentHash": "51e955977c4a789d70044f1591e941e2d84195a52dbb0382c731aa3bb19ef6a7"
+      },
+      "aggregate": {
+        "noakm": {
+          "pass_rate": 0,
+          "tokens_per_pass": null,
+          "tokens_per_run": null,
+          "wallclock_ms": 0
+        },
+        "akm": {
+          "pass_rate": 0.96,
+          "tokens_per_pass": 23500.879999999997,
+          "tokens_per_run": 23496.839999999997,
+          "wallclock_ms": 10288.24
+        },
+        "delta": {
+          "pass_rate": 0.96,
+          "tokens_per_pass": null,
+          "tokens_per_run": null,
+          "wallclock_ms": 10288.24
+        }
+      },
+      "trajectory": {
+        "akm": {
+          "correct_asset_loaded": 1,
+          "feedback_recorded": 0.88
+        }
+      },
+      "failure_modes": {
+        "by_label": {
+          "loaded_ignored": 1
+        },
+        "by_task": {
+          "drillbit/backup-policy": {
+            "loaded_ignored": 1
+          }
+        }
+      },
+      "token_measurement": {
+        "total_runs": 25,
+        "runs_with_measured_tokens": 25,
+        "runs_missing_measurement": 0,
+        "runs_unsupported_measurement": 0,
+        "coverage": 1,
+        "reliable": true
+      },
+      "tasks": [
+        {
+          "id": "drillbit/backup-policy",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 0.8,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23352,
+            "tokens_per_run": 23331.8,
+            "wallclock_ms": 10051,
+            "pass_rate_stdev": 0.4472135954999579,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 0.8,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 10051
+          }
+        },
+        {
+          "id": "drillbit/canary-enable",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 1,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23587.6,
+            "tokens_per_run": 23587.6,
+            "wallclock_ms": 10368.6,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 1,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 10368.6
+          }
+        },
+        {
+          "id": "drillbit/provision-edge",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 1,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23332.2,
+            "tokens_per_run": 23332.2,
+            "wallclock_ms": 9987,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 1,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 9987
+          }
+        },
+        {
+          "id": "drillbit/rotate-secret",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 1,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23400.6,
+            "tokens_per_run": 23400.6,
+            "wallclock_ms": 10327,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 1,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 10327
+          }
+        },
+        {
+          "id": "drillbit/scale-replicas",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 1,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23832,
+            "tokens_per_run": 23832,
+            "wallclock_ms": 10707.6,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 1,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 10707.6
+          }
+        }
+      ],
+      "negative_transfer_count": 0,
+      "negative_transfer_severity": 0,
+      "top_regressed_tasks": [],
+      "domain_level_deltas": [
+        {
+          "domain": "drillbit",
+          "task_count": 5,
+          "regression_count": 0,
+          "pass_rate_noakm": 0,
+          "pass_rate_akm": 0.96,
+          "pass_rate_delta": 0.96,
+          "tokens_per_pass_delta": null,
+          "wallclock_ms_delta": 10288.24
+        }
+      ],
+      "asset_regression_candidates": [],
+      "corpus_coverage": {
+        "coverage": {
+          "totalTasks": 5,
+          "memoryAbilityCounts": {
+            "untagged": 0,
+            "procedural_lookup": 5,
+            "multi_asset_composition": 0,
+            "temporal_update": 0,
+            "conflict_resolution": 0,
+            "abstention": 0,
+            "noisy_retrieval": 0
+          },
+          "taskFamilyCounts": {
+            "drillbit/backup": 1,
+            "drillbit/canary": 1,
+            "drillbit/provision": 1,
+            "drillbit/secret": 1,
+            "drillbit/scale": 1
+          }
+        },
+        "by_memory_ability": [
+          {
+            "category": "procedural_lookup",
+            "task_count": 5,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 0.96,
+            "pass_rate_delta": 0.96,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.6953333333333332
+          }
+        ],
+        "by_task_family": [
+          {
+            "category": "drillbit/backup",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 0.8,
+            "pass_rate_delta": 0.8,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.6877777777777776
+          },
+          {
+            "category": "drillbit/canary",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 1,
+            "pass_rate_delta": 1,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.7055555555555555
+          },
+          {
+            "category": "drillbit/provision",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 1,
+            "pass_rate_delta": 1,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.6722222222222222
+          },
+          {
+            "category": "drillbit/scale",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 1,
+            "pass_rate_delta": 1,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.7388888888888888
+          },
+          {
+            "category": "drillbit/secret",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 1,
+            "pass_rate_delta": 1,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.6722222222222222
+          }
+        ]
+      },
+      "workflow": {
+        "total_checks": 150,
+        "applicable_checks": 75,
+        "overall_compliance": 0.6953333333333331,
+        "strict_pass_rate": 0,
+        "partial_pass_rate": 1,
+        "fail_rate": 0,
+        "violation_count": 184,
+        "by_workflow": {
+          "akm-correct-asset-use": {
+            "workflow_id": "akm-correct-asset-use",
+            "count": 25,
+            "score": 0.7913333333333332,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 47
+          },
+          "akm-feedback-after-use": {
+            "workflow_id": "akm-feedback-after-use",
+            "count": 25,
+            "score": 0.55,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 87
+          },
+          "akm-lookup-before-edit": {
+            "workflow_id": "akm-lookup-before-edit",
+            "count": 25,
+            "score": 0.737333333333333,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 47
+          },
+          "akm-negative-feedback-on-failure": {
+            "workflow_id": "akm-negative-feedback-on-failure",
+            "count": 25,
+            "score": 0.7333333333333333,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 3
+          },
+          "akm-reflect-after-repeated-failure": {
+            "workflow_id": "akm-reflect-after-repeated-failure",
+            "count": 25,
+            "score": 0,
+            "pass_rate": 0,
+            "partial_rate": 0,
+            "fail_rate": 0,
+            "violation_count": 0
+          },
+          "akm-workflow-followed": {
+            "workflow_id": "akm-workflow-followed",
+            "count": 25,
+            "score": 0,
+            "pass_rate": 0,
+            "partial_rate": 0,
+            "fail_rate": 0,
+            "violation_count": 0
+          }
+        },
+        "top_violations": [
+          {
+            "code": "missing_required_event",
+            "count": 75,
+            "evidence": [
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected ≥1 akm_feedback event(s) with polarity=positive, observed 0",
+                "expected": "akm_feedback(positive) x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected ≥1 akm_feedback event(s) with polarity=positive, observed 0",
+                "expected": "akm_feedback(positive) x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-negative-feedback-on-failure",
+                "message": "expected ≥1 akm_feedback event(s) with polarity=negative, observed 0",
+                "expected": "akm_feedback(negative) x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              }
+            ]
+          },
+          {
+            "code": "wrong_feedback_polarity",
+            "count": 66,
+            "evidence": [
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "verifier failed but agent recorded no negative feedback",
+                "expected": "negative",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "verifier failed but agent recorded no negative feedback",
+                "expected": "negative",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-negative-feedback-on-failure",
+                "message": "verifier failed but agent recorded no negative feedback",
+                "expected": "negative",
+                "observed": "unknown"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "verifier passed but agent recorded no positive feedback",
+                "expected": "positive",
+                "observed": "unknown"
+              }
+            ]
+          },
+          {
+            "code": "wrong_order",
+            "count": 22,
+            "evidence": [
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-negative-feedback-on-failure",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 4,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 4,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              },
+              {
+                "task_id": "drillbit/provision-edge",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected verifier_run before akm_feedback, but akm_feedback occurred first",
+                "expected": "verifier_run < akm_feedback",
+                "observed": "akm_feedback < verifier_run"
+              }
+            ]
+          },
+          {
+            "code": "late_feedback",
+            "count": 21,
+            "evidence": [
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 4,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 4,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/provision-edge",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              },
+              {
+                "task_id": "drillbit/provision-edge",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "akm_feedback occurred before verifier_run",
+                "expected": "akm_feedback after verifier_run",
+                "observed": "akm_feedback before verifier_run"
+              }
+            ]
+          }
+        ],
+        "cross_tab": [
+          {
+            "task_outcome": "pass",
+            "pass": 0,
+            "partial": 24,
+            "fail": 0,
+            "total": 24
+          },
+          {
+            "task_outcome": "fail",
+            "pass": 0,
+            "partial": 1,
+            "fail": 0,
+            "total": 1
+          }
+        ],
+        "reliability": {
+          "by_workflow": {
+            "akm-correct-asset-use": {
+              "workflow_id": "akm-correct-asset-use",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 5,
+              "k": 5
+            },
+            "akm-feedback-after-use": {
+              "workflow_id": "akm-feedback-after-use",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 5,
+              "k": 5
+            },
+            "akm-lookup-before-edit": {
+              "workflow_id": "akm-lookup-before-edit",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 5,
+              "k": 5
+            },
+            "akm-negative-feedback-on-failure": {
+              "workflow_id": "akm-negative-feedback-on-failure",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 1,
+              "k": 1
+            }
+          },
+          "corpus": {
+            "pass_at_k": 0,
+            "pass_all_k": 0,
+            "groups": 16,
+            "tasks": 5
+          }
+        }
+      },
+      "warnings": [],
+      "searchBridge": {
+        "runs_observed": 25,
+        "searches_observed": 0,
+        "gold_rank_distribution": {
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0,
+          "7": 0,
+          "8": 0,
+          "9": 0,
+          "10": 0,
+          "missing": 0
+        },
+        "gold_rank_p50": null,
+        "gold_rank_p90": null,
+        "gold_at_rank_1": 0,
+        "gold_missing": 0,
+        "pass_rate_by_rank": []
+      },
+      "runs": [
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23272,
+            "output": 87
+          },
+          "wallclock_ms": 10643,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23259,
+            "output": 171
+          },
+          "wallclock_ms": 10721,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 23160,
+            "output": 91
+          },
+          "wallclock_ms": 9646,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": "loaded_ignored"
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23250,
+            "output": 30
+          },
+          "wallclock_ms": 9323,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23261,
+            "output": 78
+          },
+          "wallclock_ms": 9922,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23253,
+            "output": 96
+          },
+          "wallclock_ms": 10143,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23306,
+            "output": 34
+          },
+          "wallclock_ms": 10363,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23272,
+            "output": 143
+          },
+          "wallclock_ms": 10500,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 24290,
+            "output": 107
+          },
+          "wallclock_ms": 10364,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": false
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23312,
+            "output": 125
+          },
+          "wallclock_ms": 10473,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23265,
+            "output": 42
+          },
+          "wallclock_ms": 10000,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23253,
+            "output": 45
+          },
+          "wallclock_ms": 9608,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23266,
+            "output": 86
+          },
+          "wallclock_ms": 10166,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23254,
+            "output": 131
+          },
+          "wallclock_ms": 10087,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23270,
+            "output": 49
+          },
+          "wallclock_ms": 10074,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23412,
+            "output": 92
+          },
+          "wallclock_ms": 10393,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23250,
+            "output": 61
+          },
+          "wallclock_ms": 10803,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23314,
+            "output": 53
+          },
+          "wallclock_ms": 9691,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23321,
+            "output": 119
+          },
+          "wallclock_ms": 10702,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23260,
+            "output": 121
+          },
+          "wallclock_ms": 10046,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23285,
+            "output": 132
+          },
+          "wallclock_ms": 10084,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23565,
+            "output": 116
+          },
+          "wallclock_ms": 12904,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 24268,
+            "output": 109
+          },
+          "wallclock_ms": 9920,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": false
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23242,
+            "output": 32
+          },
+          "wallclock_ms": 10008,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": true
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 24284,
+            "output": 127
+          },
+          "wallclock_ms": 10622,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": true,
+            "feedback_recorded": false
+          },
+          "assets_loaded": ["skill:drillbit"],
+          "failure_mode": null
+        }
+      ],
+      "perAsset": {
+        "total_akm_runs": 25,
+        "rows": [
+          {
+            "asset_ref": "skill:drillbit",
+            "load_count": 25,
+            "load_count_passing": 24,
+            "load_count_failing": 1,
+            "load_pass_rate": 0.96
+          }
+        ]
+      },
+      "akm_overhead": {
+        "per_run": [
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 848,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 833,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "fail",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 869,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 807,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 790,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 846,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 844,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 833,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 2,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 823,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 839,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 851,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 833,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 800,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 851,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 1462,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 825,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 813,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 858,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 857,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 823,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 856,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 797,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 2,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 857,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 1,
+            "feedback_count": 1,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 831,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 1,
+            "show_count": 2,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 3,
+            "assets_loaded_count": 1,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": 811,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          }
+        ],
+        "aggregate": {
+          "total_runs": 25,
+          "passing_runs": 24,
+          "mean_search_count": 1,
+          "mean_show_count": 1.12,
+          "mean_feedback_count": 0.88,
+          "mean_tool_calls": 3,
+          "mean_assets_loaded": 1,
+          "mean_irrelevant_assets_loaded": 0,
+          "mean_time_to_first_search_ms": 0,
+          "mean_time_to_first_correct_asset_ms": 858.28,
+          "mean_context_bytes_loaded": null,
+          "mean_asset_bytes_loaded": null,
+          "total_tool_calls": 75,
+          "tool_calls_per_success": 3.125,
+          "cost_per_success": 23507.083333333332,
+          "search_engagement_rate": 1,
+          "show_engagement_rate": 1,
+          "feedback_engagement_rate": 0.88,
+          "search_to_show_ratio": 1.12,
+          "mean_positive_feedback_count": 0,
+          "mean_negative_feedback_count": 0
+        }
+      }
+    },
+    "synthetic": {
+      "schemaVersion": 1,
+      "track": "utility",
+      "branch": "main",
+      "commit": "a8ee9f9",
+      "timestamp": "2026-05-06T08:06:28.620Z",
+      "agent": {
+        "harness": "opencode",
+        "model": "shredder/qwen/qwen3.5-9b"
+      },
+      "corpus": {
+        "domains": 1,
+        "tasks": 5,
+        "slice": "eval",
+        "seedsPerArm": 5,
+        "selectedTaskIds": [
+          "drillbit/backup-policy",
+          "drillbit/canary-enable",
+          "drillbit/provision-edge",
+          "drillbit/rotate-secret",
+          "drillbit/scale-replicas"
+        ],
+        "taskCorpusHash": "1d8a7359737ec01b82f5e228f872dc67598837bc3e6187030bf1359c37d6ad31",
+        "fixtures": {
+          "drillbit": "5971f2a92c62625e78a340553ff739ed5c38b95762ec2c2c5515c606899675f2"
+        },
+        "fixtureContentHash": "51e955977c4a789d70044f1591e941e2d84195a52dbb0382c731aa3bb19ef6a7"
+      },
+      "aggregate": {
+        "noakm": {
+          "pass_rate": 0,
+          "tokens_per_pass": null,
+          "tokens_per_run": null,
+          "wallclock_ms": 0
+        },
+        "akm": {
+          "pass_rate": 0.31999999999999995,
+          "tokens_per_pass": 22958.416666666668,
+          "tokens_per_run": 19242.719999999998,
+          "wallclock_ms": 27272.960000000003
+        },
+        "delta": {
+          "pass_rate": 0.31999999999999995,
+          "tokens_per_pass": null,
+          "tokens_per_run": null,
+          "wallclock_ms": 27272.960000000003
+        }
+      },
+      "trajectory": {
+        "akm": {
+          "correct_asset_loaded": 0,
+          "feedback_recorded": 0
+        }
+      },
+      "failure_modes": {
+        "by_label": {
+          "no_search": 16
+        },
+        "by_task": {
+          "drillbit/backup-policy": {
+            "no_search": 1
+          },
+          "drillbit/canary-enable": {
+            "no_search": 3
+          },
+          "drillbit/provision-edge": {
+            "no_search": 5
+          },
+          "drillbit/rotate-secret": {
+            "no_search": 3
+          },
+          "drillbit/scale-replicas": {
+            "no_search": 4
+          }
+        }
+      },
+      "token_measurement": {
+        "total_runs": 25,
+        "runs_with_measured_tokens": 25,
+        "runs_missing_measurement": 0,
+        "runs_unsupported_measurement": 0,
+        "coverage": 1,
+        "reliable": true
+      },
+      "tasks": [
+        {
+          "id": "drillbit/backup-policy",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 0.6,
+            "pass_at_1": 1,
+            "tokens_per_pass": 23496.666666666668,
+            "tokens_per_run": 22808.6,
+            "wallclock_ms": 39974.6,
+            "pass_rate_stdev": 0.5477225575051662,
+            "budget_exceeded_count": 1,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 0.6,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 39974.6
+          }
+        },
+        {
+          "id": "drillbit/canary-enable",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 0.4,
+            "pass_at_1": 1,
+            "tokens_per_pass": 22736,
+            "tokens_per_run": 22458.8,
+            "wallclock_ms": 42579.6,
+            "pass_rate_stdev": 0.5477225575051662,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 0.4,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 42579.6
+          }
+        },
+        {
+          "id": "drillbit/provision-edge",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": 14724.2,
+            "wallclock_ms": 16950.4,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 16950.4
+          }
+        },
+        {
+          "id": "drillbit/rotate-secret",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 0.4,
+            "pass_at_1": 0,
+            "tokens_per_pass": 22075,
+            "tokens_per_run": 18043.8,
+            "wallclock_ms": 19492.6,
+            "pass_rate_stdev": 0.5477225575051662,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 0.4,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 19492.6
+          }
+        },
+        {
+          "id": "drillbit/scale-replicas",
+          "noakm": {
+            "pass_rate": 0,
+            "pass_at_1": 0,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 0,
+            "pass_rate_stdev": 0,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 0,
+            "runs_with_measured_tokens": 0
+          },
+          "akm": {
+            "pass_rate": 0.2,
+            "pass_at_1": 0,
+            "tokens_per_pass": 23526,
+            "tokens_per_run": 18178.2,
+            "wallclock_ms": 17367.6,
+            "pass_rate_stdev": 0.447213595499958,
+            "budget_exceeded_count": 0,
+            "harness_error_count": 0,
+            "count": 5,
+            "runs_with_measured_tokens": 5
+          },
+          "delta": {
+            "pass_rate": 0.2,
+            "tokens_per_pass": null,
+            "tokens_per_run": null,
+            "wallclock_ms": 17367.6
+          }
+        }
+      ],
+      "negative_transfer_count": 0,
+      "negative_transfer_severity": 0,
+      "top_regressed_tasks": [],
+      "domain_level_deltas": [
+        {
+          "domain": "drillbit",
+          "task_count": 5,
+          "regression_count": 0,
+          "pass_rate_noakm": 0,
+          "pass_rate_akm": 0.31999999999999995,
+          "pass_rate_delta": 0.31999999999999995,
+          "tokens_per_pass_delta": null,
+          "wallclock_ms_delta": 27272.960000000003
+        }
+      ],
+      "asset_regression_candidates": [],
+      "corpus_coverage": {
+        "coverage": {
+          "totalTasks": 5,
+          "memoryAbilityCounts": {
+            "untagged": 0,
+            "procedural_lookup": 5,
+            "multi_asset_composition": 0,
+            "temporal_update": 0,
+            "conflict_resolution": 0,
+            "abstention": 0,
+            "noisy_retrieval": 0
+          },
+          "taskFamilyCounts": {
+            "drillbit/backup": 1,
+            "drillbit/canary": 1,
+            "drillbit/provision": 1,
+            "drillbit/secret": 1,
+            "drillbit/scale": 1
+          }
+        },
+        "by_memory_ability": [
+          {
+            "category": "procedural_lookup",
+            "task_count": 5,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 0.31999999999999995,
+            "pass_rate_delta": 0.31999999999999995,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.5717460317460317
+          }
+        ],
+        "by_task_family": [
+          {
+            "category": "drillbit/backup",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 0.6,
+            "pass_rate_delta": 0.6,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.5809523809523809
+          },
+          {
+            "category": "drillbit/canary",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 0.4,
+            "pass_rate_delta": 0.4,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.5677777777777777
+          },
+          {
+            "category": "drillbit/provision",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 0,
+            "pass_rate_delta": 0,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.5722222222222222
+          },
+          {
+            "category": "drillbit/scale",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 0.2,
+            "pass_rate_delta": 0.2,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.57
+          },
+          {
+            "category": "drillbit/secret",
+            "task_count": 1,
+            "pass_rate_noakm": 0,
+            "pass_rate_akm": 0.4,
+            "pass_rate_delta": 0.4,
+            "negative_transfer_count": 0,
+            "workflow_compliance": 0.5677777777777777
+          }
+        ]
+      },
+      "workflow": {
+        "total_checks": 150,
+        "applicable_checks": 74,
+        "overall_compliance": 0.5716216216216219,
+        "strict_pass_rate": 0,
+        "partial_pass_rate": 1,
+        "fail_rate": 0,
+        "violation_count": 196,
+        "by_workflow": {
+          "akm-correct-asset-use": {
+            "workflow_id": "akm-correct-asset-use",
+            "count": 25,
+            "score": 0.48933333333333306,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 99
+          },
+          "akm-feedback-after-use": {
+            "workflow_id": "akm-feedback-after-use",
+            "count": 25,
+            "score": 0.7000000000000001,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 16
+          },
+          "akm-lookup-before-edit": {
+            "workflow_id": "akm-lookup-before-edit",
+            "count": 25,
+            "score": 0.5093333333333334,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 49
+          },
+          "akm-negative-feedback-on-failure": {
+            "workflow_id": "akm-negative-feedback-on-failure",
+            "count": 25,
+            "score": 0.7333333333333331,
+            "pass_rate": 0,
+            "partial_rate": 1,
+            "fail_rate": 0,
+            "violation_count": 32
+          },
+          "akm-reflect-after-repeated-failure": {
+            "workflow_id": "akm-reflect-after-repeated-failure",
+            "count": 25,
+            "score": 0,
+            "pass_rate": 0,
+            "partial_rate": 0,
+            "fail_rate": 0,
+            "violation_count": 0
+          },
+          "akm-workflow-followed": {
+            "workflow_id": "akm-workflow-followed",
+            "count": 25,
+            "score": 0,
+            "pass_rate": 0,
+            "partial_rate": 0,
+            "fail_rate": 0,
+            "violation_count": 0
+          }
+        },
+        "top_violations": [
+          {
+            "code": "missing_required_event",
+            "count": 171,
+            "evidence": [
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 akm_search event(s), observed 0",
+                "expected": "akm_search x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 akm_show event(s), observed 0",
+                "expected": "akm_show x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected ≥1 akm_show event(s), observed 0",
+                "expected": "akm_show x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-feedback-after-use",
+                "message": "expected ≥1 akm_feedback event(s) with polarity=positive, observed 0",
+                "expected": "akm_feedback(positive) x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "expected ≥1 akm_search event(s), observed 0",
+                "expected": "akm_search x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-lookup-before-edit",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 akm_search event(s), observed 0",
+                "expected": "akm_search x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 akm_show event(s), observed 0",
+                "expected": "akm_show x1",
+                "observed": "0"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "expected ≥1 first_workspace_write event(s), observed 0",
+                "expected": "first_workspace_write x1",
+                "observed": "0"
+              }
+            ]
+          },
+          {
+            "code": "irrelevant_asset_loaded",
+            "count": 25,
+            "evidence": [
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "gold asset skill:drillbit was never loaded via akm_show",
+                "expected": "skill:drillbit"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "gold asset skill:drillbit was never loaded via akm_show",
+                "expected": "skill:drillbit"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "gold asset skill:drillbit was never loaded via akm_show",
+                "expected": "skill:drillbit"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "gold asset skill:drillbit was never loaded via akm_show",
+                "expected": "skill:drillbit"
+              },
+              {
+                "task_id": "drillbit/backup-policy",
+                "arm": "akm",
+                "seed": 4,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "gold asset skill:drillbit was never loaded via akm_show",
+                "expected": "skill:drillbit"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 0,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "gold asset skill:drillbit was never loaded via akm_show",
+                "expected": "skill:drillbit"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 1,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "gold asset skill:drillbit was never loaded via akm_show",
+                "expected": "skill:drillbit"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 2,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "gold asset skill:drillbit was never loaded via akm_show",
+                "expected": "skill:drillbit"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 3,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "gold asset skill:drillbit was never loaded via akm_show",
+                "expected": "skill:drillbit"
+              },
+              {
+                "task_id": "drillbit/canary-enable",
+                "arm": "akm",
+                "seed": 4,
+                "workflow_id": "akm-correct-asset-use",
+                "message": "gold asset skill:drillbit was never loaded via akm_show",
+                "expected": "skill:drillbit"
+              }
+            ]
+          }
+        ],
+        "cross_tab": [
+          {
+            "task_outcome": "pass",
+            "pass": 0,
+            "partial": 8,
+            "fail": 0,
+            "total": 8
+          },
+          {
+            "task_outcome": "fail",
+            "pass": 0,
+            "partial": 16,
+            "fail": 0,
+            "total": 16
+          },
+          {
+            "task_outcome": "budget_exceeded",
+            "pass": 0,
+            "partial": 1,
+            "fail": 0,
+            "total": 1
+          }
+        ],
+        "reliability": {
+          "by_workflow": {
+            "akm-correct-asset-use": {
+              "workflow_id": "akm-correct-asset-use",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 5,
+              "k": 5
+            },
+            "akm-feedback-after-use": {
+              "workflow_id": "akm-feedback-after-use",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 4,
+              "k": 3
+            },
+            "akm-lookup-before-edit": {
+              "workflow_id": "akm-lookup-before-edit",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 5,
+              "k": 5
+            },
+            "akm-negative-feedback-on-failure": {
+              "workflow_id": "akm-negative-feedback-on-failure",
+              "pass_at_k": 0,
+              "pass_all_k": 0,
+              "tasks": 5,
+              "k": 5
+            }
+          },
+          "corpus": {
+            "pass_at_k": 0,
+            "pass_all_k": 0,
+            "groups": 19,
+            "tasks": 5
+          }
+        }
+      },
+      "warnings": [],
+      "searchBridge": {
+        "runs_observed": 25,
+        "searches_observed": 0,
+        "gold_rank_distribution": {
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0,
+          "7": 0,
+          "8": 0,
+          "9": 0,
+          "10": 0,
+          "missing": 0
+        },
+        "gold_rank_p50": null,
+        "gold_rank_p90": null,
+        "gold_at_rank_1": 0,
+        "gold_missing": 0,
+        "pass_rate_by_rank": []
+      },
+      "runs": [
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23812,
+            "output": 42
+          },
+          "wallclock_ms": 24277,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 24302,
+            "output": 82
+          },
+          "wallclock_ms": 25902,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 21453,
+            "output": 294
+          },
+          "wallclock_ms": 7416,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 22220,
+            "output": 32
+          },
+          "wallclock_ms": 22247,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/backup-policy",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "budget_exceeded",
+          "tokens": {
+            "input": 21753,
+            "output": 53
+          },
+          "wallclock_ms": 120031,
+          "verifier_exit_code": -1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 22012,
+            "output": 124
+          },
+          "wallclock_ms": 32223,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 22242,
+            "output": 71
+          },
+          "wallclock_ms": 48450,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 22097,
+            "output": 31
+          },
+          "wallclock_ms": 43825,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 22347,
+            "output": 34
+          },
+          "wallclock_ms": 26204,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/canary-enable",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23129,
+            "output": 207
+          },
+          "wallclock_ms": 62196,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 21972,
+            "output": 113
+          },
+          "wallclock_ms": 27240,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 1075,
+            "output": 554
+          },
+          "wallclock_ms": 15314,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 21715,
+            "output": 217
+          },
+          "wallclock_ms": 8558,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 3023,
+            "output": 405
+          },
+          "wallclock_ms": 18076,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/provision-edge",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 24424,
+            "output": 123
+          },
+          "wallclock_ms": 15564,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 23198,
+            "output": 62
+          },
+          "wallclock_ms": 15085,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 22245,
+            "output": 59
+          },
+          "wallclock_ms": 30530,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 21453,
+            "output": 176
+          },
+          "wallclock_ms": 6833,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 926,
+            "output": 254
+          },
+          "wallclock_ms": 15768,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/rotate-secret",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 21789,
+            "output": 57
+          },
+          "wallclock_ms": 29247,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 0,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 1178,
+            "output": 361
+          },
+          "wallclock_ms": 17688,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 1,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 22534,
+            "output": 42
+          },
+          "wallclock_ms": 22332,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 2,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 21457,
+            "output": 155
+          },
+          "wallclock_ms": 6686,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 3,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "pass",
+          "tokens": {
+            "input": 23497,
+            "output": 29
+          },
+          "wallclock_ms": 33444,
+          "verifier_exit_code": 0,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": null
+        },
+        {
+          "task_id": "drillbit/scale-replicas",
+          "arm": "akm",
+          "seed": 4,
+          "model": "shredder/qwen/qwen3.5-9b",
+          "outcome": "fail",
+          "tokens": {
+            "input": 21457,
+            "output": 181
+          },
+          "wallclock_ms": 6688,
+          "verifier_exit_code": 1,
+          "trajectory": {
+            "correct_asset_loaded": false,
+            "feedback_recorded": false
+          },
+          "assets_loaded": [],
+          "failure_mode": "no_search"
+        }
+      ],
+      "perAsset": {
+        "total_akm_runs": 25,
+        "rows": []
+      },
+      "akm_overhead": {
+        "per_run": [
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/backup-policy",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "budget_exceeded",
+            "search_count": 1,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 1,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": 0,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "pass",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/canary-enable",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/provision-edge",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "pass",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/rotate-secret",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "pass",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 0,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 1,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 2,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 3,
+            "outcome": "pass",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          },
+          {
+            "task_id": "drillbit/scale-replicas",
+            "arm": "akm",
+            "seed": 4,
+            "outcome": "fail",
+            "search_count": 0,
+            "show_count": 0,
+            "feedback_count": 0,
+            "positive_feedback_count": 0,
+            "negative_feedback_count": 0,
+            "total_tool_calls": 0,
+            "assets_loaded_count": 0,
+            "irrelevant_assets_loaded_count": 0,
+            "time_to_first_search_ms": null,
+            "time_to_first_correct_asset_ms": null,
+            "context_bytes_loaded": null,
+            "asset_bytes_loaded": null
+          }
+        ],
+        "aggregate": {
+          "total_runs": 25,
+          "passing_runs": 8,
+          "mean_search_count": 0.04,
+          "mean_show_count": 0,
+          "mean_feedback_count": 0,
+          "mean_tool_calls": 0.04,
+          "mean_assets_loaded": 0,
+          "mean_irrelevant_assets_loaded": 0,
+          "mean_time_to_first_search_ms": 0,
+          "mean_time_to_first_correct_asset_ms": null,
+          "mean_context_bytes_loaded": null,
+          "mean_asset_bytes_loaded": null,
+          "total_tool_calls": 1,
+          "tool_calls_per_success": 0.125,
+          "cost_per_success": 22954.75,
+          "search_engagement_rate": 0.04,
+          "show_engagement_rate": 0,
+          "feedback_engagement_rate": 0,
+          "search_to_show_ratio": 0,
+          "mean_positive_feedback_count": 0,
+          "mean_negative_feedback_count": 0
+        }
+      }
+    }
+  },
+  "perAsset": {
+    "total_akm_runs": 25,
+    "rows": [
+      {
+        "asset_ref": "skill:drillbit",
+        "load_count": 25,
+        "load_count_passing": 24,
+        "load_count_failing": 1,
+        "load_pass_rate": 0.96
+      }
+    ]
+  },
+  "failure_modes": {
+    "by_label": {
+      "loaded_ignored": 1
+    },
+    "by_task": {
+      "drillbit/backup-policy": {
+        "loaded_ignored": 1
+      }
+    }
+  },
+  "searchBridge": {
+    "runs_observed": 25,
+    "searches_observed": 0,
+    "gold_rank_distribution": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "6": 0,
+      "7": 0,
+      "8": 0,
+      "9": 0,
+      "10": 0,
+      "missing": 0
+    },
+    "gold_rank_p50": null,
+    "gold_rank_p90": null,
+    "gold_at_rank_1": 0,
+    "gold_missing": 0,
+    "pass_rate_by_rank": []
+  },
+  "feedback_integrity": {
+    "aggregate": {
+      "truePositive": 10,
+      "falsePositive": 0,
+      "trueNegative": 0,
+      "falseNegative": 0,
+      "feedback_agreement": 1,
+      "false_positive_rate": 0,
+      "false_negative_rate": 0,
+      "feedback_coverage": 1
+    },
+    "perAsset": [
+      {
+        "ref": "skill:drillbit",
+        "truePositive": 10,
+        "falsePositive": 0,
+        "trueNegative": 0,
+        "falseNegative": 0,
+        "feedback_agreement": 1,
+        "false_positive_rate": null,
+        "false_negative_rate": 0
+      }
+    ]
+  },
+  "warnings": []
+}

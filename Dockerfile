@@ -2,7 +2,7 @@ FROM node:22-bookworm-slim
 
 ARG BUN_VERSION=1.3.13
 ARG AKM_CLI_VERSION=0.7.1
-ARG OPENCODE_AI_VERSION=latest
+ARG OPENCODE_AI_VERSION=1.14.39
 ARG OPENCODE_PROVIDER_PACKAGES="@ai-sdk/openai @ai-sdk/openai-compatible opencode-antigravity-auth"
 
 ENV DEBIAN_FRONTEND=noninteractive

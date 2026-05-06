@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "track": "attribute",
+  "base": {
+    "path": "./results/reference/v1/bench-report-utility-main-a8ee9f9-2026-05-06T07-23-55.557Z-shredder-qwen-qwen3.5-9b.json",
+    "model": "shredder/qwen/qwen3.5-9b"
+  },
+  "attribution": {
+    "maskingStrategy": "leave-one-out",
+    "maskedRefs": ["skill:inkwell", "skill:docker-homelab", "skill:az-cli", "skill:drillbit", "skill:opencode"]
+  },
+  "maskingStrategy": "leave-one-out",
+  "runsPerformed": 5,
+  "perAsset": {
+    "total_akm_runs": 130,
+    "rows": [
+      {
+        "asset_ref": "skill:inkwell",
+        "load_count": 30,
+        "load_count_passing": 19,
+        "load_count_failing": 11,
+        "load_pass_rate": 0.6333333333333333
+      },
+      {
+        "asset_ref": "skill:docker-homelab",
+        "load_count": 30,
+        "load_count_passing": 16,
+        "load_count_failing": 14,
+        "load_pass_rate": 0.5333333333333333
+      },
+      {
+        "asset_ref": "skill:az-cli",
+        "load_count": 25,
+        "load_count_passing": 25,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "skill:drillbit",
+        "load_count": 25,
+        "load_count_passing": 25,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "skill:opencode",
+        "load_count": 16,
+        "load_count_passing": 16,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "knowledge:compose-migration",
+        "load_count": 5,
+        "load_count_passing": 3,
+        "load_count_failing": 2,
+        "load_pass_rate": 0.6
+      },
+      {
+        "asset_ref": "knowledge:healthcheck-patterns",
+        "load_count": 3,
+        "load_count_passing": 2,
+        "load_count_failing": 1,
+        "load_pass_rate": 0.6666666666666666
+      },
+      {
+        "asset_ref": "knowledge:networking",
+        "load_count": 2,
+        "load_count_passing": 2,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "knowledge:opencode-agents",
+        "load_count": 2,
+        "load_count_passing": 2,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "knowledge:opencode-config",
+        "load_count": 2,
+        "load_count_passing": 2,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      },
+      {
+        "asset_ref": "memory:healthcheck-test-cmd",
+        "load_count": 1,
+        "load_count_passing": 1,
+        "load_count_failing": 0,
+        "load_pass_rate": 1
+      }
+    ]
+  },
+  "attributions": [
+    {
+      "asset_ref": "skill:inkwell",
+      "base_pass_rate": 0.8076923076923077,
+      "masked_pass_rate": 0,
+      "marginal_contribution": 0.8076923076923077
+    },
+    {
+      "asset_ref": "skill:docker-homelab",
+      "base_pass_rate": 0.8076923076923077,
+      "masked_pass_rate": 0,
+      "marginal_contribution": 0.8076923076923077
+    },
+    {
+      "asset_ref": "skill:az-cli",
+      "base_pass_rate": 0.8076923076923077,
+      "masked_pass_rate": 0,
+      "marginal_contribution": 0.8076923076923077
+    },
+    {
+      "asset_ref": "skill:drillbit",
+      "base_pass_rate": 0.8076923076923077,
+      "masked_pass_rate": 0,
+      "marginal_contribution": 0.8076923076923077
+    },
+    {
+      "asset_ref": "skill:opencode",
+      "base_pass_rate": 0.8076923076923077,
+      "masked_pass_rate": 0,
+      "marginal_contribution": 0.8076923076923077
+    }
+  ]
+}

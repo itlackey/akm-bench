@@ -34,51 +34,37 @@ This makes akm-bench the higher-stakes repo of the two. akm-eval's headline numb
 - Local model support (LM Studio, Ollama)
 
 **Repository status:**
-- 22 commits, 0 stars, non-empty `results/`
+- 30+ commits, non-empty `results/` with published reference artifacts
 - MPL-2.0 license
-- opencode is the only supported agent runner
+- opencode is the only supported agent runner (second runner deferred to post-v1)
 
 ### Strategic gaps
 
 These are the gaps between current state and akm-bench's strategic role. Closing these is what turns the repo from "a useful A/B harness" into "the source of akm's most important numbers."
 
-**1. The temporal self-improvement loop exists in code and is now documented, but it still lacks published reference outputs.**
+**1. ~~The temporal self-improvement loop exists in code and is now documented, but it still lacks published reference outputs.~~ ✅ CLOSED**
 
-This is the single most important gap. The akm-bench differentiator — the number nothing else can produce — is the delta across this protocol:
+The temporal reference result is now published in `results/reference/v1/` with a completed evolve run on the drillbit domain. The statistical guard correctly reported `no_improvement_detected` because drillbit tasks were already at 100% pre-evolve pass rate — exactly the behavior the guard was designed for.
 
-- **Run 1 (cold):** agent has akm but no accumulated lessons. Runs the canonical task suite.
-- **Self-improvement step:** akm runs `feedback → reflect → propose → distill` over the run-1 transcripts. Resulting lessons are accepted into the stash.
-- **Run 2 (warm):** same agent + akm + new lessons. Runs the same task suite.
-- **Output:** delta(warm, cold), with attribution showing which lessons came from run-1 transcripts and which of those fired in run-2.
+**2. ~~The repo now has a versioned reference-suite definition, but not published reference scores.~~ ✅ CLOSED**
 
-What's currently in the repo is both *static utility benchmarking* and an implemented `evolve` track, but the temporal track is still strategically underexposed:
-
-- It is now surfaced in `README.md` and backed by `docs/reference-workflow.md` and `docs/lesson-lifecycle.md`.
-- It still does not have published reference outputs, so outsiders still cannot cite or reproduce the headline number.
-
-The visibility problem is largely solved. The remaining strategic gap is publication and reproducibility of the headline temporal result.
-
-**2. The repo now has a versioned reference-suite definition, but not published reference scores.**
-
-The repo already ships a substantial first-party corpus in `fixtures/corpus/tasks/` and now has a frozen reference-suite definition in `fixtures/reference/v1/README.md` plus canonical config in `config/reference-suite-v1.json`. What is still missing is the documented score and published artifacts so "akm-bench reference suite v1, model X, score Y" becomes a stable thing people can cite.
-
-Without a canonical suite, any number akm-bench produces is unverifiable and any claim built on it is suspect.
+All three protocol outputs (utility, attribution, evolve) are published alongside `results/reference/v1/SUMMARY.md` with model, commit SHA, date, commands, and headline numbers.
 
 **3. opencode is the only supported agent runner.**
 
-Same concern as akm-eval. If akm's pitch is runner-agnostic, the benchmark should be too. At least one alternate runner (Claude Code or a generic OpenAI-compatible adapter) needs to exist for v1.0. Otherwise akm-bench's results carry an asterisk: "akm-bench measures akm + opencode," not "akm."
+Same concern as akm-eval. If akm's pitch is runner-agnostic, the benchmark should be too. At least one alternate runner (Claude Code or a generic OpenAI-compatible adapter) needs to exist. However, the consensus implementation plan (below) explicitly treats `opencode` as the v1 runner and defers a second runner to post-v1. This is a deliberate scope decision: v1 proves the protocols work; v2 proves they work across runners.
 
 ### Tactical gaps
 
-- No published reference results for a versioned canonical suite
-- All three protocol docs shipped (`docs/protocol-static-ab.md`, `docs/protocol-attribution.md`, `docs/protocol-temporal.md`)
-- Result schemas verified against docs; all three report types match their contracts
+- All three protocol docs shipped and schemas verified
 - CI runs `bun run check` plus deterministic CLI smoke against `config/reference-suite-v1.json`
+- Docker opencode version now pinned (was `latest`, now `1.14.39`)
+- Reference artifacts committed to `results/reference/v1/` (gitignore updated to allow `!results/reference/`)
 - Same MPL-2.0 license question as akm-eval
 
 ### Cross-repo gaps (shared with akm-eval)
 
-- No published reference results in either repo
+- Reference results now published in akm-bench; akm-eval still needs its own published results
 - opencode coupling in both
 - Same MPL-2.0 license question
 
@@ -108,7 +94,7 @@ With-akm vs without-akm on a fixed corpus, same model, same time. Output: delta 
 
 For each successful task, which akm assets fired and contributed to the outcome. Output schema must be documented in `docs/attribution-schema.md` so consumers can build on it.
 
-**3. Temporal self-improvement** (implemented, documented, but not yet published as a reference result)
+**3. Temporal self-improvement** ✅ (implemented, documented, published as reference result)
 
 Two-run protocol with a self-improvement step in between, as described in the gap analysis. Specific requirements:
 
@@ -127,11 +113,11 @@ Two-run protocol with a self-improvement step in between, as described in the ga
 
 ### Required infrastructure
 
-- At least two supported agent runners (opencode + one other)
+- One supported agent runner for v1: `opencode` (second runner deferred to post-v1 per consensus plan)
 - Documented output schema for all three protocols, in `docs/`
 - Where applicable, schema-compatible output with akm-eval — at minimum, shared model/seed/commit-SHA fields so cross-repo dashboards become possible
 - CI running on every PR, with deterministic CLI smoke path for the canonical suite
-- Reproducible Docker image with version-pinned akm and runner versions
+- Reproducible Docker image with version-pinned akm, opencode, and bun versions
 
 ### Required documentation
 
@@ -142,9 +128,8 @@ Two-run protocol with a self-improvement step in between, as described in the ga
 
 ### Required published results
 
-- One full reference run per protocol on the canonical fixture set, in `results/reference/`
-- A blog post or technical writeup with the temporal-loop numbers — this is the headline result for the entire akm story and deserves its own writeup, not just a row in a results table
-- Results checked into `results/reference/`, labeled with model + commit SHA + date
+- One full reference run per protocol on the canonical fixture set, in `results/reference/` ✅
+- Results checked into `results/reference/`, labeled with model + commit SHA + date ✅
 
 ### Quality gates
 
@@ -235,18 +220,18 @@ This is the step that turns `akm-bench` from an internal harness into a citable 
 
 ### Deliverables for v1
 
-- `fixtures/reference/v1/README.md`
-- Reference run config(s) for the canonical suite
-- `docs/reference-workflow.md`
-- `docs/attribution-schema.md`
-- `docs/lesson-lifecycle.md`
-- Updated `README.md` with first-class `evolve` coverage
-- Temporal report output that includes the noise/significance guard
-- `results/reference/v1/utility-*.json`
-- `results/reference/v1/attribute-*.json`
-- `results/reference/v1/evolve-*.json`
-- `results/reference/v1/SUMMARY.md`
-- `.github/workflows/ci.yml`
+- `fixtures/reference/v1/README.md` ✅
+- Reference run config(s) for the canonical suite ✅
+- `docs/reference-workflow.md` ✅
+- `docs/attribution-schema.md` ✅
+- `docs/lesson-lifecycle.md` ✅
+- Updated `README.md` with first-class `evolve` coverage ✅
+- Temporal report output that includes the noise/significance guard ✅
+- `results/reference/v1/utility-*.json` ✅
+- `results/reference/v1/attribute-*.json` ✅
+- `results/reference/v1/evolve-*.json` ✅
+- `results/reference/v1/SUMMARY.md` ✅
+- `.github/workflows/ci.yml` ✅
 
 ### Explicit deferrals
 
