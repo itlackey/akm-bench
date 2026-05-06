@@ -33,10 +33,9 @@ export interface RunRecordSerialized {
   model: string;
   outcome: string;
   /**
-   * Spread of `RunResult.tokens` so future fields (e.g. `measurement` from
-   * #252) flow through automatically without a renderer change. Today the
-   * shape is `{input: number, output: number}`; #252 will add a sibling
-   * `measurement` field. TODO(#252): keep this pass-through.
+   * Spread of `RunResult.tokens` so future fields flow through
+   * automatically without a renderer change. Today the shape is
+   * `{input: number, output: number}` with optional `measurement`.
    */
   tokens: Record<string, unknown>;
   wallclock_ms: number;
@@ -181,8 +180,8 @@ export function serializeRunForReport(result: RunResult): RunRecordSerialized {
     seed: result.seed,
     model: result.model,
     outcome: result.outcome,
-    // TODO(#252): when RunResult.tokens grows a `measurement` key, this spread
-    // carries it forward without a renderer change.
+    // Token-shape seam: spread verbatim so any additional fields (e.g.
+    // `measurement`) are carried forward without a renderer change.
     tokens: { ...result.tokens },
     wallclock_ms: result.wallclockMs,
     verifier_exit_code: result.verifierExitCode,

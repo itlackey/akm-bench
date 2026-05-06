@@ -250,9 +250,8 @@ export function aggregateRunsForReport(runs: RunResult[]): RunRecordSerialized[]
  *     the post-hoc extraction the agent run produced.
  *   • `schemaVersion: 1` — the report schema implies it.
  *
- * Tokens are passed through as-is so a future `measurement` field added by
- * #252 lands on the rehydrated row automatically. TODO(#252): keep this
- * spread.
+ * Tokens are passed through as-is so any future fields land on the
+ * rehydrated row automatically.
  */
 export function rehydrateRunFromSerialized(row: RunRecordSerialized): RunResult {
   // The compact row uses a permissive Record shape for tokens (see

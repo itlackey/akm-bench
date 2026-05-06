@@ -50,10 +50,32 @@ This selection spans five domains and uses only deterministic `script` and `pyte
 
 - Default config: `config/reference-suite-v1.json`
 - Tasks: the 26 task IDs listed above
-- Arms: `akm`
+- Arms: `akm` (noakm excluded — see Design Rationale below)
 - Seeds: `5`
 - Budget tokens: `25000`
 - Budget wall time: `360000`
+
+### Design rationale: akm-only arm
+
+v1 runs `arms: ["akm"]` only. This means the reported pass rate is the raw
+akm pass rate, not a delta against a noakm baseline.
+
+**Why akm-only?** The suite mixes two categories of tasks:
+
+| Category | Tasks | Needs AKM? |
+| --- | --- | --- |
+| Proprietary domain (drillbit CLI, inkwell YAML schema) | 15 tasks | Yes — model cannot know these from training |
+| Meta-AKM workflow (opencode/*) | 4 tasks | Yes — tasks are about using AKM |
+| Public-domain knowledge (az-cli, docker-compose) | 7 tasks | No — model could answer from training |
+
+Because a majority (19/26) genuinely require AKM assets, the suite was
+designed as a single-arm reference run. Running noakm would produce a
+meaningless ~0% for most tasks and a noisy signal for the public-domain ones.
+
+**Recommendation for v2:** Create a parallel config with
+`arms: ["noakm", "akm"]` using only the public-domain tasks (az-cli,
+docker-homelab) to measure true AKM lift on knowledge the model could
+plausibly know without a stash.
 
 ### Immutability policy
 

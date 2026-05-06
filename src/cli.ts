@@ -46,6 +46,114 @@ import { runUtility } from "./runner";
 import { getCacheDir } from "./support/fs";
 import { isPidRunning, readBenchPid, writeBenchPid, writeBenchReportJson } from "./tmp";
 
+export type AkmMode = "installed" | "source" | "version";
+
+export interface AkmModeOptions {
+  akmMode?: AkmMode;
+  akmSource?: string;
+  akmVersion?: string;
+}
+
+/**
+ * Validate and apply akm-mode settings. Sets AKM_BENCH_AKM_BIN so that
+ * `resolveAkmRuntime()` in akm-command.ts picks up the correct binary.
+ *
+ * Validation mirrors the Docker wrapper (bin/akm-bench):
+ *   - installed: no companion flags allowed
+ *   - source: requires --akm-source, rejects --akm-version
+ *   - version: requires --akm-version, rejects --akm-source
+ */
+export function configureAkmRuntime(options: AkmModeOptions): void {
+  const mode = options.akmMode ?? "installed";
+  const source = options.akmSource;
+  const version = options.akmVersion;
+
+  switch (mode) {
+    case "installed":
+      if (source) {
+        throw new BenchConfigError("--akm-source only applies when --akm-mode source", true);
+      }
+      if (version) {
+        throw new BenchConfigError("--akm-version only applies when --akm-mode version", true);
+      }
+      break;
+    case "source":
+      if (!source) {
+        throw new BenchConfigError("--akm-source is required when --akm-mode source", true);
+      }
+      if (version) {
+        throw new BenchConfigError("--akm-version only applies when --akm-mode version", true);
+      }
+      {
+        const absSource = path.isAbsolute(source) ? source : path.resolve(source);
+        if (!fs.existsSync(absSource)) {
+          throw new BenchConfigError(`AKM source directory not found: ${absSource}`, true);
+        }
+        if (!fs.existsSync(path.join(absSource, "package.json"))) {
+          throw new BenchConfigError(`AKM source directory must contain package.json: ${absSource}`, true);
+        }
+        const installRoot = path.join(absSource, "node_modules", ".bin", "akm");
+        if (!fs.existsSync(installRoot)) {
+          process.stderr.write(`bench: installing akm from source at ${absSource}...\n`);
+          const result = Bun.spawnSync({ cmd: ["bun", "install"], cwd: absSource, stdout: "pipe", stderr: "pipe" });
+          if (result.exitCode !== 0) {
+            throw new BenchConfigError(
+              `akm source bun install failed (exit ${result.exitCode}): ${result.stderr.toString().trim()}`,
+              false,
+            );
+          }
+        }
+        const binPath = fs.existsSync(installRoot)
+          ? installRoot
+          : path.join(absSource, "node_modules", ".bin", "akm.cmd");
+        if (!fs.existsSync(binPath)) {
+          throw new BenchConfigError(`AKM binary not found after install: ${binPath}`, false);
+        }
+        process.env.AKM_BENCH_AKM_BIN = binPath;
+        const binDir = path.dirname(binPath);
+        process.env.PATH = `${binDir}:${process.env.PATH}`;
+      }
+      break;
+    case "version":
+      if (!version) {
+        throw new BenchConfigError("--akm-version is required when --akm-mode version", true);
+      }
+      if (source) {
+        throw new BenchConfigError("--akm-source only applies when --akm-mode source", true);
+      }
+      {
+        const cacheDir = path.join(getCacheDir(), "bench", "akm-versions");
+        const installRoot = path.join(cacheDir, version);
+        const binPath = path.join(installRoot, "node_modules", ".bin", "akm");
+        if (!fs.existsSync(binPath)) {
+          process.stderr.write(`bench: installing akm@${version}...\n`);
+          fs.mkdirSync(installRoot, { recursive: true });
+          const result = Bun.spawnSync({
+            cmd: ["bun", "add", `akm-cli@${version}`],
+            cwd: installRoot,
+            stdout: "pipe",
+            stderr: "pipe",
+          });
+          if (result.exitCode !== 0) {
+            throw new BenchConfigError(
+              `akm@${version} install failed (exit ${result.exitCode}): ${result.stderr.toString().trim()}`,
+              false,
+            );
+          }
+        }
+        if (!fs.existsSync(binPath)) {
+          throw new BenchConfigError(`AKM binary not found after install: ${binPath}`, false);
+        }
+        process.env.AKM_BENCH_AKM_BIN = binPath;
+        const binDir = path.dirname(binPath);
+        process.env.PATH = `${binDir}:${process.env.PATH}`;
+      }
+      break;
+    default:
+      throw new BenchConfigError(`--akm-mode must be one of: installed, source, version`, true);
+  }
+}
+
 function writeRunBanner(model: string): void {
   const providerKey = model.includes("/") ? model.slice(0, model.indexOf("/")) : model;
   process.stderr.write(`bench: provider=${providerKey} model=${model}\n`);
@@ -92,6 +200,11 @@ Config-file mode (recommended):
   discovery chain (BENCH_OPENCODE_CONFIG → opencodeConfig/opencodeConfigRef →
   config/opencode.local.json → config/opencode.json).
 
+  Global flags (apply to both config-file and subcommand modes):
+  --akm-mode <mode>        installed | source | version. Default: installed.
+  --akm-source <dir>       Local AKM source checkout when mode=source.
+  --akm-version <ver>      Published AKM version when mode=version.
+
 Subcommands (legacy; still supported):
   utility       Track A: paired noakm vs akm utility benchmark.
   evolve        Track B: longitudinal feedback → distill → propose loop.
@@ -126,7 +239,10 @@ utility flags:
   --results-dir <path>     directory where persistent JSON reports are written.
                            Overrides BENCH_RESULTS_DIR for this invocation.
   --fixtures-dir <path>    fixtures root containing \`corpus/\` and \`stashes/\`.
-                           Overrides BENCH_FIXTURES_DIR for this invocation.
+                            Overrides BENCH_FIXTURES_DIR for this invocation.
+  --akm-mode <mode>        installed | source | version. Default: installed.
+  --akm-source <dir>       Local AKM source checkout when mode=source.
+  --akm-version <ver>      Published AKM version when mode=version.
   -h, --help               show this message.
 
 evolve flags:
@@ -142,6 +258,9 @@ evolve flags:
   --json                   suppress the markdown summary on stderr.
   --results-dir <path>     directory where persistent JSON reports are written.
   --fixtures-dir <path>    fixtures root containing \`corpus/\` and \`stashes/\`.
+  --akm-mode <mode>        installed | source | version. Default: installed.
+  --akm-source <dir>       Local AKM source checkout when mode=source.
+  --akm-version <ver>      Published AKM version when mode=version.
 
 compare flags:
   --base <path>                 path to baseline UtilityRunReport JSON file. REQUIRED.
@@ -324,6 +443,12 @@ export interface UtilityCliOptions {
   opencodeProviders?: LoadedOpencodeConfig;
   resultsDir?: string;
   fixturesDir?: string;
+  /** AKM runtime mode: installed | source | version. */
+  akmMode?: AkmMode;
+  /** Local AKM source path when akmMode=source. */
+  akmSource?: string;
+  /** Published AKM version when akmMode=version. */
+  akmVersion?: string;
 }
 
 export interface UtilityCliResult {
@@ -910,6 +1035,12 @@ export interface ConfigCliOptions {
   commit?: string;
   resultsDir?: string;
   fixturesDir?: string;
+  /** AKM runtime mode: installed | source | version. */
+  akmMode?: AkmMode;
+  /** Local AKM source path when akmMode=source. */
+  akmSource?: string;
+  /** Published AKM version when akmMode=version. */
+  akmVersion?: string;
 }
 
 /**
@@ -988,6 +1119,12 @@ export interface EvolveCliOptions {
   opencodeProviders?: LoadedOpencodeConfig;
   resultsDir?: string;
   fixturesDir?: string;
+  /** AKM runtime mode: installed | source | version. */
+  akmMode?: AkmMode;
+  /** Local AKM source path when akmMode=source. */
+  akmSource?: string;
+  /** Published AKM version when akmMode=version. */
+  akmVersion?: string;
 }
 
 /**
@@ -1040,6 +1177,23 @@ async function main(argv: string[]): Promise<number> {
     return parsed.subcommand === "" ? 2 : 0;
   }
 
+  // Configure akm runtime early so all subsequent paths see the correct binary.
+  const akmModeRaw = parsed.flags.get("akm-mode");
+  if (akmModeRaw !== undefined && akmModeRaw !== "installed" && akmModeRaw !== "source" && akmModeRaw !== "version") {
+    process.stderr.write("bench: --akm-mode must be one of: installed, source, version\n");
+    return 2;
+  }
+  try {
+    configureAkmRuntime({
+      ...(akmModeRaw ? { akmMode: akmModeRaw as AkmMode } : {}),
+      ...(parsed.flags.get("akm-source") !== undefined ? { akmSource: parsed.flags.get("akm-source") } : {}),
+      ...(parsed.flags.get("akm-version") !== undefined ? { akmVersion: parsed.flags.get("akm-version") } : {}),
+    });
+  } catch (err) {
+    process.stderr.write(`bench: ${err instanceof Error ? err.message : String(err)}\n`);
+    return err instanceof BenchConfigError && err.isUsageError ? 2 : 78;
+  }
+
   // Config-file dispatch: when argv[0] looks like a JSON path that exists,
   // route to `runConfigCli`. This is the new common-case entry point —
   // existing subcommand-style invocations are untouched.
@@ -1065,6 +1219,9 @@ async function main(argv: string[]): Promise<number> {
         ...(parallelRaw !== undefined ? { parallel: parseInt32(parallelRaw, 1) } : {}),
         ...(parsed.flags.get("results-dir") !== undefined ? { resultsDir: parsed.flags.get("results-dir") } : {}),
         ...(parsed.flags.get("fixtures-dir") !== undefined ? { fixturesDir: parsed.flags.get("fixtures-dir") } : {}),
+        ...(akmModeRaw ? { akmMode: akmModeRaw as AkmMode } : {}),
+        ...(parsed.flags.get("akm-source") !== undefined ? { akmSource: parsed.flags.get("akm-source") } : {}),
+        ...(parsed.flags.get("akm-version") !== undefined ? { akmVersion: parsed.flags.get("akm-version") } : {}),
       });
     } finally {
       removePid();
@@ -1125,6 +1282,9 @@ async function main(argv: string[]): Promise<number> {
           ...(opencodeProviders ? { opencodeProviders } : {}),
           ...(parsed.flags.get("results-dir") !== undefined ? { resultsDir: parsed.flags.get("results-dir") } : {}),
           ...(parsed.flags.get("fixtures-dir") !== undefined ? { fixturesDir: parsed.flags.get("fixtures-dir") } : {}),
+          ...(akmModeRaw ? { akmMode: akmModeRaw as AkmMode } : {}),
+          ...(parsed.flags.get("akm-source") !== undefined ? { akmSource: parsed.flags.get("akm-source") } : {}),
+          ...(parsed.flags.get("akm-version") !== undefined ? { akmVersion: parsed.flags.get("akm-version") } : {}),
         });
       } finally {
         removePid();
@@ -1176,6 +1336,9 @@ async function main(argv: string[]): Promise<number> {
           ...(opencodeProvidersEvolve ? { opencodeProviders: opencodeProvidersEvolve } : {}),
           ...(parsed.flags.get("results-dir") !== undefined ? { resultsDir: parsed.flags.get("results-dir") } : {}),
           ...(parsed.flags.get("fixtures-dir") !== undefined ? { fixturesDir: parsed.flags.get("fixtures-dir") } : {}),
+          ...(akmModeRaw ? { akmMode: akmModeRaw as AkmMode } : {}),
+          ...(parsed.flags.get("akm-source") !== undefined ? { akmSource: parsed.flags.get("akm-source") } : {}),
+          ...(parsed.flags.get("akm-version") !== undefined ? { akmVersion: parsed.flags.get("akm-version") } : {}),
         });
       } finally {
         removePidEvolve();

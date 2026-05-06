@@ -1,42 +1,34 @@
 ## Published Reference Artifacts v1
 
-This directory is reserved for the published `akm-bench` reference artifacts for
+This directory contains the published `akm-bench` reference artifacts for
 reference-suite `v1`.
 
-Current status: scaffolded only. No canonical `v1` benchmark run artifacts have
-been checked in here yet.
+Status: **published** — see `SUMMARY.md` for the authoritative record of run
+conditions, environment, and headline results.
 
-What belongs here after a real run:
+### Published Artifacts
 
-- One canonical utility artifact written by:
-  `bun run src/cli.ts config/reference-suite-v1.json --results-dir ./results/reference/v1`
-- One canonical attribution artifact derived from that utility artifact:
-  `bun run src/cli.ts attribute --base ./results/reference/v1/<utility-report>.json --top 5`
-- One canonical evolve artifact from a real temporal run, typically on a domain
-  with checked-in train/eval pairs such as `drillbit` or `inkwell`
-- One completed `SUMMARY.md` describing the exact run conditions and headline
-  outcomes
+- **Utility report**: `bench-report-utility-main-a8ee9f9-2026-05-06T07-23-55.557Z-shredder-qwen-qwen3.5-9b.json`
+- **Attribution report**: `bench-report-attribute-main-a8ee9f9-2026-05-06-shredder-qwen-qwen3.5-9b.json`
+- **Evolve report**: `bench-report-evolve-main-a8ee9f9-2026-05-06T08-06-28.627Z-shredder-qwen-qwen3.5-9b.json`
 
-Expected artifact naming:
+### Run Summary
 
-- Utility and evolve reports are persisted by the CLI as:
-  `bench-report-<track>-<branch>-<commit>-<timestamp>-<model>.json`
-- Attribution reports are currently printed to stdout by `bench attribute`; save
-  the JSON under a publication-oriented filename such as
-  `attribute-<branch>-<commit>-<timestamp>-<model>.json`
+- Model: `shredder/qwen/qwen3.5-9b` via LM Studio (`http://192.168.0.99:1234/v1`)
+- Branch: `main`, Commit: `a8ee9f9`, Date: `2026-05-06`
+- Utility `aggregate.akm.pass_rate`: **80.77%** (26 tasks across 5 domains)
+- Attribution: all 5 domain skills tied at **+0.808** marginal contribution
+- Evolve: `no_improvement_detected` (drillbit already at 100% pre-evolve)
 
-Required run metadata before publishing:
+### How These Were Generated
 
-- Git branch and commit SHA used for the run
-- UTC timestamp of the run
-- Model identifier stamped into the report
-- Exact commands used
-- Seeds and parallelism
-- Corpus identity fields from the utility artifact:
-  `selectedTaskIds`, `taskCorpusHash`, `fixtures`, and `fixtureContentHash`
-- Any relevant environment or provider settings needed to reproduce the run
-- Notes on known warnings, partial failures, or reasons an artifact should not be
-  treated as canonical
+```sh
+# Utility
+bun run src/cli.ts config/reference-suite-v1.json --results-dir ./results/reference/v1
 
-Do not add benchmark numbers here unless they come from a real persisted run
-artifact checked into this directory.
+# Attribution
+bun run src/cli.ts attribute --base ./results/reference/v1/<utility-report>.json --top 5
+
+# Evolve
+bun run src/cli.ts evolve --tasks drillbit --seeds 5 --results-dir ./results/reference/v1
+```
