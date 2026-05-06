@@ -71,9 +71,9 @@ Same concern as akm-eval. If akm's pitch is runner-agnostic, the benchmark shoul
 ### Tactical gaps
 
 - No published reference results for a versioned canonical suite
-- The exact protocol-doc set in the DoD (`docs/protocol-static-ab.md`, `docs/protocol-attribution.md`, `docs/protocol-temporal.md`) still does not exist
-- Result schema may not match akm-eval's, blocking cross-repo aggregation
-- CI currently runs `bun run check`, but not a true benchmark smoke run of the canonical suite
+- All three protocol docs shipped (`docs/protocol-static-ab.md`, `docs/protocol-attribution.md`, `docs/protocol-temporal.md`)
+- Result schemas verified against docs; all three report types match their contracts
+- CI runs `bun run check` plus deterministic CLI smoke against `config/reference-suite-v1.json`
 - Same MPL-2.0 license question as akm-eval
 
 ### Cross-repo gaps (shared with akm-eval)
@@ -130,7 +130,7 @@ Two-run protocol with a self-improvement step in between, as described in the ga
 - At least two supported agent runners (opencode + one other)
 - Documented output schema for all three protocols, in `docs/`
 - Where applicable, schema-compatible output with akm-eval — at minimum, shared model/seed/commit-SHA fields so cross-repo dashboards become possible
-- CI running on every PR, with a benchmark smoke path for the canonical suite still to be added
+- CI running on every PR, with deterministic CLI smoke path for the canonical suite
 - Reproducible Docker image with version-pinned akm and runner versions
 
 ### Required documentation
