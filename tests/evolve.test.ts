@@ -33,6 +33,8 @@ const EXPECTED_REFLECT_CONSTRAINED_TASK =
 const EXPECTED_REFLECT_LINT_REPAIR_TASK =
   "Fix proposal lint issues only; preserve frontmatter/schema/ids; keep a minimal diff.";
 
+const EXPECTED_REFLECT_TIMEOUT_MS = "120000";
+
 function asReadableStream(text: string): ReadableStream<Uint8Array> {
   const bytes = new TextEncoder().encode(text);
   return new ReadableStream({
@@ -248,7 +250,14 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     // Loser crosses threshold; winner does not.
     expect(distillCalls.map((c) => c[1])).toEqual(["skill:loser"]);
     expect(reflectCalls.map((c) => c[1])).toEqual(["skill:loser"]);
-    expect(reflectCalls[0]).toEqual(["reflect", "skill:loser", "--task", EXPECTED_REFLECT_CONSTRAINED_TASK]);
+    expect(reflectCalls[0]).toEqual([
+      "reflect",
+      "skill:loser",
+      "--task",
+      EXPECTED_REFLECT_CONSTRAINED_TASK,
+      "--timeout-ms",
+      EXPECTED_REFLECT_TIMEOUT_MS,
+    ]);
     expect(report.phase1Diagnostics.refsToEvolve).toEqual(["skill:loser"]);
     expect(report.phase1Diagnostics.perRefFeedback).toEqual([
       { ref: "skill:loser", positive: 0, negative: 3 },
@@ -291,6 +300,72 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     expect(report.proposals.totalProposals).toBe(2);
     expect(report.proposals.totalAccepted).toBe(1);
     expect(report.proposals.acceptanceRate).toBe(0.5);
+  });
+
+  test("proposal show validation.ok=true is treated as lint-pass", async () => {
+    const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({
+      observed,
+      proposalQueue: [{ id: "p-validation-ok", targetRef: "skill:loser", kind: "revision" }],
+      showStdoutByProposal: {
+        "p-validation-ok": JSON.stringify({
+          proposal: { id: "p-validation-ok", ref: "skill:loser" },
+          validation: { ok: true, findings: [] },
+        }),
+      },
+    });
+
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+    });
+
+    expect(observed.calls.some((c) => c[0] === "proposal" && c[1] === "accept" && c[2] === "p-validation-ok")).toBe(true);
+    expect(report.proposalLog.find((e) => e.proposalId === "p-validation-ok")?.decision).toBe("accept");
+  });
+
+  test("proposal show validation findings are propagated into reject reason", async () => {
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({
+      proposalQueue: [{ id: "p-validation-bad", targetRef: "skill:loser", kind: "revision" }],
+      showStdoutByProposal: {
+        "p-validation-bad": JSON.stringify({
+          proposal: { id: "p-validation-bad", ref: "skill:loser" },
+          validation: {
+            ok: false,
+            findings: [
+              { severity: "error", path: "skills/docker/SKILL.md", line: 2, message: "missing description" },
+            ],
+          },
+        }),
+      },
+    });
+
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+    });
+
+    const entry = report.proposalLog.find((e) => e.proposalId === "p-validation-bad");
+    expect(entry?.decision).toBe("reject");
+    expect(entry?.rejectReason).toContain("issue_1=[error] @skills/docker/SKILL.md:2 missing description");
   });
 
   test("rebuilds index after Phase 2 only when proposals accepted", async () => {

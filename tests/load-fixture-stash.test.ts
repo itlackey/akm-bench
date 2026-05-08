@@ -95,6 +95,29 @@ describe("loadFixtureStash", () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test("skips transient .akm state when materialising a fixture", () => {
+    const root = benchMkdtemp("akm-bench-custom-stashes-");
+    const priorFixturesDir = process.env.BENCH_FIXTURES_DIR;
+    const fixtureDir = path.join(root, "stashes", "custom-stash");
+    fs.mkdirSync(path.join(fixtureDir, "skills"), { recursive: true });
+    fs.mkdirSync(path.join(fixtureDir, ".akm", "proposals", "p-1"), { recursive: true });
+    fs.writeFileSync(path.join(fixtureDir, "MANIFEST.json"), "{}\n", "utf8");
+    fs.writeFileSync(path.join(fixtureDir, "skills", "SKILL.md"), "# custom\n", "utf8");
+    fs.writeFileSync(path.join(fixtureDir, ".akm", "proposals", "p-1", "proposal.json"), '{"id":"p-1"}\n', "utf8");
+
+    process.env.BENCH_FIXTURES_DIR = root;
+    const { stashDir, cleanup } = loadFixtureStash("custom-stash", { skipIndex: true });
+    try {
+      expect(fs.existsSync(path.join(stashDir, "skills", "SKILL.md"))).toBe(true);
+      expect(fs.existsSync(path.join(stashDir, ".akm"))).toBe(false);
+    } finally {
+      cleanup();
+      if (priorFixturesDir === undefined) delete process.env.BENCH_FIXTURES_DIR;
+      else process.env.BENCH_FIXTURES_DIR = priorFixturesDir;
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("fixtureContentHash", () => {

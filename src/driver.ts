@@ -262,19 +262,48 @@ export function createIsolationDirs(stashDir?: string): IsolationDirs {
 /** Build the env passed to `runAgent`. The XDG/AKM/OPENCODE keys are pinned. */
 export function buildIsolatedEnv(dirs: IsolationDirs, model: string): Record<string, string> {
   const akmRuntime = resolveAkmRuntime();
+  const shimBinPath = materializeAkmShim(dirs.root, akmRuntime);
   const env: Record<string, string> = {
     XDG_CACHE_HOME: dirs.cacheHome,
     XDG_CONFIG_HOME: dirs.configHome,
     OPENCODE_CONFIG: path.join(dirs.opencodeConfig, "opencode.json"),
     BENCH_OPENCODE_MODEL: model,
-    AKM_BENCH_AKM_BIN: akmRuntime.binPath,
+    AKM_BENCH_AKM_BIN: shimBinPath ?? akmRuntime.binPath,
   };
-  if (akmRuntime.binDir) {
+  if (shimBinPath) {
+    const existingPath = process.env.PATH?.trim();
+    const shimDir = path.dirname(shimBinPath);
+    env.PATH = existingPath ? `${shimDir}${path.delimiter}${existingPath}` : shimDir;
+  } else if (akmRuntime.binDir) {
     const existingPath = process.env.PATH?.trim();
     env.PATH = existingPath ? `${akmRuntime.binDir}${path.delimiter}${existingPath}` : akmRuntime.binDir;
   }
   if (dirs.akmStashDir) env.AKM_STASH_DIR = dirs.akmStashDir;
   return env;
+}
+
+function materializeAkmShim(root: string, runtime: ReturnType<typeof resolveAkmRuntime>): string | undefined {
+  if (runtime.command.length === 1 && runtime.command[0] === runtime.binPath) return undefined;
+  const shimDir = path.join(root, "bin");
+  fs.mkdirSync(shimDir, { recursive: true });
+  const shimPath = path.join(shimDir, process.platform === "win32" ? "akm.cmd" : "akm");
+  if (process.platform === "win32") {
+    const cmd = runtime.command.map(windowsCmdQuote).join(" ");
+    fs.writeFileSync(shimPath, `@echo off\r\n${cmd} %*\r\n`, "utf8");
+    return shimPath;
+  }
+  const cmd = runtime.command.map(shellQuote).join(" ");
+  fs.writeFileSync(shimPath, `#!/usr/bin/env bash\nexec ${cmd} "$@"\n`, { mode: 0o755 });
+  fs.chmodSync(shimPath, 0o755);
+  return shimPath;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+function windowsCmdQuote(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
 /**

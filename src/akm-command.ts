@@ -10,21 +10,31 @@ export interface ResolvedAkmRuntime {
   binDir?: string;
 }
 
+function isJavaScriptEntrypoint(candidate: string): boolean {
+  try {
+    const resolved = fs.realpathSync(candidate);
+    return [".js", ".mjs", ".cjs"].includes(path.extname(resolved));
+  } catch {
+    return [".js", ".mjs", ".cjs"].includes(path.extname(candidate));
+  }
+}
+
+function resolveFileRuntime(candidate: string): ResolvedAkmRuntime {
+  return {
+    command: isJavaScriptEntrypoint(candidate) ? ["bun", candidate] : [candidate],
+    binPath: candidate,
+    binDir: path.dirname(candidate),
+  };
+}
+
 export function resolveAkmRuntime(): ResolvedAkmRuntime {
   const override = process.env.AKM_BENCH_AKM_BIN?.trim();
   if (override) {
-    return {
-      command: [override],
-      binPath: override,
-      ...(path.isAbsolute(override) ? { binDir: path.dirname(override) } : {}),
-    };
+    if (fs.existsSync(override)) return resolveFileRuntime(override);
+    return { command: [override], binPath: override, ...(path.isAbsolute(override) ? { binDir: path.dirname(override) } : {}) };
   }
   if (fs.existsSync(LOCAL_AKM_BIN)) {
-    return {
-      command: [LOCAL_AKM_BIN],
-      binPath: LOCAL_AKM_BIN,
-      binDir: path.dirname(LOCAL_AKM_BIN),
-    };
+    return resolveFileRuntime(LOCAL_AKM_BIN);
   }
   return { command: ["akm"], binPath: "akm" };
 }

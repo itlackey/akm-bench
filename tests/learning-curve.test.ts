@@ -208,7 +208,7 @@ describe("renderEvolveReport — learning block (#265)", () => {
       }),
     );
 
-    const parsed = json as {
+    const parsed = json as unknown as {
       proposals: {
         proposal_log?: Array<{
           id: string;

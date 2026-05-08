@@ -18,6 +18,7 @@ import { getStashesRoot } from "./fixtures-root";
 import { benchMkdtemp } from "./tmp";
 
 const INDEX_DIR_NAME = "__akm_index__";
+const TRANSIENT_FIXTURE_DIRS = new Set([".akm", INDEX_DIR_NAME]);
 
 export interface LoadedFixtureStash {
   /** Absolute path to the materialised stash directory. */
@@ -221,6 +222,7 @@ function collectFilesSorted(root: string): string[] {
   const walk = (dir: string): void => {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
+      if (entry.isDirectory() && TRANSIENT_FIXTURE_DIRS.has(entry.name)) continue;
       const abs = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(abs);
       else if (entry.isFile()) out.push(path.relative(root, abs));
@@ -235,6 +237,7 @@ function copyDirRecursive(src: string, dest: string): void {
   fs.mkdirSync(dest, { recursive: true });
   const entries = fs.readdirSync(src, { withFileTypes: true });
   for (const entry of entries) {
+    if (entry.isDirectory() && TRANSIENT_FIXTURE_DIRS.has(entry.name)) continue;
     const s = path.join(src, entry.name);
     const d = path.join(dest, entry.name);
     if (entry.isDirectory()) copyDirRecursive(s, d);

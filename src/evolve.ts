@@ -39,6 +39,7 @@ import {
   type LessonMetrics,
   type PostTaskLessonLineage,
 } from "./evolve-metrics";
+import { writeOpencodeJson } from "./environment";
 import { type LoadedFixtureStash, loadFixtureStash } from "./fixture-stash";
 import {
   computeFeedbackIntegrity,
@@ -60,6 +61,8 @@ const PHASE2_REFLECT_CONSTRAINED_TASK =
 
 const PHASE2_REFLECT_LINT_REPAIR_TASK =
   "Fix proposal lint issues only; preserve frontmatter/schema/ids; keep a minimal diff.";
+
+const PHASE2_REFLECT_TIMEOUT_MS = 180000;
 
 /** Result of an `akm` subprocess invocation. */
 export interface AkmCliResult {
@@ -247,6 +250,12 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   const preDirByFixture = new Map<string, string>();
   /** Per-fixture XDG_CACHE_HOME dirs allocated for evolve-stash indexing. */
   const evolveCacheDirByFixture = new Map<string, string>();
+  const phase2OpencodeConfigRoot = options.opencodeProviders ? benchMkdtemp("akm-evolve-opencode-") : undefined;
+  const phase2OpencodeConfigPath = phase2OpencodeConfigRoot ? `${phase2OpencodeConfigRoot}/opencode.json` : undefined;
+
+  if (phase2OpencodeConfigRoot) {
+    writeOpencodeJson(phase2OpencodeConfigRoot, options.model, options.opencodeProviders);
+  }
 
   // SIGINT trap (#267): every per-fixture stash registers its cleanup with
   // the shared registry so an external Ctrl-C reaps the tmp dirs even when
@@ -304,13 +313,14 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   }
   const fallbackEvolveDir = [...evolveDirByFixture.values()][0];
   const fallbackEvolveCacheDir = [...evolveCacheDirByFixture.values()][0];
-  const opencodeConfigPath = options.opencodeProviders?.source;
+  const opencodeConfigPath = phase2OpencodeConfigPath;
   function envForRef(ref: string | undefined): Record<string, string> {
     const baseEnv = { ...(process.env as Record<string, string>) };
     if (!materialiseStash) {
       // Tests opt out of fixture materialisation entirely; we still strip
       // the operator's AKM_STASH_DIR so the fake CLI sees a known sentinel.
       delete baseEnv.AKM_STASH_DIR;
+      if (opencodeConfigPath) baseEnv.OPENCODE_CONFIG = opencodeConfigPath;
       return baseEnv;
     }
     const fixture = ref ? refToFixture.get(ref) : undefined;
@@ -438,12 +448,19 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       if (distillResult.exitCode !== 0) {
         warnings.push(`phase2: akm distill ${ref} failed: ${distillResult.stderr.trim()}`);
       }
-      const reflectArgs = ["reflect", ref, "--task", PHASE2_REFLECT_CONSTRAINED_TASK];
+      const reflectArgs = [
+        "reflect",
+        ref,
+        "--task",
+        PHASE2_REFLECT_CONSTRAINED_TASK,
+        "--timeout-ms",
+        String(Math.min(budgetWallMs, PHASE2_REFLECT_TIMEOUT_MS)),
+      ];
       const reflectResult = await akmCli(reflectArgs, phase1Cwd, evolveEnv);
       if (reflectResult.exitCode !== 0) {
         // `reflect` requires `agent.default` to be configured — a missing
         // config is non-fatal for the bench; we record and continue.
-        warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${reflectResult.stderr.trim()}`);
+        warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${summariseAkmFailure(reflectResult)}`);
       }
     }
 
@@ -529,14 +546,19 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
           if (showInfo.status === "lint_fail" && !repairedRefs.has(p.assetRef)) {
             repairedRefs.add(p.assetRef);
             const repairReflectResult = await akmCli(
-              ["reflect", p.assetRef, "--task", PHASE2_REFLECT_LINT_REPAIR_TASK],
+              [
+                "reflect",
+                p.assetRef,
+                "--task",
+                PHASE2_REFLECT_LINT_REPAIR_TASK,
+                "--timeout-ms",
+                String(Math.min(budgetWallMs, PHASE2_REFLECT_TIMEOUT_MS)),
+              ],
               phase1Cwd,
               proposalEnv,
             );
             if (repairReflectResult.exitCode !== 0) {
-              warnings.push(
-                `phase2: lint-repair reflect ${p.assetRef} failed: ${repairReflectResult.stderr.trim()}`,
-              );
+              warnings.push(`phase2: lint-repair reflect ${p.assetRef} failed: ${summariseAkmFailure(repairReflectResult)}`);
             }
 
             const refreshedListResult = await akmCli(["proposal", "list", "--json"], phase1Cwd, proposalEnv);
@@ -671,6 +693,13 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     for (const s of preStashes.values()) {
       try {
         s.cleanup();
+      } catch {
+        /* swallow — best-effort tmp cleanup */
+      }
+    }
+    if (phase2OpencodeConfigRoot) {
+      try {
+        fs.rmSync(phase2OpencodeConfigRoot, { recursive: true, force: true });
       } catch {
         /* swallow — best-effort tmp cleanup */
       }
@@ -883,6 +912,9 @@ function parseProposalShow(stdout: string): ParsedProposalShow {
   const lintPass =
     parsed.lint_pass === true ||
     parsed.lintPass === true ||
+    (typeof parsed.validation === "object" &&
+      parsed.validation !== null &&
+      (parsed.validation as Record<string, unknown>).ok === true) ||
     (typeof parsed.lint === "object" && parsed.lint !== null && (parsed.lint as Record<string, unknown>).pass === true);
   const lintMessage = buildLintDiagnostics(parsed);
 
@@ -906,6 +938,21 @@ function buildLintDiagnostics(parsed: Record<string, unknown>): string | undefin
       for (let idx = 0; idx < issues.length; idx += 1) {
         const issueText = formatLintIssue(issues[idx]);
         if (issueText) parts.push(`issue_${idx + 1}=${issueText}`);
+      }
+    }
+  }
+
+  const validationRaw = parsed.validation;
+  if (validationRaw && typeof validationRaw === "object") {
+    const validation = validationRaw as Record<string, unknown>;
+    const validationMessage = asText(validation.message) ?? asText(validation.error) ?? asText(validation.summary);
+    if (validationMessage) parts.push(validationMessage);
+
+    const findings = validation.findings;
+    if (Array.isArray(findings) && findings.length > 0) {
+      for (let idx = 0; idx < findings.length; idx += 1) {
+        const findingText = formatLintIssue(findings[idx]);
+        if (findingText) parts.push(`issue_${idx + 1}=${findingText}`);
       }
     }
   }
@@ -966,6 +1013,26 @@ function compactOneLine(value: string, maxLen: number): string {
   const compact = value.replace(/\s+/g, " ").trim();
   if (compact.length <= maxLen) return compact;
   return `${compact.slice(0, Math.max(0, maxLen - 3))}...`;
+}
+
+function summariseAkmFailure(result: AkmCliResult): string {
+  const stderr = result.stderr.trim();
+  if (stderr.length > 0) return compactOneLine(stderr, 400);
+
+  const stdout = result.stdout.trim();
+  if (!stdout) return `<empty stderr/stdout; exit ${result.exitCode}>`;
+  try {
+    const parsed = JSON.parse(stdout) as Record<string, unknown>;
+    if (parsed.ok === false) {
+      const parts = [asText(parsed.reason), asText(parsed.error), asText(parsed.code)].filter(
+        (part): part is string => typeof part === "string" && part.length > 0,
+      );
+      if (parts.length > 0) return parts.join("; ");
+    }
+  } catch {
+    // fall through to raw preview
+  }
+  return compactOneLine(stdout, 400);
 }
 
 /**
