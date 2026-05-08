@@ -1,0 +1,26 @@
+id: workflow-compliance/repeated-fail-storage-lifecycle-eval
+title: "Set storage account lifecycle policy (eval variant)"
+domain: workflow-compliance
+difficulty: hard
+slice: eval
+gold_ref: skill:az-cli
+stash: az-cli
+verifier: script
+memory_ability: procedural_lookup
+task_family: workflow-compliance/repeated-failure
+
+budget:
+  tokens: 25000
+  wallMs: 90000
+
+# --- Workflow-compliance metadata (issue #259) ---
+# Eval variant for transfer measurement after train variants A and B
+# trigger the reflect/distill workflow.
+repeated_failure_group: az-storage-lifecycle
+workflow_failure_category: repeated-failure-reflection-trigger
+expected_workflows:
+  - akm-lookup-before-edit
+  - akm-negative-feedback-on-failure
+  - akm-reflect-after-repeated-failure
+abstention_case: false
+akm_keywords: "az cli storage lifecycle delete tier"

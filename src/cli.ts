@@ -23,6 +23,7 @@ import process from "node:process";
 import { listTasks, type TaskMetadata } from "./corpus";
 import { renderDoctorReport, runDoctor } from "./doctor";
 import { runEvolve } from "./evolve";
+import { ensureFixtureIndexesForTasks } from "./fixture-index-preflight";
 import {
   compareReports,
   type MaskedCorpusResult,
@@ -186,6 +187,18 @@ function withBenchFixturesDir<T>(fixturesDir: string | undefined, fn: () => T): 
     if (prior === undefined) delete process.env.BENCH_FIXTURES_DIR;
     else process.env.BENCH_FIXTURES_DIR = prior;
   }
+}
+
+function runFixtureIndexPreflight(tasks: ReadonlyArray<{ stash: string }>, fixturesDir?: string): string[] {
+  const preflight = withBenchFixturesDir(fixturesDir, () => ensureFixtureIndexesForTasks(tasks));
+  const lines: string[] = [];
+  lines.push(
+    `bench: fixture index preflight fixtures=${preflight.fixtureCount} reused=${preflight.reusedCount} rebuilt=${preflight.rebuiltCount}`,
+  );
+  for (const warning of preflight.warnings) {
+    lines.push(`warning: ${warning}`);
+  }
+  return lines;
 }
 
 const HELP = `akm-bench — agent-plus-akm evaluation framework
@@ -467,6 +480,7 @@ export interface UtilityCliResult {
 export async function runUtilityCli(options: UtilityCliOptions): Promise<UtilityCliResult> {
   const sliceFilter = options.slice === "all" ? undefined : options.slice;
   const tasks = withBenchFixturesDir(options.fixturesDir, () => listTasks(sliceFilter ? { slice: sliceFilter } : {}));
+  const preflightMessages = runFixtureIndexPreflight(tasks, options.fixturesDir);
 
   // noakm arm is included by default: it is the control condition for the
   // primary utility metric (pass_rate(akm) − pass_rate(noakm), spec §4).
@@ -507,6 +521,7 @@ export async function runUtilityCli(options: UtilityCliOptions): Promise<Utility
   // emitted so an operator running it interactively gets both views.
   const stdout = jsonText;
   let stderr = options.json ? "" : markdownText;
+  stderr += `${preflightMessages.join("\n")}\n`;
   stderr += `bench: wrote report ${reportPath}\n`;
   stderr += `tasks discovered: ${tasks.length} (slice=${options.slice})\n`;
   if (tasks.length === 0) {
@@ -1069,6 +1084,7 @@ export async function runConfigCli(options: ConfigCliOptions): Promise<UtilityCl
   }
 
   writeRunBanner(resolved.model);
+  const preflightMessages = runFixtureIndexPreflight(resolved.tasks, options.fixturesDir);
 
   const report = await withBenchFixturesDir(options.fixturesDir, () =>
     runUtility({
@@ -1093,6 +1109,7 @@ export async function runConfigCli(options: ConfigCliOptions): Promise<UtilityCl
   const { json, markdown } = renderUtilityReport(report);
   const stdout = `${JSON.stringify(json, null, 2)}\n`;
   let stderr = options.json ? "" : `${markdown}\n`;
+  stderr += `${preflightMessages.join("\n")}\n`;
   const reportPath = withBenchResultsDir(options.resultsDir, () => writeReportArtifact(report));
   stderr += `bench: wrote report ${reportPath}\n`;
   stderr += `bench: config=${resolved.name} tasks=${resolved.tasks.length} arms=${resolved.arms.join(",")} model=${resolved.model}\n`;
@@ -1144,6 +1161,8 @@ export async function runEvolveCli(options: EvolveCliOptions): Promise<UtilityCl
     };
   }
 
+  const preflightMessages = runFixtureIndexPreflight(tasks, options.fixturesDir);
+
   writeRunBanner(options.model);
 
   const report = await withBenchFixturesDir(options.fixturesDir, () =>
@@ -1164,6 +1183,7 @@ export async function runEvolveCli(options: EvolveCliOptions): Promise<UtilityCl
   const { json, markdown } = renderEvolveReport(report);
   const stdout = `${JSON.stringify(json, null, 2)}\n`;
   let stderr = options.json ? "" : `${markdown}\n`;
+  stderr += `${preflightMessages.join("\n")}\n`;
   stderr += `bench: wrote report ${withBenchResultsDir(options.resultsDir, () => writeBenchReportJson(json))}\n`;
   stderr += `tasks discovered: ${tasks.length} (domain=${options.domain})\n`;
   return { exitCode: 0, stdout, stderr };

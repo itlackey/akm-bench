@@ -87,11 +87,9 @@ For each selected ref, the runner calls:
 - `akm distill <ref>`
 - `akm reflect <ref>`
 
-When eval gold refs exist, the runner also passes the train/eval leakage guard
-to distill:
+The runner applies a train/eval leakage guard to distill:
 
-- CLI flag: `--exclude-feedback-from <csv>`
-- env fallback: `AKM_DISTILL_EXCLUDE_FEEDBACK_FROM=<csv>`
+- CLI flag: `--exclude-tags slice:eval`
 
 Then, for each proposal returned by `akm proposal list --json`, it calls:
 

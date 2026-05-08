@@ -177,6 +177,86 @@ describe("renderEvolveReport — learning block (#265)", () => {
     expect(markdown).toContain("lesson:docker-healthchecks");
     expect(markdown).toContain("train/task-a, train/task-b");
   });
+
+  test("emits proposal diagnostics + phase1 diagnostics in JSON and markdown", () => {
+    const { json, markdown } = renderEvolveReport(
+      baseEvolveInput({
+        proposalLog: [
+          {
+            proposalId: "p-1",
+            assetRef: "skill:loser",
+            kind: "lesson",
+            lintPass: true,
+            decision: "accept",
+          },
+          {
+            proposalId: "p-2",
+            assetRef: "skill:loser",
+            kind: "revision",
+            lintPass: false,
+            decision: "reject",
+            rejectReason: "missing description",
+          },
+        ],
+        phase1Diagnostics: {
+          perRefFeedback: [
+            { ref: "skill:loser", positive: 0, negative: 3 },
+            { ref: "skill:winner", positive: 3, negative: 0 },
+          ],
+          refsToEvolve: ["skill:loser"],
+        },
+      }),
+    );
+
+    const parsed = json as {
+      proposals: {
+        proposal_log?: Array<{
+          id: string;
+          asset: string;
+          kind: string;
+          lint: boolean;
+          decision: string;
+          reason: string | null;
+        }>;
+      };
+      phase1?: {
+        per_ref_feedback: Array<{ ref: string; positive: number; negative: number }>;
+        refs_to_evolve: string[];
+      };
+    };
+
+    expect(parsed.proposals.proposal_log).toEqual([
+      {
+        id: "p-1",
+        asset: "skill:loser",
+        kind: "lesson",
+        lint: true,
+        decision: "accept",
+        reason: null,
+      },
+      {
+        id: "p-2",
+        asset: "skill:loser",
+        kind: "revision",
+        lint: false,
+        decision: "reject",
+        reason: "missing description",
+      },
+    ]);
+    expect(parsed.phase1).toEqual({
+      per_ref_feedback: [
+        { ref: "skill:loser", positive: 0, negative: 3 },
+        { ref: "skill:winner", positive: 3, negative: 0 },
+      ],
+      refs_to_evolve: ["skill:loser"],
+    });
+
+    expect(markdown).toContain("Proposal diagnostics");
+    expect(markdown).toContain("Phase 1 diagnostics");
+    expect(markdown).toContain("promoted_refs=1");
+    expect(markdown).toContain("p-1");
+    expect(markdown).toContain("skill:loser");
+  });
 });
 
 describe("renderLearningCurveSection", () => {

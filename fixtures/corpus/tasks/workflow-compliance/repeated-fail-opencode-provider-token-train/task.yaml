@@ -1,0 +1,34 @@
+id: workflow-compliance/repeated-fail-opencode-provider-token-train
+title: "Set opencode provider env token and model for anthropic"
+domain: workflow-compliance
+difficulty: hard
+slice: train
+gold_ref: skill:opencode
+stash: noisy
+verifier: script
+memory_ability: procedural_lookup
+task_family: workflow-compliance/repeated-failure
+
+budget:
+  tokens: 25000
+  wallMs: 90000
+
+# --- Workflow-compliance metadata (issue #259) ---
+# Category: repeated-failure-reflection-trigger.
+#
+# This task intentionally exercises configuration details that are omitted from
+# `skill:opencode` in the noisy stash (env-var naming and provider token wiring).
+# Many agents following only the skill's brief guidance will fail verifier checks.
+#
+# It pairs with `workflow-compliance/repeated-fail-opencode-disable-provider` so
+# two failures against the same gold ref can trigger repeated-failure reflection
+# and produce evolve proposals for the missing guidance.
+repeated_failure_group: opencode-provider-config
+workflow_failure_category: repeated-failure-reflection-trigger
+expected_workflows:
+  - akm-lookup-before-edit
+  - akm-correct-asset-use
+  - akm-negative-feedback-on-failure
+  - akm-reflect-after-repeated-failure
+abstention_case: false
+akm_keywords: "opencode provider anthropic env token model"

@@ -9,3 +9,5 @@ src/*.json
 results/bench-report-*.json
 !results/reference/
 tests/tmp-report-output/
+fixtures/stashes/*/__akm_index__/
+results/evolve-shredder/

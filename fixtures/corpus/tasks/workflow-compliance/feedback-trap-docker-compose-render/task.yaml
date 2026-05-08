@@ -1,0 +1,33 @@
+id: workflow-compliance/feedback-trap-docker-compose-render
+title: "Render merged docker compose config with env + profile flags"
+domain: workflow-compliance
+difficulty: hard
+slice: train
+gold_ref: skill:docker
+stash: noisy
+verifier: script
+memory_ability: noisy_retrieval
+task_family: workflow-compliance/feedback-polarity
+
+budget:
+  tokens: 25000
+  wallMs: 90000
+
+# --- Workflow-compliance metadata (issue #259) ---
+# Category: feedback-polarity-trap.
+#
+# The declared gold ref (`skill:docker` in the noisy stash) is intentionally
+# high-level and does not enumerate this task's combined-flag pattern:
+# multi-file compose rendering with env injection plus profile selection and
+# interpolation suppression. Agents that over-trust the asset commonly omit
+# one of these constraints and fail verification.
+#
+# On verifier failure, the compliant workflow is to attach NEGATIVE feedback
+# to the consulted ref so utility and evolve inputs reflect the coverage gap.
+workflow_failure_category: feedback-polarity-trap
+expected_workflows:
+  - akm-lookup-before-edit
+  - akm-correct-asset-use
+  - akm-negative-feedback-on-failure
+abstention_case: false
+akm_keywords: "docker compose config env-file profile no-interpolate"

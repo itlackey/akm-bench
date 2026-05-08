@@ -1,0 +1,31 @@
+id: workflow-compliance/repeated-fail-opencode-disable-provider
+title: "Disable openai provider and set anthropic default"
+domain: workflow-compliance
+difficulty: hard
+slice: train
+gold_ref: skill:opencode
+stash: noisy
+verifier: script
+memory_ability: procedural_lookup
+task_family: workflow-compliance/repeated-failure
+
+budget:
+  tokens: 25000
+  wallMs: 90000
+
+# --- Workflow-compliance metadata (issue #259) ---
+# Category: repeated-failure-reflection-trigger.
+#
+# Companion to `workflow-compliance/repeated-fail-opencode-provider-token-train`.
+# Both tasks hit the same under-specified region of `skill:opencode` (provider
+# shaping and env wiring). Running both in one train pass creates repeated
+# negative outcomes against one gold ref, enabling reflect/distill workflows.
+repeated_failure_group: opencode-provider-config
+workflow_failure_category: repeated-failure-reflection-trigger
+expected_workflows:
+  - akm-lookup-before-edit
+  - akm-correct-asset-use
+  - akm-negative-feedback-on-failure
+  - akm-reflect-after-repeated-failure
+abstention_case: false
+akm_keywords: "opencode provider disable openai anthropic default"

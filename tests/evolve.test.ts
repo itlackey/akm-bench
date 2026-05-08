@@ -23,9 +23,15 @@ import {
   runEvolve,
 } from "../src/evolve";
 import { computeLongitudinalMetrics, computeProposalQualityMetrics, type ProposalLogEntry } from "../src/metrics";
-import type { UtilityRunReport } from "../src/report";
+import { renderEvolveReport, type UtilityRunReport } from "../src/report";
 import type { SpawnedSubprocess, SpawnFn } from "../src/support/agent";
 import { benchMkdtemp } from "../src/tmp";
+
+const EXPECTED_REFLECT_CONSTRAINED_TASK =
+  "Apply a single-issue patch only; preserve frontmatter, schema, and ids; avoid unrelated rewrites; output must satisfy proposal lint.";
+
+const EXPECTED_REFLECT_LINT_REPAIR_TASK =
+  "Fix proposal lint issues only; preserve frontmatter/schema/ids; keep a minimal diff.";
 
 function asReadableStream(text: string): ReadableStream<Uint8Array> {
   const bytes = new TextEncoder().encode(text);
@@ -69,9 +75,15 @@ function buildFakeSpawn(opts: { observed?: { arms: string[]; cwd: (string | unde
  */
 function buildFakeAkmCli(opts: {
   proposalQueue?: Array<{ id: string; targetRef: string; kind?: string }>;
+  proposalQueueSequence?: Array<Array<{ id: string; targetRef: string; kind?: string }>>;
   lintByProposal?: Record<string, { lintPass: boolean; message?: string }>;
+  showExitByProposal?: Record<string, { exitCode: number; stderr?: string }>;
+  showEnvelopeByProposal?: Record<string, { ok: false; error?: string; code?: string }>;
+  showStdoutByProposal?: Record<string, string>;
+  proposalListFailure?: { exitCode: number; stderr?: string };
   observed?: { calls: string[][]; envSeen: Record<string, string>[] };
 }): AkmCliFn {
+  let proposalListCallCount = 0;
   return async (args, _cwd, env): Promise<AkmCliResult> => {
     if (opts.observed) {
       opts.observed.calls.push(args);
@@ -82,7 +94,18 @@ function buildFakeAkmCli(opts: {
     if (args[0] === "reflect") return { exitCode: 0, stdout: "", stderr: "" };
     if (args[0] === "index") return { exitCode: 0, stdout: "", stderr: "" };
     if (args[0] === "proposal" && args[1] === "list") {
-      const queue = opts.proposalQueue ?? [];
+      if (opts.proposalListFailure) {
+        return {
+          exitCode: opts.proposalListFailure.exitCode,
+          stdout: "",
+          stderr: opts.proposalListFailure.stderr ?? "proposal list failed",
+        };
+      }
+      const queue =
+        opts.proposalQueueSequence?.[proposalListCallCount] ??
+        opts.proposalQueueSequence?.[opts.proposalQueueSequence.length - 1] ??
+        opts.proposalQueue ?? [];
+      proposalListCallCount += 1;
       return {
         exitCode: 0,
         stdout: JSON.stringify(queue.map((p) => ({ id: p.id, target_ref: p.targetRef, kind: p.kind ?? "lesson" }))),
@@ -91,6 +114,18 @@ function buildFakeAkmCli(opts: {
     }
     if (args[0] === "proposal" && args[1] === "show") {
       const id = args[2];
+      const showExit = opts.showExitByProposal?.[id];
+      if (showExit) {
+        return { exitCode: showExit.exitCode, stdout: "", stderr: showExit.stderr ?? "proposal show failed" };
+      }
+      const showStdout = opts.showStdoutByProposal?.[id];
+      if (typeof showStdout === "string") {
+        return { exitCode: 0, stdout: showStdout, stderr: "" };
+      }
+      const showEnvelope = opts.showEnvelopeByProposal?.[id];
+      if (showEnvelope) {
+        return { exitCode: 0, stdout: JSON.stringify(showEnvelope), stderr: "" };
+      }
       const lint = opts.lintByProposal?.[id] ?? { lintPass: true };
       const payload = {
         id,
@@ -170,6 +205,11 @@ describe("runEvolve — Phase 1 feedback", () => {
     const positiveLog = report.feedbackLog.filter((e: FeedbackLogEntry) => e.signal === "positive");
     expect(positiveLog.length).toBe(2);
     expect(positiveLog[0].goldRef).toBe("skill:passing");
+    const passing = report.phase1Diagnostics.perRefFeedback.find((r) => r.ref === "skill:passing");
+    const failing = report.phase1Diagnostics.perRefFeedback.find((r) => r.ref === "skill:failing");
+    expect(passing).toEqual({ ref: "skill:passing", positive: 2, negative: 0 });
+    expect(failing).toEqual({ ref: "skill:failing", positive: 0, negative: 2 });
+    expect(report.phase1Diagnostics.refsToEvolve).toEqual(["skill:failing"]);
   });
 });
 
@@ -194,7 +234,7 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({ observed, proposalQueue: [] });
-    await runEvolve({
+    const report = await runEvolve({
       tasks,
       model: "test-model",
       seedsPerArm: 3,
@@ -208,6 +248,12 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     // Loser crosses threshold; winner does not.
     expect(distillCalls.map((c) => c[1])).toEqual(["skill:loser"]);
     expect(reflectCalls.map((c) => c[1])).toEqual(["skill:loser"]);
+    expect(reflectCalls[0]).toEqual(["reflect", "skill:loser", "--task", EXPECTED_REFLECT_CONSTRAINED_TASK]);
+    expect(report.phase1Diagnostics.refsToEvolve).toEqual(["skill:loser"]);
+    expect(report.phase1Diagnostics.perRefFeedback).toEqual([
+      { ref: "skill:loser", positive: 0, negative: 3 },
+      { ref: "skill:winner", positive: 3, negative: 0 },
+    ]);
   });
 
   test("lint_pass=true → accept, lint_pass=false → reject", async () => {
@@ -247,13 +293,328 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     expect(report.proposals.acceptanceRate).toBe(0.5);
   });
 
-  test("rebuilds index after Phase 2", async () => {
+  test("rebuilds index after Phase 2 only when proposals accepted", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [fakeTask(taskDir, { id: "fake-d/eval-only", slice: "eval", expectedMatch: "ok" })];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({ observed });
     await runEvolve({ tasks, model: "test-model", seedsPerArm: 1, spawn, akmCli, materialiseStash: false });
-    expect(observed.calls.some((c) => c[0] === "index")).toBe(true);
+    // No proposals generated → no index rebuild needed
+    expect(observed.calls.some((c) => c[0] === "index")).toBe(false);
+  });
+
+  test("proposal show non-zero exit rejects with show failure reason (not lint failed)", async () => {
+    const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({
+      observed,
+      proposalQueue: [{ id: "p-show-exit", targetRef: "skill:loser", kind: "lesson" }],
+      showExitByProposal: {
+        "p-show-exit": { exitCode: 7, stderr: "boom" },
+      },
+    });
+
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+    });
+
+    const entry = report.proposalLog.find((e) => e.proposalId === "p-show-exit");
+    expect(entry).toBeDefined();
+    expect(entry?.decision).toBe("reject");
+    expect(entry?.rejectReason?.includes("proposal show failed")).toBe(true);
+    expect(entry?.rejectReason?.includes("lint failed")).toBe(false);
+    const rejectCall = observed.calls.find((c) => c[0] === "proposal" && c[1] === "reject" && c[2] === "p-show-exit");
+    expect(rejectCall?.[4]?.includes("proposal show failed")).toBe(true);
+  });
+
+  test("proposal show AKM error envelope {ok:false} takes show_error path", async () => {
+    const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({
+      observed,
+      proposalQueue: [{ id: "p-envelope", targetRef: "skill:loser", kind: "revision" }],
+      showEnvelopeByProposal: {
+        "p-envelope": { ok: false, code: "E_BAD_PROPOSAL", error: "proposal missing target" },
+      },
+    });
+
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+    });
+
+    const entry = report.proposalLog.find((e) => e.proposalId === "p-envelope");
+    expect(entry).toBeDefined();
+    expect(entry?.decision).toBe("reject");
+    expect(entry?.rejectReason?.includes("proposal show failed")).toBe(true);
+    expect(entry?.rejectReason?.includes("E_BAD_PROPOSAL")).toBe(true);
+    expect(report.warnings.some((w) => w.includes("rejected due to show error"))).toBe(true);
+  });
+
+  test("lint-fail captures rich diagnostics and propagates to report JSON", async () => {
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({
+      proposalQueue: [{ id: "p-lint-rich", targetRef: "skill:loser", kind: "lesson" }],
+      showStdoutByProposal: {
+        "p-lint-rich": JSON.stringify({
+          id: "p-lint-rich",
+          lint_pass: false,
+          message: "proposal lint checks failed",
+          lint: {
+            pass: false,
+            message: "2 rule violations",
+            issues: [
+              {
+                rule: "yaml-schema",
+                severity: "error",
+                path: "assets/lesson.yaml",
+                line: 12,
+                column: 3,
+                message: "missing required field: summary",
+              },
+              "frontmatter tags must be lowercase",
+            ],
+          },
+        }),
+      },
+    });
+
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+    });
+
+    const lintEntry = report.proposalLog.find((e) => e.proposalId === "p-lint-rich");
+    expect(lintEntry?.decision).toBe("reject");
+    expect(lintEntry?.rejectReason).toContain("lint failed: proposal lint checks failed");
+    expect(lintEntry?.rejectReason).toContain("issue_1=[error] yaml-schema @assets/lesson.yaml:12:3 missing required field: summary");
+    expect(lintEntry?.rejectReason).toContain("issue_2=frontmatter tags must be lowercase");
+
+    const rendered = renderEvolveReport({
+      timestamp: report.timestamp,
+      branch: report.branch,
+      commit: report.commit,
+      model: report.model,
+      domain: report.domain,
+      seedsPerArm: report.seedsPerArm,
+      phase1Diagnostics: report.phase1Diagnostics,
+      proposalLog: report.proposalLog,
+      proposals: report.proposals,
+      lessons: report.lessons,
+      lessonLineage: report.lessonLineage,
+      longitudinal: report.longitudinal,
+      feedbackIntegrity: report.feedbackIntegrity,
+      arms: report.arms,
+      warnings: report.warnings,
+    });
+    const proposalLogJson = (
+      rendered.json as {
+        proposals?: { proposal_log?: Array<{ id: string; reason: string | null }> };
+      }
+    ).proposals?.proposal_log;
+    const row = proposalLogJson?.find((r) => r.id === "p-lint-rich");
+    expect(row?.reason).toContain("yaml-schema");
+    expect(row?.reason).toContain("assets/lesson.yaml:12:3");
+  });
+
+  test("proposal show parse_error carries structured raw preview in reason and warning", async () => {
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({
+      proposalQueue: [{ id: "p-bad-json", targetRef: "skill:loser", kind: "revision" }],
+      showStdoutByProposal: {
+        "p-bad-json": "{\n  \"ok\": true,\n  \"lint\": [this is invalid json]\n}",
+      },
+    });
+
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+    });
+
+    const entry = report.proposalLog.find((e) => e.proposalId === "p-bad-json");
+    expect(entry?.decision).toBe("reject");
+    expect(entry?.rejectReason).toContain("proposal show parse error");
+    expect(entry?.rejectReason).toContain("raw={ \"ok\": true, \"lint\": [this is invalid json] }");
+    expect(report.warnings.some((w) => w.includes("rejected due to show parse error"))).toBe(true);
+    expect(report.warnings.some((w) => w.includes("raw={ \"ok\": true, \"lint\": [this is invalid json] }"))).toBe(true);
+  });
+
+  test("proposal list non-zero exit adds warning and continues safely", async () => {
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({
+      proposalListFailure: { exitCode: 9, stderr: "cannot read queue" },
+    });
+
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+    });
+
+    expect(report.proposalLog.length).toBe(0);
+    expect(
+      report.warnings.some(
+        (w) =>
+          w.includes("proposal list --json failed") &&
+          w.includes("skipping this fixture's proposal queue") &&
+          w.includes("cannot read queue"),
+      ),
+    ).toBe(true);
+  });
+
+  test("lint fail triggers one-shot reflect repair; new proposal then passes and is accepted", async () => {
+    const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({
+      observed,
+      proposalQueueSequence: [
+        [{ id: "p-initial", targetRef: "skill:loser", kind: "lesson" }],
+        [
+          { id: "p-initial", targetRef: "skill:loser", kind: "lesson" },
+          { id: "p-repaired", targetRef: "skill:loser", kind: "lesson" },
+        ],
+      ],
+      lintByProposal: {
+        "p-initial": { lintPass: false, message: "initial lint failure" },
+        "p-repaired": { lintPass: true },
+      },
+    });
+
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+    });
+
+    const reflectRepairCalls = observed.calls.filter(
+      (c) => c[0] === "reflect" && c[1] === "skill:loser" && c[3] === EXPECTED_REFLECT_LINT_REPAIR_TASK,
+    );
+    expect(reflectRepairCalls.length).toBe(1);
+    const repairedAccept = observed.calls.find((c) => c[0] === "proposal" && c[1] === "accept" && c[2] === "p-repaired");
+    expect(repairedAccept).toBeDefined();
+    expect(report.proposalLog.find((e) => e.proposalId === "p-initial")?.decision).toBe("reject");
+    expect(report.proposalLog.find((e) => e.proposalId === "p-repaired")?.decision).toBe("accept");
+    const proposalListCalls = observed.calls.filter((c) => c[0] === "proposal" && c[1] === "list");
+    expect(proposalListCalls.length).toBe(2);
+  });
+
+  test("lint fail with no new proposal after repair keeps original rejected", async () => {
+    const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({
+      observed,
+      proposalQueueSequence: [
+        [{ id: "p-initial", targetRef: "skill:loser", kind: "lesson" }],
+        [{ id: "p-initial", targetRef: "skill:loser", kind: "lesson" }],
+      ],
+      lintByProposal: {
+        "p-initial": { lintPass: false, message: "still failing" },
+      },
+    });
+
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+    });
+
+    const reflectRepairCalls = observed.calls.filter(
+      (c) => c[0] === "reflect" && c[1] === "skill:loser" && c[3] === EXPECTED_REFLECT_LINT_REPAIR_TASK,
+    );
+    expect(reflectRepairCalls.length).toBe(1);
+    expect(observed.calls.some((c) => c[0] === "proposal" && c[1] === "accept")).toBe(false);
+    expect(report.proposalLog.length).toBe(1);
+    expect(report.proposalLog[0]?.proposalId).toBe("p-initial");
+    expect(report.proposalLog[0]?.decision).toBe("reject");
+    const proposalListCalls = observed.calls.filter((c) => c[0] === "proposal" && c[1] === "list");
+    expect(proposalListCalls.length).toBe(2);
+  });
+});
+
+describe("runEvolve — preflight warnings", () => {
+  let workspaceRoot: string;
+  let taskDir: string;
+  beforeAll(() => {
+    workspaceRoot = benchMkdtemp("bench-evolve-preflight-");
+    taskDir = path.join(workspaceRoot, "task");
+    fs.mkdirSync(taskDir, { recursive: true });
+  });
+  afterAll(() => {
+    fs.rmSync(workspaceRoot, { recursive: true, force: true });
+  });
+
+  test("warns when unique train gold refs are below 2", async () => {
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/train-a", goldRef: "skill:shared", slice: "train", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/train-b", goldRef: "skill:shared", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({});
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 1,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+    });
+
+    expect(report.warnings.some((w) => w.includes("low train gold_ref diversity"))).toBe(true);
   });
 });
 
@@ -368,11 +729,11 @@ describe("runEvolve — leakage prevention (§7.4)", () => {
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });
 
-  test("invokes distill with --exclude-feedback-from when ref is also an eval-slice gold ref (#267)", async () => {
+  test("invokes distill with --exclude-tags slice:eval to prevent eval leakage (#267)", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     // The same `skill:shared` is the gold ref for BOTH a failing train task
-    // AND an eval task. Distill is now invoked WITH the exclusion flag;
-    // distill itself filters the leaked feedback out of the prompt.
+    // AND an eval task. Distill now uses tag-based filtering — train feedback
+    // is tagged `slice:train`, distill excludes `slice:eval` tags.
     const tasks = [
       fakeTask(taskDir, { id: "fake-d/train-shared", goldRef: "skill:shared", slice: "train", expectedMatch: "WONT" }),
       fakeTask(taskDir, { id: "fake-d/eval-shared", goldRef: "skill:shared", slice: "eval", expectedMatch: "ok" }),
@@ -388,16 +749,13 @@ describe("runEvolve — leakage prevention (§7.4)", () => {
       materialiseStash: false,
     });
     const distillCalls = observed.calls.filter((c) => c[0] === "distill");
-    // Distill now runs even on shared refs — but with the exclusion flag.
+    // Distill runs with tag-based exclusion (not ref-based).
     expect(distillCalls.length).toBe(1);
-    const flagIdx = distillCalls[0]?.indexOf("--exclude-feedback-from") ?? -1;
-    expect(flagIdx).toBeGreaterThan(-1);
-    expect(distillCalls[0]?.[flagIdx + 1]).toBe("skill:shared");
-    // Per-ref leakage info note replaces the old "skipped" warning.
-    expect(report.warnings.some((w) => w.includes("filtered eval-slice gold-ref feedback"))).toBe(true);
-    // Env var fallback is also threaded through for harnesses that drop flags.
-    const distillEnv = observed.envSeen.find((env) => env.AKM_DISTILL_EXCLUDE_FEEDBACK_FROM !== undefined);
-    expect(distillEnv?.AKM_DISTILL_EXCLUDE_FEEDBACK_FROM).toBe("skill:shared");
+    const excludeTagsIdx = distillCalls[0]?.indexOf("--exclude-tags") ?? -1;
+    expect(excludeTagsIdx).toBeGreaterThan(-1);
+    expect(distillCalls[0]?.[excludeTagsIdx + 1]).toBe("slice:eval");
+    // No ref-based leakage warning since we use tags now.
+    expect(report.warnings.some((w) => w.includes("filtered eval-slice gold-ref feedback"))).toBe(false);
   });
 
   test("does not emit the deprecated '--exclude-gold-ref' generic warning (#267)", async () => {
@@ -429,9 +787,9 @@ describe("runEvolve — leakage prevention (§7.4)", () => {
     const distillCalls = observed.calls.filter((c) => c[0] === "distill");
     expect(distillCalls.length).toBe(3);
     for (const call of distillCalls) {
-      const idx = call.indexOf("--exclude-feedback-from");
+      const idx = call.indexOf("--exclude-tags");
       expect(idx).toBeGreaterThan(-1);
-      expect(call[idx + 1]).toBe("skill:eval-target");
+      expect(call[idx + 1]).toBe("slice:eval");
     }
   });
 });

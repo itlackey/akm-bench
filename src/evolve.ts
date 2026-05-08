@@ -14,14 +14,10 @@
  *     original un-evolved fixture), `post` (the evolved fixture), `synthetic`
  *     (no stash, scratchpad-only "Bring Your Own Skills" prompt).
  *
- * Leakage prevention (spec §7.4): before invoking distill we compute the set
- * of eval-slice gold refs and pass it to `akm distill` via
- * `--exclude-feedback-from <csv>` (#267). `akmDistill` filters those
- * feedback events out of its LLM input before constructing the prompt.
- * Refs in the exclusion list still see distillation run — but distillation
- * runs from asset content alone, with no feedback signal that could have
- * leaked from the eval slice. The proposal log + Phase 1 feedback stream
- * are also filtered before computeProposalQualityMetrics ever sees them.
+ * Leakage prevention (spec §7.4): before invoking distill we pass
+ * `--exclude-tags slice:eval` so eval-slice feedback never enters distill's
+ * LLM input. Phase 1 feedback is tagged with `slice:train`, so train signal
+ * remains available even when train/eval share a gold ref.
  *
  * Test seams: every external interaction is funnelled through one of three
  * injectable functions:
@@ -33,6 +29,7 @@
  * real `loadFixtureStash`.
  */
 
+import fs from "node:fs";
 import { resolveAkmCommand } from "./akm-command";
 import { registerCleanup } from "./cleanup";
 import type { TaskMetadata, TaskSlice } from "./corpus";
@@ -57,6 +54,12 @@ import type { UtilityRunReport } from "./report";
 import { runUtility } from "./runner";
 import type { SpawnFn } from "./support/agent";
 import { benchMkdtemp } from "./tmp";
+
+const PHASE2_REFLECT_CONSTRAINED_TASK =
+  "Apply a single-issue patch only; preserve frontmatter, schema, and ids; avoid unrelated rewrites; output must satisfy proposal lint.";
+
+const PHASE2_REFLECT_LINT_REPAIR_TASK =
+  "Fix proposal lint issues only; preserve frontmatter/schema/ids; keep a minimal diff.";
 
 /** Result of an `akm` subprocess invocation. */
 export interface AkmCliResult {
@@ -118,6 +121,14 @@ export interface FeedbackLogEntry {
   ok: boolean;
 }
 
+/** Phase 1 diagnostics surfaced in evolve reports. */
+export interface Phase1Diagnostics {
+  /** Per-ref feedback totals accumulated from Phase 1 runs. */
+  perRefFeedback: Array<{ ref: string; positive: number; negative: number }>;
+  /** Refs promoted to Phase 2 distill/reflect after thresholding. */
+  refsToEvolve: string[];
+}
+
 /** Aggregate evolve report. Renders to JSON + markdown via `renderEvolveReport`. */
 export interface EvolveRunReport {
   timestamp: string;
@@ -133,6 +144,8 @@ export interface EvolveRunReport {
   seedsPerArm: number;
   /** Phase 1 feedback events recorded. */
   feedbackLog: FeedbackLogEntry[];
+  /** Phase 1 per-ref totals + promoted refs (additive diagnostics). */
+  phase1Diagnostics: Phase1Diagnostics;
   /** Phase 2 proposal events recorded. */
   proposalLog: ProposalLogEntry[];
   /** Aggregate proposal-quality metrics. */
@@ -204,6 +217,17 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   const trainTasks = options.tasks.filter((t) => effectiveSlice(t) === "train");
   const evalTasks = options.tasks.filter((t) => effectiveSlice(t) === "eval");
 
+  const uniqueTrainGoldRefs = new Set(
+    trainTasks
+      .map((t) => t.goldRef)
+      .filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0),
+  );
+  if (uniqueTrainGoldRefs.size < 2) {
+    warnings.push(
+      `preflight: low train gold_ref diversity (${uniqueTrainGoldRefs.size} unique ref(s)); evolve Phase 2 may overfit or produce unstable proposal quality metrics`,
+    );
+  }
+
   // Use the first task's domain (or "all") as the corpus label. The CLI
   // already filtered to one domain; this is just for the report header.
   const domain = uniqueDomain(options.tasks);
@@ -237,11 +261,6 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         const evolved = loadFixtureStash(name, { skipIndex: false });
         evolveStashes.set(name, evolved);
         evolveDirByFixture.set(name, evolved.stashDir);
-        // Allocate a per-fixture cache dir for the evolve-stash re-index.
-        // `loadFixtureStash` used its own isolated XDG_CACHE_HOME; subsequent
-        // `akmCli` calls (feedback, distill, reflect) must look in the same
-        // cache. We allocate a fresh bench cache dir and pass it through
-        // `indexEvolveStash` + `envForRef` so the FTS5 DB is in a known place.
         evolveCacheDirByFixture.set(name, benchMkdtemp(`akm-evolve-cache-${name}-`));
         stashDeregistrations.push(
           registerCleanup(() => {
@@ -285,6 +304,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   }
   const fallbackEvolveDir = [...evolveDirByFixture.values()][0];
   const fallbackEvolveCacheDir = [...evolveCacheDirByFixture.values()][0];
+  const opencodeConfigPath = options.opencodeProviders?.source;
   function envForRef(ref: string | undefined): Record<string, string> {
     const baseEnv = { ...(process.env as Record<string, string>) };
     if (!materialiseStash) {
@@ -299,29 +319,31 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     if (dir) baseEnv.AKM_STASH_DIR = dir;
     else delete baseEnv.AKM_STASH_DIR;
     if (cacheDir) baseEnv.XDG_CACHE_HOME = cacheDir;
+    // Forward the opencode config path so `akm reflect` (which spawns
+    // `opencode run`) can find the LLM provider configuration.
+    if (opencodeConfigPath) baseEnv.OPENCODE_CONFIG = opencodeConfigPath;
     return baseEnv;
   }
 
-  // ── Phase 1 pre-flight: index each evolve stash in its dedicated cache. ───
-  // `loadFixtureStash` already ran `akm index` but used an isolated
-  // XDG_CACHE_HOME that subsequent `akmCli` calls (feedback, distill, reflect)
-  // cannot see. Re-running `akm index` here via `akmCli` with the same
-  // AKM_STASH_DIR + XDG_CACHE_HOME that `envForRef` will produce ensures the
-  // FTS5 database is populated where Phase 1 feedback will look.
-  // Non-zero exit adds a warning but does not abort — Phase 1 can still run
-  // with degraded feedback if the index step fails.
+  // ── Phase 1 pre-flight: copy pre-built index into each evolve cache. ──────
+  // `loadFixtureStash` already populated `stash.indexCacheHome` with the
+  // pre-built FTS5 index (from `__akm_index__/`). We copy it into the
+  // dedicated `evolveCacheDirByFixture` so `akmCli` feedback/distill calls
+  // find the DB in the right place — no `akm index` spawn needed.
   if (materialiseStash) {
-    const phase1Cwd = options.tasks[0]?.taskDir ?? process.cwd();
-    for (const [fixtureName, stashDir] of evolveDirByFixture) {
+    process.stderr.write(`[evolve] copying pre-built indexes for ${evolveDirByFixture.size} fixture(s)\n`);
+    for (const [fixtureName, stash] of evolveStashes) {
       const cacheDir = evolveCacheDirByFixture.get(fixtureName);
       if (!cacheDir) continue;
-      try {
-        const result = await indexEvolveStash(stashDir, cacheDir, akmCli, phase1Cwd);
-        if (!result.ok) {
-          warnings.push(`evolve: pre-flight akm index failed for stash ${stashDir}: ${result.stderr.trim()}`);
+      if (stash.indexCacheHome) {
+        try {
+          copyDirRecursiveSync(stash.indexCacheHome, cacheDir);
+          process.stderr.write(`[evolve] index copied: ${fixtureName}\n`);
+        } catch (err) {
+          warnings.push(`evolve: failed to copy index for "${fixtureName}": ${(err as Error).message}`);
         }
-      } catch (err) {
-        warnings.push(`evolve: pre-flight akm index threw for stash ${stashDir}: ${(err as Error).message}`);
+      } else {
+        warnings.push(`evolve: no pre-built index for "${fixtureName}" — Phase 1 feedback may be degraded`);
       }
     }
   }
@@ -331,7 +353,10 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   let syntheticReport: UtilityRunReport;
   let phase1Report: UtilityRunReport;
   const feedbackLog: FeedbackLogEntry[] = [];
+  const phase1FeedbackByRef = new Map<string, FeedbackCounts>();
+  const refsToEvolve: string[] = [];
   const proposalLog: ProposalLogEntry[] = [];
+  const repairedRefs = new Set<string>();
 
   try {
     // ── Phase 1: accumulate signal on the train slice (akm arm only). ─────
@@ -353,9 +378,9 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       ...(options.commit ? { commit: options.commit } : {}),
       ...(options.opencodeProviders ? { opencodeProviders: options.opencodeProviders } : {}),
     });
+    process.stderr.write(`[evolve] Phase 1 complete: ${phase1Report.akmRuns?.length ?? 0} akm run(s)\n`);
 
     // Issue feedback events per (task, seed) outcome on the akm arm.
-    const feedbackByRef = new Map<string, FeedbackCounts>();
     const phase1Cwd = options.tasks[0]?.taskDir ?? process.cwd();
     for (const run of phase1Report.akmRuns ?? []) {
       const taskMeta = options.tasks.find((t) => t.id === run.taskId);
@@ -363,7 +388,13 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       if (!goldRef) continue;
       if (run.outcome === "harness_error") continue;
       const signal: "positive" | "negative" = run.outcome === "pass" ? "positive" : "negative";
-      const args = ["feedback", goldRef, signal === "positive" ? "--positive" : "--negative"];
+      const args = [
+        "feedback",
+        goldRef,
+        signal === "positive" ? "--positive" : "--negative",
+        "--tag",
+        `slice:${taskMeta?.slice ?? "train"}`,
+      ];
       // Wrap in try/catch so a single throwing akmCli (e.g. subprocess
       // crash) cannot leave `feedbackByRef` partially populated and let
       // Phase 2 proceed on corrupt state.
@@ -377,62 +408,38 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         feedbackLog.push({ taskId: run.taskId, seed: run.seed, goldRef, signal, ok: false });
         warnings.push(`phase1.feedback_dispatch_failed: ${goldRef} ${(err as Error).message}`);
       }
-      const counts = feedbackByRef.get(goldRef) ?? { positive: 0, negative: 0 };
+      const counts = phase1FeedbackByRef.get(goldRef) ?? { positive: 0, negative: 0 };
       if (signal === "positive") counts.positive += 1;
       else counts.negative += 1;
-      feedbackByRef.set(goldRef, counts);
+      phase1FeedbackByRef.set(goldRef, counts);
     }
 
     // ── Phase 2: evolve. ────────────────────────────────────────────────────
-    const evalGoldRefs = new Set<string>();
-    for (const t of evalTasks) {
-      if (t.goldRef) evalGoldRefs.add(t.goldRef);
-    }
-
-    const refsToEvolve: string[] = [];
-    for (const [ref, counts] of feedbackByRef.entries()) {
+    for (const [ref, counts] of phase1FeedbackByRef.entries()) {
       if (crossesNegativeThreshold(counts, negativeThreshold)) refsToEvolve.push(ref);
     }
     refsToEvolve.sort();
 
-    // §7.4 leakage prevention (#267): instead of hard-skipping refs that
-    // overlap eval-slice gold refs, we now pass the gold-ref set through
-    // `--exclude-feedback-from` (and the matching env var) so `akm distill`
-    // filters those events out of its LLM input. The behaviour collapses
-    // back to "no useful feedback shown" for refs that ARE the gold ref —
-    // distill then runs from asset content only, which is what we want.
-    const evalGoldRefList = [...evalGoldRefs].sort();
-    const excludeFeedbackCsv = evalGoldRefList.join(",");
+    // §7.4 leakage prevention (#267): Phase 1 feedback is tagged with
+    // `slice:train`. Distill excludes `slice:eval` tags so eval feedback
+    // never leaks into the LLM input while preserving train feedback.
     for (const ref of refsToEvolve) {
-      // The env var fallback is the contract `akm distill` honours; it lets
-      // the bench keep working even if a hypothetical caller invokes
-      // distill via a wrapper that mangles flags.
       const evolveEnv: Record<string, string> = {
         ...envForRef(ref),
-        AKM_BENCH_EXCLUDE_GOLD_REFS: excludeFeedbackCsv,
-        ...(excludeFeedbackCsv ? { AKM_DISTILL_EXCLUDE_FEEDBACK_FROM: excludeFeedbackCsv } : {}),
       };
 
-      // Pass the eval-gold list explicitly via the CLI flag so the contract
-      // is observable in test logs (the env var is a fallback for harnesses
-      // that strip flags). Reflect doesn't accept this flag — it's a distill
-      // concern only.
-      const distillArgs = ["distill", ref];
-      if (excludeFeedbackCsv) {
-        distillArgs.push("--exclude-feedback-from", excludeFeedbackCsv);
-      }
+      const distillArgs = [
+        "distill",
+        ref,
+        "--exclude-tags",
+        "slice:eval",
+      ];
       const distillResult = await akmCli(distillArgs, phase1Cwd, evolveEnv);
       if (distillResult.exitCode !== 0) {
         warnings.push(`phase2: akm distill ${ref} failed: ${distillResult.stderr.trim()}`);
-      } else if (evalGoldRefs.has(ref) && excludeFeedbackCsv) {
-        // Per-ref leakage info — replaces the previous "skipped" message.
-        // Operator can audit which refs ran through the filter and confirm
-        // distillation didn't see leaked feedback.
-        warnings.push(
-          `phase2: filtered eval-slice gold-ref feedback from distill input for ${ref} (--exclude-feedback-from ${excludeFeedbackCsv}).`,
-        );
       }
-      const reflectResult = await akmCli(["reflect", ref], phase1Cwd, evolveEnv);
+      const reflectArgs = ["reflect", ref, "--task", PHASE2_REFLECT_CONSTRAINED_TASK];
+      const reflectResult = await akmCli(reflectArgs, phase1Cwd, evolveEnv);
       if (reflectResult.exitCode !== 0) {
         // `reflect` requires `agent.default` to be configured — a missing
         // config is non-fatal for the bench; we record and continue.
@@ -455,13 +462,47 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       } else if (!materialiseStash) {
         delete proposalEnv.AKM_STASH_DIR;
       }
+      const fixtureLabel = fixtureName ?? "default";
       const listResult = await akmCli(["proposal", "list", "--json"], phase1Cwd, proposalEnv);
-      const proposals = parseProposalList(listResult.stdout);
-      for (const p of proposals) {
+      if (listResult.exitCode !== 0) {
+        const stderr = listResult.stderr.trim() || "<empty stderr>";
+        warnings.push(
+          `phase2: akm proposal list --json failed for fixture "${fixtureLabel}" (exit ${listResult.exitCode}); skipping this fixture's proposal queue. stderr: ${stderr}`,
+        );
+        continue;
+      }
+      const processedProposalIds = new Set<string>();
+      const queue = parseProposalList(listResult.stdout);
+      while (queue.length > 0) {
+        const p = queue.shift();
+        if (!p || processedProposalIds.has(p.id)) continue;
+        processedProposalIds.add(p.id);
         const showResult = await akmCli(["proposal", "show", p.id, "--json"], phase1Cwd, proposalEnv);
-        const lintInfo = parseProposalShow(showResult.stdout);
-        const lintPass = lintInfo.lintPass;
-        if (lintPass) {
+        if (showResult.exitCode !== 0) {
+          const stderr = showResult.stderr.trim() || "<empty stderr>";
+          const showFailureReason = `proposal show failed (exit ${showResult.exitCode}): ${stderr}`;
+          const rejectResult = await akmCli(
+            ["proposal", "reject", p.id, "--reason", showFailureReason],
+            phase1Cwd,
+            proposalEnv,
+          );
+          warnings.push(`phase2: proposal ${p.id} rejected due to show command failure: ${showFailureReason}`);
+          proposalLog.push({
+            proposalId: p.id,
+            assetRef: p.assetRef,
+            kind: p.kind,
+            lintPass: false,
+            decision: "reject",
+            rejectReason: showFailureReason,
+          });
+          if (rejectResult.exitCode !== 0) {
+            warnings.push(`phase2: akm proposal reject ${p.id} failed after show failure: ${rejectResult.stderr.trim()}`);
+          }
+          continue;
+        }
+
+        const showInfo = parseProposalShow(showResult.stdout);
+        if (showInfo.status === "lint_pass") {
           const acceptResult = await akmCli(["proposal", "accept", p.id], phase1Cwd, proposalEnv);
           proposalLog.push({
             proposalId: p.id,
@@ -472,19 +513,65 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
             ...(acceptResult.exitCode === 0 ? {} : { rejectReason: `accept failed: ${acceptResult.stderr.trim()}` }),
           });
         } else {
-          const reason = lintInfo.lintMessage ?? "lint failed";
+          const reason =
+            showInfo.status === "lint_fail"
+              ? showInfo.message ?? "lint failed"
+              : showInfo.status === "show_error"
+                ? showInfo.message ?? "proposal show error"
+                : showInfo.message ?? "proposal show parse error";
+          const rejectReason =
+            showInfo.status === "lint_fail"
+              ? `lint failed: ${reason}`
+              : showInfo.status === "show_error"
+                ? `proposal show failed: ${reason}`
+                : `proposal show parse error: ${reason}`;
+
+          if (showInfo.status === "lint_fail" && !repairedRefs.has(p.assetRef)) {
+            repairedRefs.add(p.assetRef);
+            const repairReflectResult = await akmCli(
+              ["reflect", p.assetRef, "--task", PHASE2_REFLECT_LINT_REPAIR_TASK],
+              phase1Cwd,
+              proposalEnv,
+            );
+            if (repairReflectResult.exitCode !== 0) {
+              warnings.push(
+                `phase2: lint-repair reflect ${p.assetRef} failed: ${repairReflectResult.stderr.trim()}`,
+              );
+            }
+
+            const refreshedListResult = await akmCli(["proposal", "list", "--json"], phase1Cwd, proposalEnv);
+            if (refreshedListResult.exitCode !== 0) {
+              const stderr = refreshedListResult.stderr.trim() || "<empty stderr>";
+              warnings.push(
+                `phase2: akm proposal list --json refresh failed for fixture "${fixtureLabel}" after lint repair on ${p.assetRef} (exit ${refreshedListResult.exitCode}); stderr: ${stderr}`,
+              );
+            } else {
+              const refreshed = parseProposalList(refreshedListResult.stdout);
+              for (const candidate of refreshed) {
+                if (candidate.assetRef !== p.assetRef) continue;
+                if (processedProposalIds.has(candidate.id)) continue;
+                queue.push(candidate);
+              }
+            }
+          }
+
           const rejectResult = await akmCli(
-            ["proposal", "reject", p.id, "--reason", `lint failed: ${reason}`],
+            ["proposal", "reject", p.id, "--reason", rejectReason],
             phase1Cwd,
             proposalEnv,
           );
+          if (showInfo.status === "show_error" || showInfo.status === "parse_error") {
+            warnings.push(
+              `phase2: proposal ${p.id} rejected due to ${showInfo.status === "show_error" ? "show error" : "show parse error"}: ${reason}`,
+            );
+          }
           proposalLog.push({
             proposalId: p.id,
             assetRef: p.assetRef,
             kind: p.kind,
             lintPass: false,
             decision: "reject",
-            rejectReason: reason,
+            rejectReason,
           });
           if (rejectResult.exitCode !== 0) {
             warnings.push(`phase2: akm proposal reject ${p.id} failed: ${rejectResult.stderr.trim()}`);
@@ -493,9 +580,17 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       }
 
       // Rebuild the index so accepted lessons surface in Phase 3.
-      const indexResult = await akmCli(["index"], phase1Cwd, proposalEnv);
-      if (indexResult.exitCode !== 0) {
-        warnings.push(`phase2: akm index rebuild failed: ${indexResult.stderr.trim()}`);
+      // Only needed when at least one proposal was accepted — if all were
+      // rejected (or none generated) the index is unchanged.
+      const acceptedCount = proposalLog.filter((p) => p.decision === "accept").length;
+      if (acceptedCount > 0) {
+        process.stderr.write(`[evolve] rebuilding index after ${acceptedCount} accepted proposal(s)\n`);
+        const indexResult = await akmCli(["index"], phase1Cwd, proposalEnv);
+        if (indexResult.exitCode !== 0) {
+          warnings.push(`phase2: akm index rebuild failed: ${indexResult.stderr.trim()}`);
+        }
+      } else {
+        process.stderr.write(`[evolve] skipping index rebuild — 0 accepted proposals\n`);
       }
     }
 
@@ -610,6 +705,12 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     domain,
     seedsPerArm,
     feedbackLog,
+    phase1Diagnostics: {
+      perRefFeedback: [...phase1FeedbackByRef.entries()]
+        .map(([ref, counts]) => ({ ref, positive: counts.positive, negative: counts.negative }))
+        .sort((a, b) => a.ref.localeCompare(b.ref)),
+      refsToEvolve: refsToEvolve.slice(),
+    },
     proposalLog,
     proposals: proposalsMetrics,
     lessons,
@@ -744,33 +845,127 @@ function parseProposalList(stdout: string): ProposalListEntry[] {
 
 /** Parsed lint outcome from `akm proposal show <id> --json`. */
 interface ParsedProposalShow {
-  lintPass: boolean;
-  lintMessage?: string;
+  status: "lint_pass" | "lint_fail" | "show_error" | "parse_error";
+  message?: string;
 }
 
 function parseProposalShow(stdout: string): ParsedProposalShow {
-  if (!stdout.trim()) return { lintPass: false, lintMessage: "empty proposal show output" };
+  if (!stdout.trim()) {
+    return { status: "parse_error", message: "empty proposal show output" };
+  }
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(stdout) as Record<string, unknown>;
   } catch (err) {
-    return { lintPass: false, lintMessage: `proposal show: parse error (${(err as Error).message})` };
+    const rawPreview = compactOneLine(stdout, 200);
+    return {
+      status: "parse_error",
+      message: `invalid JSON (${(err as Error).message}); raw=${rawPreview}`,
+    };
   }
+
+  if (parsed.ok === false) {
+    const showErrorParts: string[] = [];
+    const code = asText(parsed.code);
+    const error = asText(parsed.error);
+    const message = asText(parsed.message);
+    const details = asText(parsed.details);
+    if (code) showErrorParts.push(`code=${code}`);
+    if (error) showErrorParts.push(`error=${error}`);
+    if (message) showErrorParts.push(`message=${message}`);
+    if (details) showErrorParts.push(`details=${details}`);
+    return {
+      status: "show_error",
+      message: showErrorParts.length > 0 ? showErrorParts.join("; ") : "ok=false from proposal show",
+    };
+  }
+
   const lintPass =
     parsed.lint_pass === true ||
     parsed.lintPass === true ||
     (typeof parsed.lint === "object" && parsed.lint !== null && (parsed.lint as Record<string, unknown>).pass === true);
+  const lintMessage = buildLintDiagnostics(parsed);
+
+  if (lintPass) return { status: "lint_pass", ...(lintMessage ? { message: lintMessage } : {}) };
+  return { status: "lint_fail", ...(lintMessage ? { message: lintMessage } : {}) };
+}
+
+function buildLintDiagnostics(parsed: Record<string, unknown>): string | undefined {
+  const parts: string[] = [];
+  const topLevelMessage = asText(parsed.message);
+  if (topLevelMessage) parts.push(topLevelMessage);
+
   const lintRaw = parsed.lint;
-  let lintMessage: string | undefined;
   if (lintRaw && typeof lintRaw === "object") {
-    const issues = (lintRaw as Record<string, unknown>).issues;
+    const lint = lintRaw as Record<string, unknown>;
+    const lintMessage = asText(lint.message) ?? asText(lint.error) ?? asText(lint.summary);
+    if (lintMessage) parts.push(lintMessage);
+
+    const issues = lint.issues;
     if (Array.isArray(issues) && issues.length > 0) {
-      lintMessage = issues
-        .map((i) => (typeof i === "string" ? i : ((i as { message?: string })?.message ?? JSON.stringify(i))))
-        .join("; ");
+      for (let idx = 0; idx < issues.length; idx += 1) {
+        const issueText = formatLintIssue(issues[idx]);
+        if (issueText) parts.push(`issue_${idx + 1}=${issueText}`);
+      }
     }
   }
-  return { lintPass, ...(lintMessage ? { lintMessage } : {}) };
+
+  if (parts.length === 0) return undefined;
+  return parts.join("; ");
+}
+
+function formatLintIssue(issue: unknown): string | undefined {
+  if (typeof issue === "string") return compactOneLine(issue, 180);
+  if (!issue || typeof issue !== "object") return asText(issue);
+
+  const rec = issue as Record<string, unknown>;
+  const message = asText(rec.message) ?? asText(rec.error);
+  const rule = asText(rec.rule) ?? asText(rec.ruleId) ?? asText(rec.code);
+  const severity = asText(rec.severity) ?? asText(rec.level);
+  const file = asText(rec.path) ?? asText(rec.file) ?? asText(rec.filePath);
+  const line = asInteger(rec.line);
+  const column = asInteger(rec.column) ?? asInteger(rec.col);
+  const location =
+    file || line !== undefined || column !== undefined
+      ? `@${file ?? "<unknown>"}${line !== undefined ? `:${line}` : ""}${column !== undefined ? `:${column}` : ""}`
+      : undefined;
+
+  const pieces: string[] = [];
+  if (severity) pieces.push(`[${severity}]`);
+  if (rule) pieces.push(rule);
+  if (location) pieces.push(location);
+  if (message) pieces.push(message);
+  if (pieces.length > 0) return compactOneLine(pieces.join(" "), 220);
+
+  try {
+    return compactOneLine(JSON.stringify(issue), 220);
+  } catch {
+    return undefined;
+  }
+}
+
+function asText(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const compact = compactOneLine(value, 240);
+    return compact.length > 0 ? compact : undefined;
+  }
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return undefined;
+}
+
+function asInteger(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function compactOneLine(value: string, maxLen: number): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxLen) return compact;
+  return `${compact.slice(0, Math.max(0, maxLen - 3))}...`;
 }
 
 /**
@@ -792,10 +987,12 @@ export async function indexEvolveStash(
   akmCli: AkmCliFn,
   cwd: string,
 ): Promise<{ ok: boolean; stderr: string }> {
+  const configDir = cacheDir + "/config";
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
     AKM_STASH_DIR: stashDir,
     XDG_CACHE_HOME: cacheDir,
+    XDG_CONFIG_HOME: configDir,
   };
   const result = await akmCli(["index"], cwd, env);
   return { ok: result.exitCode === 0, stderr: result.stderr };
@@ -810,4 +1007,16 @@ export function buildSyntheticPrompt(taskId: string): string {
     "and steps you intend to use, then proceed. Cite the scratchpad in your trace so the verifier",
     "can attribute the approach to your own reasoning rather than retrieved guidance.",
   ].join("\n");
+}
+
+/** Synchronous recursive directory copy (used for pre-built index transfer). */
+function copyDirRecursiveSync(src: string, dest: string): void {
+  fs.mkdirSync(dest, { recursive: true });
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const s = `${src}/${entry.name}`;
+    const d = `${dest}/${entry.name}`;
+    if (entry.isDirectory()) copyDirRecursiveSync(s, d);
+    else if (entry.isFile()) fs.copyFileSync(s, d);
+  }
 }

@@ -4,8 +4,7 @@
  *   • `listTasks()` returns `[]` cleanly when the corpus dir is missing.
  *   • The shipped sample task at `_example/example-task` is excluded by
  *     default but loadable via `{ includeExamples: true }`.
- *   • The seeded corpus contains 23 tasks (issue #237 seeded 17 across
- *     three domains; #259 added six workflow-compliance tasks) and every
+  *   • The seeded corpus contains 44 tasks and every
  *     entry validates against the §13.1 schema.
  *   • `partitionSlice` is deterministic — same input → same partitioning
  *     across calls.
@@ -58,7 +57,7 @@ describe("listTasks", () => {
 
   test("seeds hand-authored tasks across all domains", () => {
     const tasks = listTasks();
-    expect(tasks).toHaveLength(40);
+    expect(tasks).toHaveLength(44);
     const byDomain = new Map<string, TaskMetadata[]>();
     for (const task of tasks) {
       const list = byDomain.get(task.domain) ?? [];
@@ -71,7 +70,7 @@ describe("listTasks", () => {
     expect(byDomain.get("docker-homelab")).toHaveLength(6);
     expect(byDomain.get("az-cli")).toHaveLength(6);
     expect(byDomain.get("opencode")).toHaveLength(6);
-    expect(byDomain.get("workflow-compliance")).toHaveLength(6);
+    expect(byDomain.get("workflow-compliance")).toHaveLength(10);
     expect(byDomain.get("drillbit")).toHaveLength(7);
     expect(byDomain.get("inkwell")).toHaveLength(9);
   });
@@ -99,10 +98,10 @@ describe("listTasks", () => {
     const evalTasks = listTasks({ slice: "eval" });
     expect(train.every((t) => t.slice === "train")).toBe(true);
     expect(evalTasks.every((t) => t.slice === "eval")).toBe(true);
-    // 23 train (19 + 2 drillbit train + 2 inkwell train)
-    // 17 eval  (15 prior + 2 new: inkwell/full-config + opencode/select-correct-skill)
-    expect(train).toHaveLength(23);
-    expect(evalTasks).toHaveLength(17);
+    // 26 train (19 + 2 drillbit train + 2 inkwell train + 3 workflow-compliance train)
+    // 18 eval  (15 prior + 2 new: inkwell/full-config + opencode/select-correct-skill + 1 new: workflow-compliance/repeated-fail-storage-lifecycle-eval)
+    expect(train).toHaveLength(26);
+    expect(evalTasks).toHaveLength(18);
   });
 });
 

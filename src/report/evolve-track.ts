@@ -31,6 +31,20 @@ export interface EvolveReportInput {
   model: string;
   domain: string;
   seedsPerArm: number;
+  /** Optional Phase 1 diagnostics (additive). */
+  phase1Diagnostics?: {
+    perRefFeedback: Array<{ ref: string; positive: number; negative: number }>;
+    refsToEvolve: string[];
+  };
+  /** Optional proposal-level diagnostics log (additive). */
+  proposalLog?: Array<{
+    proposalId: string;
+    assetRef: string;
+    kind: "lesson" | "revision" | "unknown";
+    lintPass: boolean;
+    decision: "accept" | "reject";
+    rejectReason?: string;
+  }>;
   proposals: ProposalQualityMetrics;
   /**
    * Per-lesson quality + reuse metrics (#264). Optional so older artefacts
@@ -118,6 +132,18 @@ function buildEvolveJson(input: EvolveReportInput): EvolveReportJson {
       total_accepted: input.proposals.totalAccepted,
       acceptance_rate: input.proposals.acceptanceRate,
       lint_pass_rate: input.proposals.lintPassRate,
+      ...(input.proposalLog
+        ? {
+            proposal_log: input.proposalLog.map((entry) => ({
+              id: entry.proposalId,
+              asset: entry.assetRef,
+              kind: entry.kind,
+              lint: entry.lintPass,
+              decision: entry.decision,
+              reason: entry.rejectReason ?? null,
+            })),
+          }
+        : {}),
       rows: input.proposals.rows.map((r) => ({
         asset_ref: r.assetRef,
         proposal_count: r.proposalCount,
@@ -125,6 +151,18 @@ function buildEvolveJson(input: EvolveReportInput): EvolveReportJson {
         accepted_count: r.acceptedCount,
       })),
     },
+    ...(input.phase1Diagnostics
+      ? {
+          phase1: {
+            per_ref_feedback: input.phase1Diagnostics.perRefFeedback.map((row) => ({
+              ref: row.ref,
+              positive: row.positive,
+              negative: row.negative,
+            })),
+            refs_to_evolve: input.phase1Diagnostics.refsToEvolve.slice(),
+          },
+        }
+      : {}),
     ...(input.lessons ? { lessons: serialiseLessons(input.lessons) } : {}),
     ...(input.lessonLineage ? { lesson_lineage: serialiseLessonLineage(input.lessonLineage) } : {}),
     longitudinal: {
@@ -400,6 +438,10 @@ function formatNullableRate(value: number | null): string {
   return value.toFixed(2);
 }
 
+function escapeMarkdownTableCell(value: string): string {
+  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
 function buildEvolveMarkdown(input: EvolveReportInput): string {
   const lines: string[] = [];
   lines.push(`# akm-bench evolve — ${input.model}`);
@@ -483,6 +525,42 @@ function buildEvolveMarkdown(input: EvolveReportInput): string {
   } else {
     lines.push("_No proposals generated._");
     lines.push("");
+  }
+
+  if (input.proposalLog && input.proposalLog.length > 0) {
+    lines.push("### Proposal diagnostics");
+    lines.push("");
+    lines.push("| id | asset | kind | lint | decision | reason |");
+    lines.push("|----|-------|------|------|----------|--------|");
+    for (const entry of input.proposalLog) {
+      const reason = escapeMarkdownTableCell(entry.rejectReason ?? "n/a");
+      lines.push(
+        `| \`${entry.proposalId}\` | \`${entry.assetRef}\` | ${entry.kind} | ${entry.lintPass ? "pass" : "fail"} | ${entry.decision} | ${reason} |`,
+      );
+    }
+    lines.push("");
+  }
+
+  if (input.phase1Diagnostics) {
+    lines.push("## Phase 1 diagnostics");
+    lines.push("");
+    const promoted = input.phase1Diagnostics.refsToEvolve.length;
+    lines.push(`promoted_refs=${promoted}`);
+    lines.push("");
+    if (input.phase1Diagnostics.perRefFeedback.length > 0) {
+      lines.push("| ref | positive | negative | promoted |");
+      lines.push("|-----|----------|----------|----------|");
+      const promotedSet = new Set(input.phase1Diagnostics.refsToEvolve);
+      for (const row of input.phase1Diagnostics.perRefFeedback) {
+        lines.push(
+          `| \`${row.ref}\` | ${row.positive} | ${row.negative} | ${promotedSet.has(row.ref) ? "yes" : "no"} |`,
+        );
+      }
+      lines.push("");
+    } else {
+      lines.push("_No Phase 1 feedback recorded._");
+      lines.push("");
+    }
   }
 
   if (input.lessons) {

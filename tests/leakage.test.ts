@@ -162,9 +162,12 @@ describe("cross-task eval/train verifier leakage check", () => {
     // Skip pairs that are intentional train/eval variants of the same task family
     // (e.g. inkwell/add-healthcheck-train vs inkwell/add-healthcheck) — they share
     // field-access patterns by design, just with different expected values.
+    // Also skip workflow-compliance variants (e.g. repeated-fail-storage-lifecycle-a/b/eval)
+    // which share structural assertions by design.
     const isVariantPair = (trainId: string, evalId: string) => {
-      const trainBase = trainId.replace(/-train$/, "");
-      return trainBase === evalId || evalId.startsWith(`${trainBase}-`);
+      const trainBase = trainId.replace(/-train$/, "").replace(/-[a-z]+$/, "");
+      const evalBase = evalId.replace(/-eval$/, "").replace(/-[a-z]+$/, "");
+      return trainBase === evalBase || evalId.startsWith(`${trainBase}-`);
     };
     for (const trainTask of trainTasks) {
       const trainFragments = crossTaskFragments(trainTask);

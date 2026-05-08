@@ -13,8 +13,11 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { resolveAkmCommand } from "./akm-command";
+import { resolveFixtureIndexCacheEntry } from "./fixture-index-cache";
 import { getStashesRoot } from "./fixtures-root";
 import { benchMkdtemp } from "./tmp";
+
+const INDEX_DIR_NAME = "__akm_index__";
 
 export interface LoadedFixtureStash {
   /** Absolute path to the materialised stash directory. */
@@ -96,6 +99,11 @@ export interface LoadFixtureStashOptions {
    * 300ms for a wasted spawn. Defaults to false.
    */
   skipIndex?: boolean;
+  /**
+   * If true, ignore any pre-built index at `__akm_index__/` and run `akm
+   * index` fresh. Useful after fixture content changes. Defaults to false.
+   */
+  forceReindex?: boolean;
 }
 
 /**
@@ -103,8 +111,15 @@ export interface LoadFixtureStashOptions {
  * `akm index` against it. Returns the tmp path plus a cleanup function that
  * restores the prior env value and recursively removes the tmp dir.
  *
- * Pass `{ skipIndex: true }` if the caller will build its own index and the
- * helper's `akm index` spawn would be wasted work.
+ * When a pre-built index exists in the bench cache, it is copied into the tmp
+ * cache dir instead of spawning `akm index`, saving ~0.6-1s per load.
+ *
+ * Transition behavior: as a fallback, this loader still accepts legacy
+ * fixture-local caches under `fixtures/stashes/<name>/__akm_index__/`.
+ *
+ * Pass `{ skipIndex: true }` to disable indexing entirely, or
+ * `{ forceReindex: true }` to ignore pre-built caches and run `akm index`
+ * fresh.
  */
 export function loadFixtureStash(name: string, options: LoadFixtureStashOptions = {}): LoadedFixtureStash {
   const sourceDir = fixtureSourceDir(name);
@@ -122,30 +137,35 @@ export function loadFixtureStash(name: string, options: LoadFixtureStashOptions 
   process.env.AKM_STASH_DIR = stashDir;
 
   if (!options.skipIndex) {
-    // Use isolated XDG dirs for the index invocation so the helper never
-    // touches the operator's real ~/.cache/akm or pulls in their configured
-    // registries / sources. The shipped fixture is the only thing indexed.
-    const result = Bun.spawnSync({
-      cmd: [...resolveAkmCommand(), "index"],
-      cwd: stashDir,
-      env: {
-        ...process.env,
-        AKM_STASH_DIR: stashDir,
-        XDG_CACHE_HOME: cacheHome,
-        XDG_CONFIG_HOME: configHome,
-      },
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    const preBuiltIndex = preBuiltIndexPath(name, contentHash);
+    if (preBuiltIndex && !options.forceReindex) {
+      // Copy pre-built index (fast: ~5ms for SQLite files)
+      copyDirRecursive(preBuiltIndex.cacheHome, cacheHome);
+      copyDirRecursive(preBuiltIndex.configHome, configHome);
+    } else {
+      // Run akm index (slow: ~600-900ms per fixture)
+      const result = Bun.spawnSync({
+        cmd: [...resolveAkmCommand(), "index"],
+        cwd: stashDir,
+        env: {
+          ...process.env,
+          AKM_STASH_DIR: stashDir,
+          XDG_CACHE_HOME: cacheHome,
+          XDG_CONFIG_HOME: configHome,
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
 
-    if (result.exitCode !== 0) {
-      // Restore env and clean up before throwing so the caller is not left
-      // with a leaked tmp dir or mutated process state.
-      if (priorAkmStashDir === undefined) delete process.env.AKM_STASH_DIR;
-      else process.env.AKM_STASH_DIR = priorAkmStashDir;
-      fs.rmSync(tmpRoot, { recursive: true, force: true });
-      const stderr = result.stderr ? new TextDecoder().decode(result.stderr) : "";
-      throw new Error(`akm index failed for fixture "${name}" (exit ${result.exitCode}): ${stderr}`);
+      if (result.exitCode !== 0) {
+        // Restore env and clean up before throwing so the caller is not left
+        // with a leaked tmp dir or mutated process state.
+        if (priorAkmStashDir === undefined) delete process.env.AKM_STASH_DIR;
+        else process.env.AKM_STASH_DIR = priorAkmStashDir;
+        fs.rmSync(tmpRoot, { recursive: true, force: true });
+        const stderr = result.stderr ? new TextDecoder().decode(result.stderr) : "";
+        throw new Error(`akm index failed for fixture "${name}" (exit ${result.exitCode}): ${stderr}`);
+      }
     }
   }
 
@@ -169,6 +189,27 @@ function fixtureSourceDir(name: string): string {
     throw new Error(`fixture not found: ${name} (expected ${dir}/MANIFEST.json)`);
   }
   return dir;
+}
+
+/**
+ * Resolve a pre-built index location for this fixture content:
+ *   1. Preferred: bench cache preflight entry keyed by fixture/runtime fingerprint
+ *   2. Fallback: legacy fixture-local `__akm_index__/`
+ */
+function preBuiltIndexPath(name: string, contentHash: string): { cacheHome: string; configHome: string } | undefined {
+  const cacheEntry = resolveFixtureIndexCacheEntry(name, contentHash);
+  if (cacheEntry) {
+    return { cacheHome: cacheEntry.cacheHome, configHome: cacheEntry.configHome };
+  }
+
+  const indexDir = path.join(getStashesRoot(), name, INDEX_DIR_NAME);
+  const cacheHome = path.join(indexDir, "cache");
+  const configHome = path.join(indexDir, "config");
+  const indexDb = path.join(cacheHome, "akm", "index.db");
+  if (fs.existsSync(indexDb)) {
+    return { cacheHome, configHome };
+  }
+  return undefined;
 }
 
 function isSafeName(name: string): boolean {

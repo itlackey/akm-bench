@@ -1,0 +1,17 @@
+{
+  "$schema": "./bench-run-config.schema.json",
+  "schemaVersion": 1,
+  "name": "evolve-demo",
+  "description": "Evolve workflow demonstration: workflow-compliance repeated-failure family (train) + eval variant for transfer measurement.",
+  "tasks": [
+    "workflow-compliance/repeated-fail-storage-lifecycle-a",
+    "workflow-compliance/repeated-fail-storage-lifecycle-b",
+    "workflow-compliance/repeated-fail-storage-lifecycle-eval"
+  ],
+  "arms": ["akm"],
+  "seeds": 3,
+  "budgetTokens": 25000,
+  "budgetWallMs": 360000,
+  "parallel": 2,
+  "opencodeConfigRef": "./opencode.local.json"
+}

@@ -175,6 +175,16 @@ This requires a domain with both `train` and `eval` tasks. The runner uses the
 train slice to accumulate feedback and generate proposals, then evaluates the
 `pre`, `post`, and `synthetic` arms on the eval slice.
 
+Before utility/config/evolve runs, the CLI performs a fixture-index preflight.
+Each unique fixture index is built once per fixture content + toolchain
+fingerprint, then reused from cache on subsequent runs.
+
+- Cache location: `${AKM_CACHE_DIR:-~/.cache/akm}/bench/fixture-indexes/`
+- Fingerprint includes fixture content hash, AKM runtime identity/version, Bun
+  version, and platform/arch
+- Legacy `fixtures/stashes/*/__akm_index__/` is an optional transition fallback
+  and is gitignored
+
 ## Local Models
 
 If you want to benchmark against a local model, use `config/opencode.local.json`.

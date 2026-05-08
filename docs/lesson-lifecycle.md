@@ -51,18 +51,17 @@ The defaults are:
 For each selected ref, the runner executes:
 
 ```sh
-akm distill <ref>
-akm reflect <ref>
+akm distill <ref> --exclude-tags slice:eval
+akm reflect <ref> --task "Apply a single-issue patch only; preserve frontmatter, schema, and ids; avoid unrelated rewrites; output must satisfy proposal lint."
 ```
 
-If the eval slice contains gold refs, the runner also passes them to distill via
-`--exclude-feedback-from` and matching environment variables so distillation
-does not ingest eval-slice feedback.
+Distill always excludes eval-tagged feedback (`slice:eval`) so train/eval
+feedback sharing the same gold ref does not starve distillation.
 
 Important current behavior:
 
-- `distill` is the only step that receives the eval-feedback exclusion list
-- `reflect` is still run, but does not take that flag
+- `distill` receives `--exclude-tags slice:eval`
+- `reflect` receives an explicit constrained repair task focused on minimal, schema-safe, lint-clean edits
 - failures in either command produce warnings and do not abort the entire run
 
 ## 3. Proposal Acceptance
