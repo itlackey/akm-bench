@@ -27,7 +27,7 @@ import { computeTaskCorpusHash, readTaskBody, type TaskMetadata, type TaskSlice 
 import { type RunOptions, type RunResult, runOne } from "./driver";
 import { validateFixtureCorpus } from "./environment";
 import { computeFixtureContentHash, type LoadedFixtureStash, loadFixtureStash } from "./fixture-stash";
-import { getWorkflowsRoot } from "./fixtures-root";
+import { getCorpusRoot, getWorkflowsRoot } from "./fixtures-root";
 import {
   aggregateCorpus,
   aggregateFailureModes,
@@ -136,6 +136,8 @@ function cleanupOldPartials(): void {
 
 export type Arm = "noakm" | "akm" | "synthetic";
 
+const PRESEEDED_ARTIFACTS = new Set(["prep-note.txt"]);
+
 /**
  * Optional per-arm prompt-override seam (#267). The runner forwards the
  * builder's return value into `RunOptions.prompt` for each `runOne` call.
@@ -158,7 +160,7 @@ export interface RunUtilityOptions {
   seedsPerArm?: number;
   /** Token budget per run. Defaults to 30000 (spec §7.1). */
   budgetTokens?: number;
-  /** Wallclock budget per run in ms. Defaults to 120000. */
+  /** Wallclock budget per run in ms. Defaults to 600000. */
   budgetWallMs?: number;
   /**
    * Number of (task, arm, seed) triples to execute concurrently. Defaults to
@@ -198,6 +200,12 @@ export interface RunUtilityOptions {
    * present in this map.
    */
   stashDirByFixture?: Map<string, string>;
+  /**
+   * Optional override map keyed by `task.stash` (fixture name) providing a
+   * pre-built `XDG_CACHE_HOME` for that fixture's AKM index. Used by
+   * `runEvolve` so Phase 3 pre/post arms can reuse already-built indexes.
+   */
+  indexCacheHomeByFixture?: Map<string, string>;
   /**
    * Optional per-arm prompt override (#267). When supplied and the builder
    * returns a non-undefined string, that string is forwarded as
@@ -288,7 +296,7 @@ async function runInBatches<T>(items: T[], n: number, fn: (item: T) => Promise<v
 export async function runUtility(options: RunUtilityOptions): Promise<UtilityRunReport> {
   const seedsPerArm = options.seedsPerArm ?? 5;
   const budgetTokens = options.budgetTokens ?? 30000;
-  const budgetWallMs = options.budgetWallMs ?? 120000;
+  const budgetWallMs = options.budgetWallMs ?? 600000;
   const slice = options.slice ?? "all";
   const materialiseStash = options.materialiseStash ?? true;
   // Clamp parallel to [1, 8].
@@ -359,6 +367,7 @@ export async function runUtility(options: RunUtilityOptions): Promise<UtilityRun
     // `stashDirByFixture` provides a directory for this task's fixture, we
     // skip `loadFixtureStash` entirely and forward the override.
     const overrideStashDir = options.stashDirByFixture?.get(task.stash);
+    const overrideIndexCacheHome = options.indexCacheHomeByFixture?.get(task.stash);
 
     // Materialise the akm-arm stash once per task. We share it across the K
     // seeds because the stash content is identical and re-running `akm
@@ -470,7 +479,9 @@ export async function runUtility(options: RunUtilityOptions): Promise<UtilityRun
         warnings: runWarnings,
         ...(promptOverride !== undefined ? { prompt: promptOverride } : {}),
         ...(options.opencodeProviders ? { opencodeProviders: options.opencodeProviders } : {}),
-        ...(stash?.indexCacheHome ? { indexCacheHome: stash.indexCacheHome } : {}),
+        ...((overrideIndexCacheHome ?? stash?.indexCacheHome)
+          ? { indexCacheHome: overrideIndexCacheHome ?? stash?.indexCacheHome }
+          : {}),
       });
 
       // Merge per-run warnings into the shared array.
@@ -511,6 +522,7 @@ export async function runUtility(options: RunUtilityOptions): Promise<UtilityRun
       // arms are not evaluated — workflow specs target the akm arm.
       if (arm === "akm" && workflowSpecs.length > 0) {
         const trace = normalizeRunToTrace(run, {
+          workspaceWrites: run.workspaceWrites,
           warnings: runWarnings,
           harness: {
             agentStartedTs: run.startedAt,
@@ -617,7 +629,9 @@ async function runOneIsolated(args: {
     }
   });
   try {
-    seedWorkspace(args.task.taskDir, workspace);
+    seedWorkspace({ taskDir: args.task.taskDir, domain: args.task.domain }, workspace);
+
+    const beforeFiles = snapshotWorkspaceFiles(workspace);
 
     const runOptions: RunOptions = {
       track: "utility",
@@ -645,6 +659,8 @@ async function runOneIsolated(args: {
 
     // Splice in the trajectory metric. The driver always returns
     // `{ null, null }` — this is where the real values get filled.
+    const workspaceWrites = detectWorkspaceWrites(beforeFiles, workspace);
+
     const trajectory = computeTrajectory({ goldRef: args.task.goldRef }, result, {
       warnings: args.warnings,
     });
@@ -657,20 +673,113 @@ async function runOneIsolated(args: {
     // `classifyFailureMode` returns null for non-failed runs.
     const failureMode =
       args.arm === "akm" ? classifyFailureMode(args.task, { ...result, trajectory, assetsLoaded }) : null;
-    return { ...result, trajectory, assetsLoaded, failureMode };
+    if (args.arm === "akm") {
+      const trace = normalizeRunToTrace({ ...result, trajectory, assetsLoaded }, {
+        workspaceWrites,
+        warnings: args.warnings,
+        harness: {
+          agentStartedTs: result.startedAt,
+          agentFinishedTs: result.finishedAt,
+        },
+      });
+      const hasFirstWrite = trace.events.some((e) => e.type === "first_workspace_write");
+      if (!hasFirstWrite) {
+        const fallback = detectLikelyWorkspaceWrite(result, workspace);
+        if (fallback) {
+          workspaceWrites.push(fallback);
+        }
+      }
+    }
+    return { ...result, trajectory, assetsLoaded, failureMode, workspaceWrites };
   } finally {
     deregisterWorkspace();
     fs.rmSync(workspace, { recursive: true, force: true });
   }
 }
 
+function snapshotWorkspaceFiles(root: string): Map<string, { mtimeMs: number; size: number }> {
+  const out = new Map<string, { mtimeMs: number; size: number }>();
+  walkWorkspace(root, root, out, false);
+  return out;
+}
+
+function detectWorkspaceWrites(
+  before: Map<string, { mtimeMs: number; size: number }>,
+  root: string,
+): string[] {
+  const writes: string[] = [];
+  const after = new Map<string, { mtimeMs: number; size: number }>();
+  walkWorkspace(root, root, after, true, writes, before);
+  writes.sort();
+  return writes;
+}
+
+function walkWorkspace(
+  base: string,
+  current: string,
+  out: Map<string, { mtimeMs: number; size: number }>,
+  detect: boolean,
+  writes: string[] = [],
+  before: Map<string, { mtimeMs: number; size: number }> = new Map(),
+): void {
+  const entries = fs.readdirSync(current, { withFileTypes: true });
+  for (const entry of entries) {
+    const abs = path.join(current, entry.name);
+    const rel = path.relative(base, abs).split(path.sep).join("/");
+    if (entry.isDirectory()) {
+      walkWorkspace(base, abs, out, detect, writes, before);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    const stat = fs.statSync(abs);
+    const snapshot = { mtimeMs: stat.mtimeMs, size: stat.size };
+    out.set(rel, snapshot);
+    if (!detect) continue;
+    if (PRESEEDED_ARTIFACTS.has(rel)) {
+      const prev = before.get(rel);
+      if (prev && prev.size === snapshot.size) continue;
+    }
+    const prev = before.get(rel);
+    if (!prev || prev.mtimeMs !== snapshot.mtimeMs || prev.size !== snapshot.size) {
+      writes.push(rel);
+    }
+  }
+}
+
+function detectLikelyWorkspaceWrite(result: RunResult, workspace: string): string | undefined {
+  if (!result.verifierStdout) return undefined;
+  const lower = result.verifierStdout.toLowerCase();
+  if (lower.includes("prep-note.txt")) {
+    const p = path.join(workspace, "prep-note.txt");
+    if (fs.existsSync(p)) return "prep-note.txt";
+  }
+  if (lower.includes("opencode.json")) {
+    const p = path.join(workspace, "opencode.json");
+    if (fs.existsSync(p)) return "opencode.json";
+  }
+  return undefined;
+}
+
+export const _PRESEEDED_ARTIFACTS = PRESEEDED_ARTIFACTS;
+export const _detectWorkspaceWrites = detectWorkspaceWrites;
+export const _snapshotWorkspaceFiles = snapshotWorkspaceFiles;
+export const _seedWorkspace = seedWorkspace;
+
 /**
  * Copy the task's `workspace/` template into the per-run tmp dir. If the
  * task has no `workspace/` (loader-test fixtures), the run starts with an
  * empty cwd — that is also valid for verifier-only tasks.
  */
-function seedWorkspace(taskDir: string, dest: string): void {
-  const src = path.join(taskDir, "workspace");
+function seedWorkspace(task: Pick<TaskMetadata, "taskDir" | "domain">, dest: string): void {
+  const base = path.join(getCorpusRoot(), "base", "workspace");
+  if (fs.existsSync(base)) {
+    copyDirRecursive(base, dest);
+  }
+  const domainBase = path.join(getCorpusRoot(), "base", "domains", task.domain, "workspace");
+  if (fs.existsSync(domainBase)) {
+    copyDirRecursive(domainBase, dest);
+  }
+  const src = path.join(task.taskDir, "workspace");
   if (!fs.existsSync(src)) return;
   copyDirRecursive(src, dest);
 }

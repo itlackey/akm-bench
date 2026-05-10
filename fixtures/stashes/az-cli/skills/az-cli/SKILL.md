@@ -49,6 +49,15 @@ az storage account create -n <name> -g <resource-group> --sku <sku>
 # example (Standard_LRS): az storage account create -n mystorageacct -g myrg --sku Standard_LRS
 ```
 
+For lifecycle rules, use `az storage account management-policy create` and pass the policy JSON inline or via `@policy.json`:
+
+```sh
+az storage account management-policy create --account-name <name> --resource-group <resource-group> --policy '{"rules":[{"enabled":true,"name":"expire-90d","type":"Lifecycle","definition":{"filters":{"blobTypes":["blockBlob"],"prefixMatch":["logs-archive"]},"actions":{"baseBlob":{"delete":{"daysAfterModificationGreaterThan":90}}}}}]}'
+# tier-to-cool variant: replace the delete action with {"tierToCool":{"daysAfterLastAccessTimeGreaterThan":30}}
+```
+
+When a task mentions storage lifecycle, management policy, delete-after-days, or tier-to-cool, this is the command family to use.
+
 ## Key Vault secrets
 
 Set a secret value in a Key Vault using `az keyvault secret` and the `set` operation:

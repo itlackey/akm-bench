@@ -2,7 +2,6 @@
 
 ## Using AKM (when AKM_STASH_DIR is set)
 
-If you see AKM_STASH_DIR in your environment, a knowledge stash is available.
 You MUST search it before attempting the task:
 
 1. `akm search arithmetic` — find relevant skills and knowledge

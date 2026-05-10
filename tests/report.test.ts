@@ -268,6 +268,8 @@ describe("serializeRunForReport", () => {
       trajectory: { correct_asset_loaded: true, feedback_recorded: false },
       assets_loaded: ["skill:foo"],
       failure_mode: null,
+      termination_cause: null,
+      first_error_line: null,
     });
     // No events / stdout leakage even when the source carries large data.
     expect(Object.keys(row)).not.toContain("events");
@@ -289,6 +291,17 @@ describe("serializeRunForReport", () => {
     const row = serializeRunForReport(run);
     expect(row.outcome).toBe("fail");
     expect(row.failure_mode).toBe("wrong_asset");
+  });
+
+  test("serializes termination_cause and first_error_line when present", () => {
+    const run = makeRun({
+      outcome: "budget_exceeded",
+      terminationCause: "agent_timeout",
+      firstErrorLine: "agent CLI \"opencode\" timed out after 120000ms",
+    });
+    const row = serializeRunForReport(run);
+    expect(row.termination_cause).toBe("agent_timeout");
+    expect(row.first_error_line).toContain("timed out");
   });
 });
 

@@ -36,6 +36,30 @@ export interface EvolveReportInput {
     perRefFeedback: Array<{ ref: string; positive: number; negative: number }>;
     refsToEvolve: string[];
   };
+  /** Optional phase + per-command timing diagnostics. */
+  phaseTimings?: {
+    phase1: { startedAt: string; endedAt: string; elapsedMs: number };
+    phase2: { startedAt: string; endedAt: string; elapsedMs: number };
+    phase3: {
+      startedAt: string;
+      endedAt: string;
+      elapsedMs: number;
+      arms: {
+        preElapsedMs: number;
+        postElapsedMs: number;
+        syntheticElapsedMs: number;
+      };
+    };
+    totalElapsedMs: number;
+    akmCommands: Array<{
+      phase: "phase1" | "phase2";
+      command: string;
+      args: string[];
+      elapsedMs: number;
+      exitCode: number;
+      watchdogExceeded: boolean;
+    }>;
+  };
   /** Optional proposal-level diagnostics log (additive). */
   proposalLog?: Array<{
     proposalId: string;
@@ -163,6 +187,41 @@ function buildEvolveJson(input: EvolveReportInput): EvolveReportJson {
           },
         }
       : {}),
+    ...(input.phaseTimings
+      ? {
+          phase_timings: {
+            phase1: {
+              started_at: input.phaseTimings.phase1.startedAt,
+              ended_at: input.phaseTimings.phase1.endedAt,
+              elapsed_ms: input.phaseTimings.phase1.elapsedMs,
+            },
+            phase2: {
+              started_at: input.phaseTimings.phase2.startedAt,
+              ended_at: input.phaseTimings.phase2.endedAt,
+              elapsed_ms: input.phaseTimings.phase2.elapsedMs,
+            },
+            phase3: {
+              started_at: input.phaseTimings.phase3.startedAt,
+              ended_at: input.phaseTimings.phase3.endedAt,
+              elapsed_ms: input.phaseTimings.phase3.elapsedMs,
+              arms: {
+                pre_elapsed_ms: input.phaseTimings.phase3.arms.preElapsedMs,
+                post_elapsed_ms: input.phaseTimings.phase3.arms.postElapsedMs,
+                synthetic_elapsed_ms: input.phaseTimings.phase3.arms.syntheticElapsedMs,
+              },
+            },
+            total_elapsed_ms: input.phaseTimings.totalElapsedMs,
+            akm_commands: input.phaseTimings.akmCommands.map((row) => ({
+              phase: row.phase,
+              command: row.command,
+              args: row.args,
+              elapsed_ms: row.elapsedMs,
+              exit_code: row.exitCode,
+              watchdog_exceeded: row.watchdogExceeded,
+            })),
+          },
+        }
+      : {}),
     ...(input.lessons ? { lessons: serialiseLessons(input.lessons) } : {}),
     ...(input.lessonLineage ? { lesson_lineage: serialiseLessonLineage(input.lessonLineage) } : {}),
     longitudinal: {
@@ -171,6 +230,9 @@ function buildEvolveJson(input: EvolveReportInput): EvolveReportJson {
       post_pass_rate_stdev: input.longitudinal.postPassRateStdev,
       significance_threshold: input.longitudinal.significanceThreshold,
       interpretation: input.longitudinal.interpretation,
+      directional_improvement: input.longitudinal.directionalImprovement,
+      exceeds_significance_threshold: input.longitudinal.exceedsSignificanceThreshold,
+      matches_or_beats_synthetic: input.longitudinal.matchesOrBeatsSynthetic,
       over_synthetic_lift: input.longitudinal.overSyntheticLift,
       degradation_count: input.longitudinal.degradationCount,
       pre_pass_rate: input.longitudinal.prePassRate,
@@ -466,8 +528,15 @@ function buildEvolveMarkdown(input: EvolveReportInput): string {
   lines.push(
     `**improvement_slope: ${signedFixed(input.longitudinal.improvementSlope, 2)}** (post=${input.longitudinal.postPassRate.toFixed(2)}, pre=${input.longitudinal.prePassRate.toFixed(2)})`,
   );
+  const directionalLabel = input.longitudinal.directionalImprovement
+    ? input.longitudinal.exceedsSignificanceThreshold
+      ? "directional improvement detected"
+      : "directional improvement below detection threshold"
+    : input.longitudinal.improvementSlope < 0
+      ? "directional regression"
+      : "no directional change";
   lines.push(
-    `**${input.longitudinal.interpretation}** (delta ${signedFixed(input.longitudinal.improvementSlope, 2)} vs threshold ${input.longitudinal.significanceThreshold.toFixed(2)}; pre_stdev=${input.longitudinal.prePassRateStdev.toFixed(2)}, post_stdev=${input.longitudinal.postPassRateStdev.toFixed(2)})`,
+    `**${input.longitudinal.interpretation}** (${directionalLabel}; delta ${signedFixed(input.longitudinal.improvementSlope, 2)} vs threshold ${input.longitudinal.significanceThreshold.toFixed(2)}; pre_stdev=${input.longitudinal.prePassRateStdev.toFixed(2)}, post_stdev=${input.longitudinal.postPassRateStdev.toFixed(2)})`,
   );
   // Second line: real feedback_agreement (per #244), or placeholder when
   // metrics not supplied.
@@ -486,6 +555,11 @@ function buildEvolveMarkdown(input: EvolveReportInput): string {
   lines.push("|--------|-------|");
   lines.push(`| improvement_slope | ${signedFixed(input.longitudinal.improvementSlope, 2)} |`);
   lines.push(`| interpretation | ${input.longitudinal.interpretation} |`);
+  lines.push(`| directional_improvement | ${input.longitudinal.directionalImprovement ? "yes" : "no"} |`);
+  lines.push(
+    `| exceeds_significance_threshold | ${input.longitudinal.exceedsSignificanceThreshold ? "yes" : "no"} |`,
+  );
+  lines.push(`| matches_or_beats_synthetic | ${input.longitudinal.matchesOrBeatsSynthetic ? "yes" : "no"} |`);
   lines.push(`| pre_pass_rate_stdev | ${input.longitudinal.prePassRateStdev.toFixed(2)} |`);
   lines.push(`| post_pass_rate_stdev | ${input.longitudinal.postPassRateStdev.toFixed(2)} |`);
   lines.push(`| significance_threshold | ${input.longitudinal.significanceThreshold.toFixed(2)} |`);
@@ -561,6 +635,30 @@ function buildEvolveMarkdown(input: EvolveReportInput): string {
       lines.push("_No Phase 1 feedback recorded._");
       lines.push("");
     }
+  }
+
+  if (input.phaseTimings) {
+    const watchdogCount = input.phaseTimings.akmCommands.filter((row) => row.watchdogExceeded).length;
+    lines.push("## Phase timings");
+    lines.push("");
+    lines.push("| phase | elapsed_ms | start | end |");
+    lines.push("|-------|-----------:|-------|-----|");
+    lines.push(
+      `| phase1 | ${input.phaseTimings.phase1.elapsedMs} | ${input.phaseTimings.phase1.startedAt} | ${input.phaseTimings.phase1.endedAt} |`,
+    );
+    lines.push(
+      `| phase2 | ${input.phaseTimings.phase2.elapsedMs} | ${input.phaseTimings.phase2.startedAt} | ${input.phaseTimings.phase2.endedAt} |`,
+    );
+    lines.push(
+      `| phase3 | ${input.phaseTimings.phase3.elapsedMs} | ${input.phaseTimings.phase3.startedAt} | ${input.phaseTimings.phase3.endedAt} |`,
+    );
+    lines.push(`| total | ${input.phaseTimings.totalElapsedMs} | n/a | n/a |`);
+    lines.push("");
+    lines.push(
+      `phase3_arms_ms: pre=${input.phaseTimings.phase3.arms.preElapsedMs}, post=${input.phaseTimings.phase3.arms.postElapsedMs}, synthetic=${input.phaseTimings.phase3.arms.syntheticElapsedMs}`,
+    );
+    lines.push(`akm_commands=${input.phaseTimings.akmCommands.length}, watchdog_exceeded=${watchdogCount}`);
+    lines.push("");
   }
 
   if (input.lessons) {

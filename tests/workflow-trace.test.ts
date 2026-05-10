@@ -50,7 +50,7 @@ describe("normalizeRunToTrace — AKM event input", () => {
       events: [
         ev("show", "2026-04-27T10:00:01.000Z", { ref: "skill:deploy" }),
         ev("search", "2026-04-27T10:00:00.000Z", { metadata: { query: "deploy docker" } }),
-        ev("feedback", "2026-04-27T10:00:02.000Z", { ref: "skill:deploy", metadata: { vote: 1 } }),
+        ev("feedback", "2026-04-27T10:00:02.000Z", { ref: "skill:deploy", metadata: { signal: "positive" } }),
       ],
     });
 
@@ -71,6 +71,7 @@ describe("normalizeRunToTrace — AKM event input", () => {
     expect(trace.events[0].query).toBe("deploy docker");
     expect(trace.events[1].assetRef).toBe("skill:deploy");
     expect(trace.events[2].assetRef).toBe("skill:deploy");
+    expect(trace.events[2].args).toEqual(["--positive"]);
     expect(trace.events[3].source).toBe("verifier");
     expect(trace.events[3].exitCode).toBe(0);
 
@@ -78,6 +79,16 @@ describe("normalizeRunToTrace — AKM event input", () => {
     for (let i = 0; i < trace.events.length; i += 1) {
       expect(trace.events[i].id).toBe(i);
     }
+  });
+
+  test("maps feedback metadata.signal=negative to args polarity", () => {
+    const run = makeRun({
+      events: [ev("feedback", "2026-04-27T10:00:02.000Z", { ref: "skill:deploy", metadata: { signal: "negative" } })],
+    });
+    const trace = normalizeRunToTrace(run);
+    const feedback = trace.events.find((e) => e.type === "akm_feedback");
+    expect(feedback).toBeDefined();
+    expect(feedback?.args).toEqual(["--negative"]);
   });
 
   test("ignores unrelated AKM event types (add/remove/update)", () => {
@@ -139,6 +150,15 @@ describe("normalizeRunToTrace — stdout / tool-call input", () => {
     expect(searches[0].source).toBe("akm_events");
     expect(searches[1].source).toBe("agent_stdout");
   });
+
+  test("uses run.agentStdout when options.agentStdout is omitted", () => {
+    const run = makeRun({ agentStdout: 'akm search "from-run"\nref: skill:foo' });
+    const trace = normalizeRunToTrace(run);
+    const search = trace.events.find((e) => e.type === "akm_search");
+    expect(search).toBeDefined();
+    expect(search?.source).toBe("agent_stdout");
+    expect(search?.query).toBe("from-run");
+  });
 });
 
 describe("normalizeRunToTrace — workspace-write detection", () => {
@@ -165,6 +185,15 @@ describe("normalizeRunToTrace — workspace-write detection", () => {
     const trace = normalizeRunToTrace(run, { workspaceWrites: [] });
     const writes = trace.events.filter((e) => e.type === "first_workspace_write" || e.type === "workspace_write");
     expect(writes.length).toBe(0);
+  });
+
+  test("uses run.workspaceWrites when options.workspaceWrites is omitted", () => {
+    const run = makeRun({ workspaceWrites: ["prep-note.txt", "opencode.json"] });
+    const trace = normalizeRunToTrace(run);
+    const writes = trace.events.filter((e) => e.type === "first_workspace_write" || e.type === "workspace_write");
+    expect(writes.length).toBe(2);
+    expect(writes[0].type).toBe("first_workspace_write");
+    expect(writes[0].filePath).toBe("prep-note.txt");
   });
 
   test("harness lifecycle markers emit agent_started and agent_finished", () => {

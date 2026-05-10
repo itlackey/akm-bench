@@ -6,7 +6,14 @@
       "description": "Run coding tasks with the opencode agent CLI",
       "tags": ["opencode", "agent", "cli", "coding"],
       "aliases": ["oc"],
-      "searchHints": ["run opencode", "opencode agent", "agent cli"],
+      "searchHints": [
+        "run opencode",
+        "opencode agent",
+        "agent cli",
+        "opencode config provider env token",
+        "disable openai provider",
+        "anthropic api key model"
+      ],
       "filename": "SKILL.md",
       "quality": "curated",
       "confidence": 0.9

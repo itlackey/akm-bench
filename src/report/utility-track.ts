@@ -125,6 +125,7 @@ function buildUtilityJson(input: UtilityRunReport): UtilityReportJson {
     workflow: buildWorkflowAggregate(input.workflowChecks ?? []),
     warnings,
     ...(input.searchBridge ? { searchBridge: serialiseSearchBridge(input.searchBridge) } : {}),
+    request_metrics: buildRequestMetricsBlock(input),
   };
 
   // Compact raw runs[] — additive top-level key (#249). One row per
@@ -164,6 +165,56 @@ function buildUtilityJson(input: UtilityRunReport): UtilityReportJson {
   envelope.akm_overhead = buildAkmOverheadBlock(input);
 
   return envelope;
+}
+
+function buildRequestMetricsBlock(input: UtilityRunReport): {
+  total_requests: number;
+  total_tokens: number;
+  runs_with_request_metrics: number;
+  per_run: Array<{
+    task_id: string;
+    arm: string;
+    seed: number;
+    total_requests: number;
+    total_tokens: number;
+    source: string;
+    steps: Array<{
+      request_index: number;
+      input: number;
+      output: number;
+      total: number;
+    }>;
+  }>;
+} {
+  const runs = input.allRuns ?? [];
+  const perRun = runs.map((run) => ({
+    task_id: run.taskId,
+    arm: run.arm,
+    seed: run.seed,
+    total_requests: run.requestMetrics?.totalRequests ?? 0,
+    total_tokens: run.requestMetrics?.totalTokens ?? 0,
+    source: run.requestMetrics?.source ?? "missing",
+    steps: (run.requestMetrics?.steps ?? []).map((step) => ({
+      request_index: step.requestIndex,
+      input: step.input,
+      output: step.output,
+      total: step.total,
+    })),
+  }));
+  let totalRequests = 0;
+  let totalTokens = 0;
+  let runsWithRequestMetrics = 0;
+  for (const row of perRun) {
+    totalRequests += row.total_requests;
+    totalTokens += row.total_tokens;
+    if (row.total_requests > 0 || row.steps.length > 0) runsWithRequestMetrics += 1;
+  }
+  return {
+    total_requests: totalRequests,
+    total_tokens: totalTokens,
+    runs_with_request_metrics: runsWithRequestMetrics,
+    per_run: perRun,
+  };
 }
 
 function serialiseCorpus(c: CorpusMetrics): {

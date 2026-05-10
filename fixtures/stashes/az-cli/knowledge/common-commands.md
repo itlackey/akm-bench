@@ -18,9 +18,12 @@ az account set --subscription <name-or-id>
 az storage account list -g <rg> -o table
 az storage blob list --account-name <acct> -c <container> --auth-mode login -o table
 az storage blob upload --account-name <acct> -c <container> -f ./local.txt -n remote.txt --auth-mode login
+az storage account management-policy create --account-name <acct> --resource-group <rg> --policy @policy.json
 ```
 
 `--auth-mode login` uses your AAD identity and avoids passing account keys around.
+
+For lifecycle policies, the JSON usually needs `blobTypes`, a rule `name`, and an action such as `delete.daysAfterModificationGreaterThan` or `tierToCool.daysAfterLastAccessTimeGreaterThan`.
 
 ## Key Vault
 

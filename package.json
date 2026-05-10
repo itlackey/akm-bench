@@ -6,12 +6,13 @@
   "description": "Standalone benchmark harness for evaluating akm-assisted agent runs.",
   "license": "MPL-2.0",
   "scripts": {
+    "pretest": "bun run build-indexes",
     "typecheck": "bunx tsc --noEmit",
     "test": "bun test ./tests",
-    "lint": "bunx biome check src/ fixtures/ config/ results/ tests/",
-    "lint:fix": "bunx biome check --write src/ fixtures/ config/ results/ tests/",
-    "format": "bunx biome format --write src/ fixtures/ config/ results/ tests/ README.md .gitignore package.json tsconfig.json biome.json",
-    "check": "bun run lint && bun run typecheck && bun test ./tests",
+    "lint": "bunx biome check src/ fixtures/ config/ tests/",
+    "lint:fix": "bunx biome check --write src/ fixtures/ config/ tests/",
+    "format": "bunx biome format --write src/ fixtures/ config/ tests/ README.md .gitignore package.json tsconfig.json biome.json",
+    "check": "bun run lint && bun run typecheck && bun run build-indexes && bun test ./tests",
     "build-indexes": "bun run src/build-fixture-indexes.ts"
   },
   "engines": {

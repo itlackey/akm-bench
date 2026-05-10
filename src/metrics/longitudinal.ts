@@ -29,6 +29,12 @@ export interface LongitudinalMetrics {
   significanceThreshold: number;
   /** Machine-readable temporal interpretation required by purpose.md. */
   interpretation: "improvement_detected" | "no_improvement_detected";
+  /** True when post > pre, even if the gain is below the detection threshold. */
+  directionalImprovement: boolean;
+  /** True when `improvementSlope > significanceThreshold`. */
+  exceedsSignificanceThreshold: boolean;
+  /** True when post >= synthetic. */
+  matchesOrBeatsSynthetic: boolean;
   /** `pass_rate(post) - pass_rate(synthetic)`. */
   overSyntheticLift: number;
   /**
@@ -67,6 +73,9 @@ export function computeLongitudinalMetrics(
   const postPassRateStdev = meanTaskPassRateStdev(postReport);
   const significanceThreshold = 2 * Math.max(prePassRateStdev, postPassRateStdev);
   const improvementSlope = postPassRate - prePassRate;
+  const directionalImprovement = improvementSlope > 0;
+  const exceedsSignificanceThreshold = improvementSlope > significanceThreshold;
+  const matchesOrBeatsSynthetic = postPassRate >= syntheticPassRate;
 
   const seedsPerArm = Math.max(1, postReport.corpus.seedsPerArm);
   const oneSeedFraction = 1 / seedsPerArm;
@@ -113,7 +122,10 @@ export function computeLongitudinalMetrics(
     prePassRateStdev,
     postPassRateStdev,
     significanceThreshold,
-    interpretation: improvementSlope > significanceThreshold ? "improvement_detected" : "no_improvement_detected",
+    interpretation: exceedsSignificanceThreshold ? "improvement_detected" : "no_improvement_detected",
+    directionalImprovement,
+    exceedsSignificanceThreshold,
+    matchesOrBeatsSynthetic,
     overSyntheticLift: postPassRate - syntheticPassRate,
     degradationCount: degradations.length,
     degradations,

@@ -205,8 +205,21 @@ function perRun(run: RunResult, taskMetadata: AkmOverheadOptions["taskMetadata"]
       // Events sourced from events.jsonl also have args populated by
       // normalizeRunToTrace. Absence of both flags is treated as unknown
       // (contributes to feedbackCount but not to either polarity counter).
-      if (ev.args?.includes("--positive")) positiveFeedbackCount += 1;
-      else if (ev.args?.includes("--negative")) negativeFeedbackCount += 1;
+      if (
+        ev.args?.includes("--positive") ||
+        ev.args?.includes("+1") ||
+        ev.args?.includes("positive") ||
+        ev.args?.includes("+")
+      ) {
+        positiveFeedbackCount += 1;
+      } else if (
+        ev.args?.includes("--negative") ||
+        ev.args?.includes("-1") ||
+        ev.args?.includes("negative") ||
+        ev.args?.includes("-")
+      ) {
+        negativeFeedbackCount += 1;
+      }
     }
   }
   const totalToolCalls = searchCount + showCount + feedbackCount;

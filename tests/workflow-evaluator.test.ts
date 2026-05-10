@@ -237,6 +237,25 @@ describe("evaluateRunAgainstSpec — wrong feedback polarity", () => {
     const result = evaluateRunAgainstSpec(trace, spec, makeRun());
     expect(result.status).toBe("pass");
   });
+
+  test("polarity: positive step matches --positive args", () => {
+    const spec = makeSpec({
+      required_sequence: [
+        { event: "agent_started" },
+        { event: "akm_feedback", polarity: "positive" },
+        { event: "agent_finished" },
+      ],
+      forbidden: [],
+    });
+    const trace = makeTrace([
+      ev("agent_started"),
+      ev("akm_feedback", { args: ["--positive", "skill:foo"] }),
+      ev("verifier_run", { exitCode: 0 }),
+      ev("agent_finished"),
+    ]);
+    const result = evaluateRunAgainstSpec(trace, spec, makeRun());
+    expect(result.status).toBe("pass");
+  });
 });
 
 /* ── Irrelevant asset loaded ──────────────────────────────────────────────── */

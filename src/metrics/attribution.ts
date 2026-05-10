@@ -73,7 +73,7 @@ export function extractAssetLoads(runResult: RunResult): string[] {
   // 2 & 3. Stdout scanning. Bound the scan so a runaway agent stdout cannot
   // OOM the bench. Truncation is silent — the trajectory parser already
   // surfaces a warning for the same data on its own scan.
-  let haystack = runResult.verifierStdout || "";
+  let haystack = runResult.agentStdout ?? runResult.verifierStdout ?? "";
   if (haystack.length > ASSET_LOAD_STDOUT_SCAN_CAP) {
     haystack = haystack.slice(0, ASSET_LOAD_STDOUT_SCAN_CAP);
   }
@@ -276,6 +276,7 @@ export function rehydrateRunFromSerialized(row: RunRecordSerialized): RunResult 
       feedbackRecorded: row.trajectory.feedback_recorded,
     },
     events: [],
+    agentStdout: "",
     verifierStdout: "",
     verifierExitCode: row.verifier_exit_code,
     assetsLoaded: [...row.assets_loaded],

@@ -49,6 +49,25 @@ describe("extractGoldRanks", () => {
     expect(extractGoldRanks(r, "skill:foo")).toEqual([]);
   });
 
+  test("uses agentStdout when verifierStdout is empty", () => {
+    const r = fakeResult("", {
+      agentStdout: 'akm search "q"\nref: skill:gold\nref: skill:other',
+    });
+    const events = extractGoldRanks(r, "skill:gold");
+    expect(events).toHaveLength(1);
+    expect(events[0].rankOfGold).toBe(1);
+  });
+
+  test("falls back to verifierStdout when agentStdout is an empty string", () => {
+    const r = fakeResult('akm search "q"\nref: skill:gold', {
+      agentStdout: "",
+    });
+    const events = extractGoldRanks(r, "skill:gold");
+    expect(events).toHaveLength(1);
+    expect(events[0].query).toBe("q");
+    expect(events[0].rankOfGold).toBe(1);
+  });
+
   test("extracts a single search with text-mode ref output, gold at rank 1", () => {
     const stdout = [
       `> akm search "redis healthcheck"`,

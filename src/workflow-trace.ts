@@ -227,7 +227,7 @@ export function normalizeRunToTrace(run: RunResult, options: NormalizeOptions = 
   }
 
   // 3) Agent stdout — scan for `akm <verb>` invocations not already covered.
-  const stdoutSeeds = fromAgentStdout(options.agentStdout, run, options, originalIndex);
+  const stdoutSeeds = fromAgentStdout(options.agentStdout ?? run.agentStdout, run, options, originalIndex);
   for (const seed of stdoutSeeds) {
     seeds.push(seed);
     originalIndex += 1;
@@ -242,6 +242,29 @@ export function normalizeRunToTrace(run: RunResult, options: NormalizeOptions = 
         // Workspace writes have no native timestamp; place them after akm_events
         // by giving them a high lexical hint anchored to the run finish marker
         // when present, else a sentinel that sorts after ISO timestamps.
+        orderHint: options.harness?.agentFinishedTs ?? "~workspace",
+        sourceRank: SOURCE_RANK.filesystem_diff,
+        originalIndex: originalIndex++,
+        partial: (() => {
+          const clampedFilePath = clamp(filePath);
+          const partial = makePartial(run, options, {
+            type: isFirst ? "first_workspace_write" : "workspace_write",
+            source: "filesystem_diff",
+            filePath: clampedFilePath.value,
+          });
+          if (clampedFilePath.truncated) partial.bytesTruncated = true;
+          return partial;
+        })(),
+      });
+      isFirst = false;
+    }
+  }
+
+  if ((!options.workspaceWrites || options.workspaceWrites.length === 0) && run.workspaceWrites?.length) {
+    let isFirst = true;
+    for (const filePath of run.workspaceWrites) {
+      if (typeof filePath !== "string" || filePath.length === 0) continue;
+      seeds.push({
         orderHint: options.harness?.agentFinishedTs ?? "~workspace",
         sourceRank: SOURCE_RANK.filesystem_diff,
         originalIndex: originalIndex++,
@@ -370,6 +393,13 @@ function fromAkmEvent(
   // probe a small whitelist so a malicious agent can't smuggle arbitrary
   // payloads into the trace.
   if (meta && typeof meta === "object") {
+    if (traceType === "akm_feedback") {
+      const signal = (meta as Record<string, unknown>).signal;
+      if (typeof signal === "string") {
+        if (signal === "positive") partial.args = ["--positive"];
+        else if (signal === "negative") partial.args = ["--negative"];
+      }
+    }
     const q = (meta as Record<string, unknown>).query;
     if (typeof q === "string") {
       const clampedQuery = clamp(q);

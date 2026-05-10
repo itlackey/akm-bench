@@ -19,7 +19,6 @@
       "src/**",
       "fixtures/**",
       "config/**",
-      "results/**",
       "tests/**",
       "README.md",
       ".gitignore",

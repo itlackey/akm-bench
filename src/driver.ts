@@ -62,8 +62,8 @@ export interface RunOptions {
   taskTitle?: string;
   /**
    * Pre-resolved akm search keywords from task.yaml `akm_keywords` field.
-   * When set, the driver puts a concrete `akm search <keywords>` command on
-   * line 1 of the akm-arm prompt. When absent, falls back to the task domain.
+   * When set, the akm-arm prompt uses these terms in its stash-discovery
+   * guidance. When absent, falls back to the task domain.
    */
   akmKeywords?: string;
   /**
@@ -117,6 +117,45 @@ export interface TrajectoryRecord {
  */
 export type TokenMeasurementStatus = "parsed" | "missing" | "unsupported";
 
+/**
+ * Per-request token telemetry captured from opencode JSON step events.
+ *
+ * `requestIndex` is 1-based in the order emitted by the model runtime.
+ */
+export interface RequestTokenStep {
+  requestIndex: number;
+  input: number;
+  output: number;
+  total: number;
+}
+
+/**
+ * Per-run request/token metrics with both step-level detail and run aggregate.
+ */
+export interface RequestTokenMetrics {
+  totalRequests: number;
+  totalTokens: number;
+  steps: RequestTokenStep[];
+  source: "step_finish" | "summary" | "missing";
+}
+
+/**
+ * Deterministic termination-cause labels stamped on every new RunResult.
+ * These explain why the run ended in its final outcome bucket.
+ */
+export type TerminationCause =
+  | "completed"
+  | "profile_lookup_failed"
+  | "profile_missing"
+  | "environment_setup_failed"
+  | "agent_timeout"
+  | "agent_spawn_failed"
+  | "agent_parse_error"
+  | "agent_non_zero_exit"
+  | "token_budget_exceeded"
+  | "verifier_runtime_missing"
+  | "verifier_failed";
+
 /** Run result envelope (spec §5.2). */
 export interface RunResult {
   schemaVersion: 1;
@@ -126,6 +165,11 @@ export interface RunResult {
   model: string;
   outcome: "pass" | "fail" | "budget_exceeded" | "harness_error";
   tokens: { input: number; output: number };
+  /**
+   * Per-run request/token telemetry: aggregate counts plus per-request steps
+   * when the provider emits structured step token events.
+   */
+  requestMetrics?: RequestTokenMetrics;
   /**
    * Status of the token-usage measurement on this run (issue #252). Aggregate
    * metrics MUST skip runs whose measurement is not `"parsed"` and report-
@@ -139,6 +183,17 @@ export interface RunResult {
   wallclockMs: number;
   trajectory: TrajectoryRecord;
   events: EventEnvelope[];
+  /**
+   * Relative workspace paths written during the run, captured by the runner.
+   * Optional/additive: older artefacts omit this field.
+   */
+  workspaceWrites?: string[];
+  /**
+   * Reconstructed agent output text extracted from the opencode JSON stream.
+   * This is the canonical trace input for workflow/search attribution when
+   * available. Kept in-memory only (not persisted in compact runs[] rows).
+   */
+  agentStdout?: string;
   verifierStdout: string;
   verifierExitCode: number;
   /**
@@ -170,6 +225,17 @@ export interface RunResult {
    * `agent_finished`.
    */
   finishedAt?: string;
+  /**
+   * Deterministic terminal-cause label for this run (timeout vs model/provider
+   * error vs verifier failure, etc). Optional/additive so older artefacts
+   * remain valid.
+   */
+  terminationCause?: TerminationCause;
+  /**
+   * First relevant error line extracted from agent/verifier output. Optional
+   * and null-equivalent when no error line was observed.
+   */
+  firstErrorLine?: string;
 }
 
 /** Operator-config env names that MUST NOT leak into per-run children. */
@@ -236,18 +302,17 @@ export function createIsolationDirs(stashDir?: string): IsolationDirs {
   fs.mkdirSync(configHome, { recursive: true });
   fs.mkdirSync(opencodeConfig, { recursive: true });
 
-  // Symlink the real opencode config dir into XDG_CONFIG_HOME so opencode
-  // can find its installed npm provider packages (node_modules). Without
-  // this, overriding XDG_CONFIG_HOME produces an empty opencode config dir
-  // and provider plugins (e.g. @ai-sdk/openai-compatible) fail to load.
-  // OPENCODE_CONFIG still points to our materialised file, which opencode
-  // reads in preference to XDG_CONFIG_HOME/opencode/opencode.json.
+  // Create an isolated opencode config dir. We intentionally do NOT symlink
+  // the operator's full ~/.config/opencode directory because that would drag
+  // user plugin declarations into bench runs. Only the dependency store
+  // (node_modules) is linked so provider SDK packages remain resolvable.
   const realOpencodeConfigDir = path.join(os.homedir(), ".config", "opencode");
   const isolatedOpencodeConfigDir = path.join(configHome, "opencode");
-  if (fs.existsSync(realOpencodeConfigDir)) {
-    fs.symlinkSync(realOpencodeConfigDir, isolatedOpencodeConfigDir);
-  } else {
-    fs.mkdirSync(isolatedOpencodeConfigDir, { recursive: true });
+  fs.mkdirSync(isolatedOpencodeConfigDir, { recursive: true });
+  const realNodeModulesDir = path.join(realOpencodeConfigDir, "node_modules");
+  const isolatedNodeModulesDir = path.join(isolatedOpencodeConfigDir, "node_modules");
+  if (fs.existsSync(realNodeModulesDir) && !fs.existsSync(isolatedNodeModulesDir)) {
+    fs.symlinkSync(realNodeModulesDir, isolatedNodeModulesDir);
   }
 
   return {
@@ -306,6 +371,23 @@ function windowsCmdQuote(value: string): string {
   return `"${value.replaceAll('"', '""')}"`;
 }
 
+function extractFirstErrorLine(...sources: Array<string | undefined>): string | undefined {
+  const lines: string[] = [];
+  for (const src of sources) {
+    if (!src) continue;
+    for (const raw of src.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (line.length === 0) continue;
+      lines.push(line);
+    }
+  }
+  if (lines.length === 0) return undefined;
+  const preferred = lines.find((line) =>
+    /(error|failed|exception|not found|invalid|unauthorized|forbidden|timeout|timed out|budget)/i.test(line),
+  );
+  return preferred ?? lines[0];
+}
+
 /**
  * Strip `AKM_STASH_DIR` from a child env object. Used by the synthetic-arm
  * spawn path (#261) so the operator's real `AKM_STASH_DIR` cannot leak in
@@ -334,10 +416,12 @@ export function parseTokenUsage(stdout: string): {
   output: number;
   text: string;
   measurement: TokenMeasurementStatus;
+  requestMetrics: RequestTokenMetrics;
 } {
   let parsedInput = 0;
   let parsedOutput = 0;
   let sawTokenEvent = false;
+  const stepMetrics: RequestTokenStep[] = [];
   const textParts: string[] = [];
 
   for (const line of stdout.split("\n")) {
@@ -360,6 +444,16 @@ export function parseTokenUsage(stdout: string): {
         parsedInput = typeof tokens.input === "number" ? tokens.input : 0;
         parsedOutput = typeof tokens.output === "number" ? tokens.output : 0;
         sawTokenEvent = true;
+        if (event.type === "step_finish") {
+          const input = parsedInput;
+          const output = parsedOutput;
+          stepMetrics.push({
+            requestIndex: stepMetrics.length + 1,
+            input,
+            output,
+            total: input + output,
+          });
+        }
       }
     } catch {
       // Fall back to the legacy text parser below when stdout is not JSONL.
@@ -367,24 +461,55 @@ export function parseTokenUsage(stdout: string): {
   }
 
   if (sawTokenEvent) {
+    const derivedFromStep = stepMetrics.length > 0;
+    const steps =
+      derivedFromStep && stepMetrics.length > 0
+        ? stepMetrics
+        : [{ requestIndex: 1, input: parsedInput, output: parsedOutput, total: parsedInput + parsedOutput }];
+    const totalTokens = steps.reduce((sum, step) => sum + step.total, 0);
     return {
       input: parsedInput,
       output: parsedOutput,
       text: textParts.join(""),
       measurement: "parsed",
+      requestMetrics: {
+        totalRequests: steps.length,
+        totalTokens,
+        steps,
+        source: derivedFromStep ? "step_finish" : "summary",
+      },
     };
   }
 
   const inputMatch = stdout.match(/(?:input(?:[_\s-]?tokens?)?|tokens?[_\s-]?input|inputTokens)["'\s:=]+(\d+)/i);
   const outputMatch = stdout.match(/(?:output(?:[_\s-]?tokens?)?|tokens?[_\s-]?output|outputTokens)["'\s:=]+(\d+)/i);
   if (!inputMatch && !outputMatch) {
-    return { input: 0, output: 0, text: stdout, measurement: "missing" };
+    return {
+      input: 0,
+      output: 0,
+      text: stdout,
+      measurement: "missing",
+      requestMetrics: {
+        totalRequests: 0,
+        totalTokens: 0,
+        steps: [],
+        source: "missing",
+      },
+    };
   }
+  const input = inputMatch ? Number.parseInt(inputMatch[1], 10) : 0;
+  const output = outputMatch ? Number.parseInt(outputMatch[1], 10) : 0;
   return {
-    input: inputMatch ? Number.parseInt(inputMatch[1], 10) : 0,
-    output: outputMatch ? Number.parseInt(outputMatch[1], 10) : 0,
+    input,
+    output,
     text: stdout,
     measurement: "parsed",
+    requestMetrics: {
+      totalRequests: 1,
+      totalTokens: input + output,
+      steps: [{ requestIndex: 1, input, output, total: input + output }],
+      source: "summary",
+    },
   };
 }
 
@@ -474,28 +599,19 @@ function defaultPrompt(options: RunOptions): string {
   // Derive search keywords: prefer explicit field, fall back to task domain.
   const keywords = options.akmKeywords ?? options.taskId.split("/")[0].replace(/-/g, " ");
 
-  // Force the model to use the bash tool to run akm CLI commands before
-  // writing any output. Each step is an explicit bash invocation so the
-  // model cannot skip to writing the answer without executing the commands.
+  // Keep AKM guidance explicit for benchmark comparability, but avoid a rigid
+  // tool-by-tool script so agents can follow equivalent flows.
   return [
-    `You have access to a knowledge stash via the akm CLI tool.`,
+    `You have access to a knowledge stash via the akm CLI tool. Use it to ground your solution in stash material before finalizing your answer.`,
     ``,
-    `Step 1 — open a terminal and execute this bash command:`,
-    `  bash: akm search ${keywords}`,
+    `Start by discovering relevant stash resources for this task (keywords: ${keywords}).`,
+    `Then open the most relevant reference(s) and apply that guidance to the workspace task requirements.`,
     ``,
-    `Step 2 — from the search results, execute:`,
-    `  bash: akm show <ref>   (e.g. akm show skill:${keywords.split(" ")[0]})`,
+    `Use README.md in the workspace for task-specific constraints and details.`,
+    `Follow README.md for required output format and file targets in the workspace.`,
     ``,
-    `Step 3 — read README.md in the workspace to understand the specific task requirements:`,
-    `  bash: cat ${options.workspace}/README.md`,
-    ``,
-    `Step 4 — using the skill content from step 2 and the task requirements from step 3,`,
-    `write the answer to ${options.workspace}/commands.txt`,
-    ``,
-    `Step 5 — execute:`,
-    `  bash: akm feedback <ref> --positive   (or --negative)`,
-    ``,
-    `DO NOT write commands.txt before running steps 1 and 2.`,
+    `Before finishing, record AKM feedback for the reference you used (positive or negative).`,
+    `Examples of useful AKM commands: akm search ${keywords}; akm show <ref>; akm feedback <ref> --positive|--negative.`,
     ``,
     taskLine,
     `Workspace: ${options.workspace}`,
@@ -525,6 +641,7 @@ export async function runOne(options: RunOptions): Promise<RunResult> {
     verifierStdout: "",
     verifierExitCode: -1,
     assetsLoaded: [],
+    terminationCause: "completed",
   };
 
   // Look up the built-in opencode profile defensively. The lookup is a pure
@@ -536,10 +653,14 @@ export async function runOne(options: RunOptions): Promise<RunResult> {
     profile = getBuiltinAgentProfile("opencode");
   } catch (err) {
     result.verifierStdout = `harness: getBuiltinAgentProfile("opencode") threw: ${err instanceof Error ? err.message : String(err)}`;
+    result.terminationCause = "profile_lookup_failed";
+    result.firstErrorLine = extractFirstErrorLine(result.verifierStdout);
     return result;
   }
   if (!profile) {
     result.verifierStdout = `harness: built-in agent profile "opencode" missing; available: ${BUILTIN_AGENT_PROFILE_NAMES.join(", ")}`;
+    result.terminationCause = "profile_missing";
+    result.firstErrorLine = extractFirstErrorLine(result.verifierStdout);
     return result;
   }
 
@@ -560,6 +681,8 @@ export async function runOne(options: RunOptions): Promise<RunResult> {
     });
   } catch (err) {
     result.verifierStdout = `harness: environment setup failed: ${err instanceof Error ? err.message : String(err)}`;
+    result.terminationCause = "environment_setup_failed";
+    result.firstErrorLine = extractFirstErrorLine(result.verifierStdout);
     return result;
   }
 
@@ -587,18 +710,28 @@ export async function runOne(options: RunOptions): Promise<RunResult> {
     const parsed = parseTokenUsage(agentResult.stdout);
     result.tokens = { input: parsed.input, output: parsed.output };
     result.tokenMeasurement = parsed.measurement;
+    result.requestMetrics = parsed.requestMetrics;
+    result.agentStdout = parsed.text;
     result.events = readRunEvents(dirs.cacheHome, { warnings: options.warnings });
 
     if (!agentResult.ok) {
       if (agentResult.reason === "timeout") {
         result.outcome = "budget_exceeded";
+        result.terminationCause = "agent_timeout";
+        result.firstErrorLine = extractFirstErrorLine(agentResult.error, agentResult.stderr, agentResult.stdout);
         return result;
       }
       // spawn_failed / non_zero_exit / parse_error all mean the harness
       // itself broke; the verifier never saw the workspace.
       if (agentResult.reason === "spawn_failed" || agentResult.reason === "parse_error") {
         result.outcome = "harness_error";
+        result.terminationCause = agentResult.reason === "spawn_failed" ? "agent_spawn_failed" : "agent_parse_error";
+        result.firstErrorLine = extractFirstErrorLine(agentResult.error, agentResult.stderr, agentResult.stdout);
         return result;
+      }
+      if (agentResult.reason === "non_zero_exit") {
+        result.terminationCause = "agent_non_zero_exit";
+        result.firstErrorLine = extractFirstErrorLine(agentResult.error, agentResult.stderr, agentResult.stdout);
       }
       // non_zero_exit from the agent: intentionally falls through to the
       // verifier path. Per spec §5.3 ("deterministic verifiers, never LLM"),
@@ -615,6 +748,11 @@ export async function runOne(options: RunOptions): Promise<RunResult> {
       const totalTokens = result.tokens.input + result.tokens.output;
       if (totalTokens > options.budgetTokens) {
         result.outcome = "budget_exceeded";
+        result.terminationCause = "token_budget_exceeded";
+        result.firstErrorLine = extractFirstErrorLine(
+          `token budget exceeded: ${totalTokens} > ${options.budgetTokens}`,
+          result.firstErrorLine,
+        );
         return result;
       }
     }
@@ -630,8 +768,18 @@ export async function runOne(options: RunOptions): Promise<RunResult> {
     if (verifierResult.exitCode === 127) {
       // Missing runtime (e.g. pytest not on PATH) — not the agent's fault.
       result.outcome = "harness_error";
+      if (!result.terminationCause || result.terminationCause === "completed") {
+        result.terminationCause = "verifier_runtime_missing";
+      }
+      result.firstErrorLine = result.firstErrorLine ?? extractFirstErrorLine(verifierResult.stdout);
     } else {
       result.outcome = verifierResult.exitCode === 0 ? "pass" : "fail";
+      if (result.outcome === "fail" && (!result.terminationCause || result.terminationCause === "completed")) {
+        result.terminationCause = "verifier_failed";
+      }
+      if (result.outcome === "fail") {
+        result.firstErrorLine = result.firstErrorLine ?? extractFirstErrorLine(verifierResult.stdout);
+      }
     }
     return result;
   } finally {

@@ -1,5 +1,5 @@
 id: workflow-compliance/repeated-fail-opencode-disable-provider
-title: "Disable openai provider and set anthropic default"
+title: "Disable openai provider and set shredder default"
 domain: workflow-compliance
 difficulty: hard
 slice: train
@@ -28,4 +28,4 @@ expected_workflows:
   - akm-negative-feedback-on-failure
   - akm-reflect-after-repeated-failure
 abstention_case: false
-akm_keywords: "opencode provider disable openai anthropic default"
+akm_keywords: "opencode config provider disable openai shredder options apiKey env OPENAI_API_KEY"

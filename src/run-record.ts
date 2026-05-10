@@ -38,6 +38,20 @@ export interface RunRecordSerialized {
    * `{input: number, output: number}` with optional `measurement`.
    */
   tokens: Record<string, unknown>;
+  /**
+   * Per-run request/token telemetry captured by the driver.
+   */
+  request_metrics?: {
+    total_requests: number;
+    total_tokens: number;
+    source: string;
+    steps: Array<{
+      request_index: number;
+      input: number;
+      output: number;
+      total: number;
+    }>;
+  };
   wallclock_ms: number;
   verifier_exit_code: number;
   trajectory: {
@@ -46,6 +60,8 @@ export interface RunRecordSerialized {
   };
   assets_loaded: string[];
   failure_mode: string | null;
+  termination_cause: string | null;
+  first_error_line: string | null;
 }
 
 /**
@@ -183,6 +199,21 @@ export function serializeRunForReport(result: RunResult): RunRecordSerialized {
     // Token-shape seam: spread verbatim so any additional fields (e.g.
     // `measurement`) are carried forward without a renderer change.
     tokens: { ...result.tokens },
+    ...(result.requestMetrics
+      ? {
+          request_metrics: {
+            total_requests: result.requestMetrics.totalRequests,
+            total_tokens: result.requestMetrics.totalTokens,
+            source: result.requestMetrics.source,
+            steps: result.requestMetrics.steps.map((step) => ({
+              request_index: step.requestIndex,
+              input: step.input,
+              output: step.output,
+              total: step.total,
+            })),
+          },
+        }
+      : {}),
     wallclock_ms: result.wallclockMs,
     verifier_exit_code: result.verifierExitCode,
     trajectory: {
@@ -191,5 +222,7 @@ export function serializeRunForReport(result: RunResult): RunRecordSerialized {
     },
     assets_loaded: [...(result.assetsLoaded ?? [])],
     failure_mode: result.failureMode ?? null,
+    termination_cause: result.terminationCause ?? null,
+    first_error_line: result.firstErrorLine ?? null,
   };
 }

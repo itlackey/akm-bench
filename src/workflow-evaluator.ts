@@ -557,6 +557,8 @@ function eventPolarity(ev: WorkflowTraceEvent): "positive" | "negative" | undefi
   // args-based detection.
   if (Array.isArray(ev.args)) {
     for (const a of ev.args) {
+      if (a === "--positive") return "positive";
+      if (a === "--negative") return "negative";
       if (a === "+1" || a === "positive" || a === "+") return "positive";
       if (a === "-1" || a === "negative" || a === "-") return "negative";
     }

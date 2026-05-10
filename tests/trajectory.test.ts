@@ -86,6 +86,35 @@ describe("computeTrajectory.correctAssetLoaded", () => {
     const traj = computeTrajectory({ goldRef: "skill:docker-homelab" }, fakeRun({ events: [event] }));
     expect(traj.correctAssetLoaded).toBe(true);
   });
+
+  test("false when only feedback event carries the gold ref", () => {
+    const traj = computeTrajectory(
+      { goldRef: "skill:docker-homelab" },
+      fakeRun({
+        events: [
+          {
+            schemaVersion: 1,
+            id: 2,
+            ts: "2026-04-27T00:00:00.000Z",
+            eventType: "feedback",
+            ref: "skill:docker-homelab",
+          },
+        ],
+      }),
+    );
+    expect(traj.correctAssetLoaded).toBe(false);
+  });
+
+  test("prefers agentStdout over verifierStdout when present", () => {
+    const traj = computeTrajectory(
+      { goldRef: "skill:docker-homelab" },
+      fakeRun({
+        agentStdout: "tool: akm show skill:docker-homelab",
+        verifierStdout: "",
+      }),
+    );
+    expect(traj.correctAssetLoaded).toBe(true);
+  });
 });
 
 describe("computeTrajectory.feedbackRecorded", () => {

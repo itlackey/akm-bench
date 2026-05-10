@@ -72,6 +72,9 @@ function baseEvolveInput(extra: Partial<EvolveReportInput> = {}): EvolveReportIn
       postPassRateStdev: 0,
       significanceThreshold: 0,
       interpretation: "improvement_detected",
+      directionalImprovement: true,
+      exceedsSignificanceThreshold: true,
+      matchesOrBeatsSynthetic: true,
       overSyntheticLift: 0.05,
       degradationCount: 0,
       degradations: [],
@@ -82,6 +85,50 @@ function baseEvolveInput(extra: Partial<EvolveReportInput> = {}): EvolveReportIn
     arms: { pre: emptyUtilityReport(), post: emptyUtilityReport(), synthetic: emptyUtilityReport() },
     warnings: [],
     ...extra,
+  };
+}
+
+function basePhaseTimings() {
+  return {
+    phase1: {
+      startedAt: "2026-04-27T00:00:00.000Z",
+      endedAt: "2026-04-27T00:00:10.000Z",
+      elapsedMs: 10000,
+    },
+    phase2: {
+      startedAt: "2026-04-27T00:00:10.000Z",
+      endedAt: "2026-04-27T00:00:25.000Z",
+      elapsedMs: 15000,
+    },
+    phase3: {
+      startedAt: "2026-04-27T00:00:25.000Z",
+      endedAt: "2026-04-27T00:00:40.000Z",
+      elapsedMs: 15000,
+      arms: {
+        preElapsedMs: 4000,
+        postElapsedMs: 7000,
+        syntheticElapsedMs: 4000,
+      },
+    },
+    totalElapsedMs: 40000,
+    akmCommands: [
+      {
+        phase: "phase1" as const,
+        command: "feedback",
+        args: ["feedback", "skill:loser", "--negative"],
+        elapsedMs: 50,
+        exitCode: 0,
+        watchdogExceeded: false,
+      },
+      {
+        phase: "phase2" as const,
+        command: "reflect",
+        args: ["reflect", "skill:loser"],
+        elapsedMs: 130000,
+        exitCode: 0,
+        watchdogExceeded: true,
+      },
+    ],
   };
 }
 
@@ -256,6 +303,31 @@ describe("renderEvolveReport — learning block (#265)", () => {
     expect(markdown).toContain("promoted_refs=1");
     expect(markdown).toContain("p-1");
     expect(markdown).toContain("skill:loser");
+  });
+
+  test("emits phase timing diagnostics in JSON and markdown", () => {
+    const { json, markdown } = renderEvolveReport(baseEvolveInput({ phaseTimings: basePhaseTimings() }));
+    const parsed = json as {
+      phase_timings?: {
+        phase1: { elapsed_ms: number };
+        phase2: { elapsed_ms: number };
+        phase3: { arms: { pre_elapsed_ms: number; post_elapsed_ms: number; synthetic_elapsed_ms: number } };
+        total_elapsed_ms: number;
+        akm_commands: Array<{ command: string; watchdog_exceeded: boolean }>;
+      };
+    };
+    expect(parsed.phase_timings).toBeDefined();
+    expect(parsed.phase_timings?.phase1.elapsed_ms).toBe(10000);
+    expect(parsed.phase_timings?.phase2.elapsed_ms).toBe(15000);
+    expect(parsed.phase_timings?.phase3.arms.post_elapsed_ms).toBe(7000);
+    expect(parsed.phase_timings?.total_elapsed_ms).toBe(40000);
+    expect(parsed.phase_timings?.akm_commands.map((row) => ({ command: row.command, watchdog_exceeded: row.watchdog_exceeded }))).toEqual([
+      { command: "feedback", watchdog_exceeded: false },
+      { command: "reflect", watchdog_exceeded: true },
+    ]);
+    expect(markdown).toContain("Phase timings");
+    expect(markdown).toContain("phase3_arms_ms: pre=4000, post=7000, synthetic=4000");
+    expect(markdown).toContain("watchdog_exceeded=1");
   });
 });
 

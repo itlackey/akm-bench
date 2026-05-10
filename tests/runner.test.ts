@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import type { TaskMetadata } from "../src/corpus";
-import { runUtility } from "../src/runner";
+import { _seedWorkspace, runUtility } from "../src/runner";
 import type { SpawnedSubprocess, SpawnFn } from "../src/support/agent";
 import { benchMkdtemp } from "../src/tmp";
 
@@ -290,7 +290,7 @@ describe("runUtility", () => {
       await runUtility({
         tasks: [fakeTask(taskDir)],
         arms: ["noakm"],
-        model: "test",
+        model: "opencode/big-pickle",
         seedsPerArm: 1,
         spawn,
         materialiseStash: false,
@@ -298,6 +298,40 @@ describe("runUtility", () => {
       expect(seenContents).toEqual(["hello"]);
     } finally {
       fs.rmSync(wsTemplate, { recursive: true, force: true });
+    }
+  });
+
+  test("base + domain workspace files are copied first and task files override them", async () => {
+    const prevFixtures = process.env.BENCH_FIXTURES_DIR;
+    const fixturesRoot = benchMkdtemp("bench-fixtures-base-");
+    process.env.BENCH_FIXTURES_DIR = fixturesRoot;
+    const baseWorkspace = path.join(fixturesRoot, "corpus", "base", "workspace");
+    fs.mkdirSync(baseWorkspace, { recursive: true });
+    fs.writeFileSync(path.join(baseWorkspace, "base-only.txt"), "from-base");
+    fs.writeFileSync(path.join(baseWorkspace, "override.txt"), "base");
+
+    const domainWorkspace = path.join(fixturesRoot, "corpus", "base", "domains", "runner", "workspace");
+    fs.mkdirSync(domainWorkspace, { recursive: true });
+    fs.writeFileSync(path.join(domainWorkspace, "domain-only.txt"), "from-domain");
+    fs.writeFileSync(path.join(domainWorkspace, "override.txt"), "domain");
+
+    const wsTemplate = path.join(taskDir, "workspace");
+    fs.mkdirSync(wsTemplate, { recursive: true });
+    fs.writeFileSync(path.join(wsTemplate, "override.txt"), "task");
+
+    const out = benchMkdtemp("bench-seed-workspace-");
+
+    try {
+      _seedWorkspace({ taskDir, domain: "runner" }, out);
+      expect(fs.readFileSync(path.join(out, "base-only.txt"), "utf8")).toBe("from-base");
+      expect(fs.readFileSync(path.join(out, "domain-only.txt"), "utf8")).toBe("from-domain");
+      expect(fs.readFileSync(path.join(out, "override.txt"), "utf8")).toBe("task");
+    } finally {
+      if (prevFixtures === undefined) delete process.env.BENCH_FIXTURES_DIR;
+      else process.env.BENCH_FIXTURES_DIR = prevFixtures;
+      fs.rmSync(fixturesRoot, { recursive: true, force: true });
+      fs.rmSync(wsTemplate, { recursive: true, force: true });
+      fs.rmSync(out, { recursive: true, force: true });
     }
   });
 

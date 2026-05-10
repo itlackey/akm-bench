@@ -683,7 +683,7 @@ describe("computeAkmOverhead — successful AKM use", () => {
       events: [
         akmEvent("search", "2026-04-27T10:00:00.000Z", undefined, { query: "deploy" }),
         akmEvent("show", "2026-04-27T10:00:00.500Z", "skill:deploy"),
-        akmEvent("feedback", "2026-04-27T10:00:01.000Z", "skill:deploy"),
+        akmEvent("feedback", "2026-04-27T10:00:01.000Z", "skill:deploy", { signal: "positive" }),
       ],
     });
     const tasks = metaMap([{ id: "demo/ok", goldRef: "skill:deploy", expectedTransferFrom: [] }]);
@@ -692,6 +692,8 @@ describe("computeAkmOverhead — successful AKM use", () => {
     expect(r.searchCount).toBe(1);
     expect(r.showCount).toBe(1);
     expect(r.feedbackCount).toBe(1);
+    expect(r.positiveFeedbackCount).toBe(1);
+    expect(r.negativeFeedbackCount).toBe(0);
     expect(r.totalToolCalls).toBe(3);
     expect(r.assetsLoadedCount).toBe(1);
     expect(r.irrelevantAssetsLoadedCount).toBe(0);

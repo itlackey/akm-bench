@@ -21,8 +21,8 @@
     {
       "name": "common-commands",
       "type": "knowledge",
-      "description": "Quick reference of high-frequency az CLI commands",
-      "tags": ["azure", "az", "reference", "cheatsheet"],
+      "description": "Quick reference of high-frequency az CLI commands, including storage management-policy examples",
+      "tags": ["azure", "az", "reference", "cheatsheet", "storage", "lifecycle", "management-policy"],
       "filename": "common-commands.md",
       "quality": "curated",
       "confidence": 0.85

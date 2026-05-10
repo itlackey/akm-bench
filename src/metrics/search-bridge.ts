@@ -3,6 +3,7 @@
  */
 
 import type { RunResult } from "../driver";
+import { normalizeRunToTrace } from "../workflow-trace";
 
 // ── Search-pipeline bridge (§6.7) ──────────────────────────────────────────
 
@@ -73,11 +74,10 @@ const TOP_K = 10;
 /**
  * Extract the gold rank for every `akm search` invocation in a run.
  *
- * The parser scans `runResult.verifierStdout` (which carries the captured
- * agent stdout including its tool-call trace) for `akm search` commands
- * and the result lists that follow them. The first 10 hits are considered;
- * if the gold ref appears, `rankOfGold` is its 1-based position, else
- * `null`.
+ * Preferred source is the structured events stream (`runResult.events`) when
+ * it carries search entries. Fallback source is agent/verifier stdout parsing.
+ * The first 10 hits are considered; if the gold ref appears, `rankOfGold` is
+ * its 1-based position, else `null`.
  *
  * Pure function: never reads from disk and never mutates inputs. When
  * `goldRef` is undefined the function returns `[]` — we only attribute
@@ -85,8 +85,19 @@ const TOP_K = 10;
  */
 export function extractGoldRanks(runResult: RunResult, goldRef: string | undefined): GoldRankEvent[] {
   if (!goldRef) return [];
-  const haystack = runResult.verifierStdout;
-  if (!haystack) return [];
+  const fromEvents = extractGoldRanksFromEvents(runResult, goldRef);
+  if (fromEvents.length > 0) return fromEvents;
+
+  const haystack = pickStdout(runResult);
+  if (!haystack) {
+    // Last-resort fallback: reuse the normalised workflow trace so search-bridge
+    // remains consistent with AKM-overhead when only trace-level evidence is
+    // available (e.g. parser recognised `akm search` but no raw stdout/events
+    // block was retained on the run record).
+    const fromTrace = extractGoldRanksFromTrace(runResult, goldRef);
+    if (fromTrace.length > 0) return fromTrace;
+    return [];
+  }
 
   const events: GoldRankEvent[] = [];
 
@@ -140,6 +151,61 @@ export function extractGoldRanks(runResult: RunResult, goldRef: string | undefin
     events.push(active);
   }
 
+  if (events.length === 0) {
+    const fromTrace = extractGoldRanksFromTrace(runResult, goldRef);
+    if (fromTrace.length > 0) return fromTrace;
+  }
+
+  return events;
+}
+
+function pickStdout(runResult: RunResult): string | undefined {
+  if (typeof runResult.agentStdout === "string" && runResult.agentStdout.length > 0) {
+    return runResult.agentStdout;
+  }
+  if (typeof runResult.verifierStdout === "string" && runResult.verifierStdout.length > 0) {
+    return runResult.verifierStdout;
+  }
+  return undefined;
+}
+
+function extractGoldRanksFromTrace(runResult: RunResult, goldRef: string): GoldRankEvent[] {
+  const trace = normalizeRunToTrace(runResult);
+  const events: GoldRankEvent[] = [];
+  for (const ev of trace.events) {
+    if (ev.type !== "akm_search") continue;
+    const results = Array.isArray(ev.resultRefs)
+      ? ev.resultRefs.filter((item): item is string => typeof item === "string").slice(0, TOP_K)
+      : [];
+    events.push({
+      query: typeof ev.query === "string" ? ev.query : "",
+      results,
+      rankOfGold: computeRank(results, goldRef),
+    });
+  }
+  return events;
+}
+
+function extractGoldRanksFromEvents(runResult: RunResult, goldRef: string): GoldRankEvent[] {
+  const events: GoldRankEvent[] = [];
+  for (const event of runResult.events) {
+    if (event.eventType !== "search" && event.eventType !== "search_invoked") continue;
+    const meta = event.metadata;
+    const query =
+      meta && typeof meta === "object" && typeof (meta as Record<string, unknown>).query === "string"
+        ? ((meta as Record<string, unknown>).query as string)
+        : "";
+    const resultRefsRaw =
+      meta && typeof meta === "object" ? (meta as Record<string, unknown>).resultRefs : undefined;
+    const results = Array.isArray(resultRefsRaw)
+      ? resultRefsRaw.filter((item): item is string => typeof item === "string").slice(0, TOP_K)
+      : [];
+    events.push({
+      query,
+      results,
+      rankOfGold: computeRank(results, goldRef),
+    });
+  }
   return events;
 }
 

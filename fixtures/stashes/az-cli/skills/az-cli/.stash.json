@@ -6,7 +6,16 @@
       "description": "Operate Azure resources from the command line using the az CLI",
       "tags": ["azure", "az", "cli", "cloud"],
       "aliases": ["azure-cli", "az"],
-      "searchHints": ["azure command line", "manage azure resources", "az login", "azure subscription"],
+      "searchHints": [
+        "azure command line",
+        "manage azure resources",
+        "az login",
+        "azure subscription",
+        "storage lifecycle management policy",
+        "az storage account management-policy create",
+        "delete after days blockBlob",
+        "tier to cool last access"
+      ],
       "filename": "SKILL.md",
       "quality": "curated",
       "confidence": 0.95

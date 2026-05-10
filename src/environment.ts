@@ -238,9 +238,7 @@ export function setupBenchEnvironment(params: BenchEnvParams): BenchEnvironment 
     if (indexCacheHome) {
       const srcAkmDir = path.join(indexCacheHome, "akm");
       try {
-        for (const entry of fs.readdirSync(srcAkmDir)) {
-          fs.copyFileSync(path.join(srcAkmDir, entry), path.join(destAkmDir, entry));
-        }
+        copyIndexCacheEntries(srcAkmDir, destAkmDir);
       } catch (err) {
         warnings.push(`index copy failed, falling back to re-index: ${(err as Error).message}`);
         _runAkmIndex(stashDir, env);
@@ -261,6 +259,21 @@ export function setupBenchEnvironment(params: BenchEnvParams): BenchEnvironment 
       }
     },
   };
+}
+
+function copyIndexCacheEntries(srcDir: string, destDir: string): void {
+  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const srcPath = path.join(srcDir, entry.name);
+    const destPath = path.join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      fs.mkdirSync(destPath, { recursive: true });
+      copyIndexCacheEntries(srcPath, destPath);
+      continue;
+    }
+    if (entry.isFile()) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
 }
 
 function _runAkmIndex(stashDir: string, env: Record<string, string>): void {

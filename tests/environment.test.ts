@@ -14,6 +14,7 @@ import {
   writeOpencodeJson,
 } from "../src/environment";
 import type { LoadedOpencodeConfig } from "../src/opencode-config";
+import { _detectWorkspaceWrites, _snapshotWorkspaceFiles } from "../src/runner";
 import { benchMkdtemp } from "../src/tmp";
 
 // ── writeOpencodeJson ────────────────────────────────────────────────────────
@@ -278,5 +279,69 @@ describe("setupBenchEnvironment dryRun", () => {
     expect(fs.existsSync(root)).toBe(true);
     env.teardown();
     expect(fs.existsSync(root)).toBe(false);
+  });
+
+  test("copies cached index recursively and skips non-file entries", () => {
+    const stashDir = benchMkdtemp("akm-bench-env-stash-");
+    const indexCacheHome = benchMkdtemp("akm-bench-env-cache-");
+    fs.mkdirSync(path.join(indexCacheHome, "akm", "nested"), { recursive: true });
+    fs.writeFileSync(path.join(indexCacheHome, "akm", "index.db"), "db", "utf8");
+    fs.writeFileSync(path.join(indexCacheHome, "akm", "nested", "meta.json"), "{}", "utf8");
+    fs.symlinkSync(path.join(indexCacheHome, "akm", "index.db"), path.join(indexCacheHome, "akm", "registry-index"));
+
+    const env = setupBenchEnvironment({
+      model: "anthropic/claude-opus-4-7",
+      arm: "akm",
+      stashDir,
+      indexCacheHome,
+    });
+    try {
+      expect(fs.existsSync(path.join(env.dirs.cacheHome, "akm", "index.db"))).toBe(true);
+      expect(fs.existsSync(path.join(env.dirs.cacheHome, "akm", "nested", "meta.json"))).toBe(true);
+      expect(fs.existsSync(path.join(env.dirs.cacheHome, "akm", "registry-index"))).toBe(false);
+    } finally {
+      env.teardown();
+      fs.rmSync(stashDir, { recursive: true, force: true });
+      fs.rmSync(indexCacheHome, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── runner workspace-write detection helpers ────────────────────────────────
+
+describe("runner workspace-write detection", () => {
+  test("ignores preseeded prep-note.txt when unchanged", () => {
+    const workspace = benchMkdtemp("akm-bench-write-detect-");
+    try {
+      fs.writeFileSync(path.join(workspace, "prep-note.txt"), "prep: seeded\n", "utf8");
+      fs.writeFileSync(path.join(workspace, "opencode.json"), "{}\n", "utf8");
+
+      const before = _snapshotWorkspaceFiles(workspace);
+      const writes = _detectWorkspaceWrites(before, workspace);
+      expect(writes).toEqual([]);
+    } finally {
+      fs.rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  test("detects changed preseeded prep-note.txt and real file edits", async () => {
+    const workspace = benchMkdtemp("akm-bench-write-detect-");
+    try {
+      const prep = path.join(workspace, "prep-note.txt");
+      const cfg = path.join(workspace, "opencode.json");
+      fs.writeFileSync(prep, "prep: seeded\n", "utf8");
+      fs.writeFileSync(cfg, "{}\n", "utf8");
+
+      const before = _snapshotWorkspaceFiles(workspace);
+      await Bun.sleep(5);
+      fs.writeFileSync(prep, "prep: changed\n", "utf8");
+      fs.writeFileSync(cfg, '{"model":"x"}\n', "utf8");
+
+      const writes = _detectWorkspaceWrites(before, workspace);
+      expect(writes).toContain("prep-note.txt");
+      expect(writes).toContain("opencode.json");
+    } finally {
+      fs.rmSync(workspace, { recursive: true, force: true });
+    }
   });
 });

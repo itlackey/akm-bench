@@ -129,6 +129,14 @@ describe("runOne", () => {
     const result = await runOne({ ...baseOptions, workspace, spawn });
     expect(result.outcome).toBe("fail");
     expect(result.verifierExitCode).toBe(1);
+    expect(result.terminationCause).toBe("verifier_failed");
+  });
+
+  test("fail: agent non-zero exit still runs verifier and records fail outcome", async () => {
+    const { spawn } = scriptedSpawn({ exitCode: 2, stdout: "nope" });
+    const result = await runOne({ ...baseOptions, workspace, spawn });
+    expect(result.outcome).toBe("fail");
+    expect(result.verifierExitCode).toBe(1);
   });
 
   test("budget_exceeded: agent times out (runAgent reason: timeout)", async () => {
@@ -141,12 +149,16 @@ describe("runOne", () => {
       budgetWallMs: 50,
     });
     expect(result.outcome).toBe("budget_exceeded");
+    expect(result.terminationCause).toBe("agent_timeout");
+    expect(result.firstErrorLine?.toLowerCase()).toContain("timed out");
   });
 
   test("harness_error: agent spawn throws synchronously", async () => {
     const { spawn } = scriptedSpawn({ exitCode: 0, throwSync: new Error("ENOENT") });
     const result = await runOne({ ...baseOptions, workspace, spawn });
     expect(result.outcome).toBe("harness_error");
+    expect(result.terminationCause).toBe("agent_spawn_failed");
+    expect(result.firstErrorLine).toContain("ENOENT");
   });
 
   test("budget_exceeded: parsed token usage exceeds budgetTokens", async () => {
@@ -167,6 +179,24 @@ describe("runOne", () => {
     expect(result.tokens.input).toBe(70_000);
     expect(result.tokens.output).toBe(50_000);
     expect(result.tokenMeasurement).toBe("parsed");
+    expect(result.terminationCause).toBe("token_budget_exceeded");
+    expect(result.firstErrorLine).toContain("token budget exceeded");
+  });
+
+  test("fail: non-zero agent exit is classified distinctly from verifier failure", async () => {
+    const { spawn } = scriptedSpawn({ exitCode: 2, stdout: "provider crash" }, { exitCode: 1, stdout: "verify fail" });
+    const result = await runOne({ ...baseOptions, workspace, spawn });
+    expect(result.outcome).toBe("fail");
+    expect(result.terminationCause).toBe("agent_non_zero_exit");
+    expect(result.firstErrorLine?.toLowerCase()).toContain("exited with code");
+  });
+
+  test("harness_error: verifier exit 127 is tagged as verifier_runtime_missing", async () => {
+    const { spawn } = scriptedSpawn({ exitCode: 0, stdout: "ok" }, { exitCode: 127, stdout: "pytest: command not found" });
+    const result = await runOne({ ...baseOptions, workspace, spawn, verifier: "pytest" });
+    expect(result.outcome).toBe("harness_error");
+    expect(result.terminationCause).toBe("verifier_runtime_missing");
+    expect(result.firstErrorLine).toContain("command not found");
   });
 
   test("tokenMeasurement: parsed when stdout reports tokens", async () => {
@@ -194,6 +224,8 @@ describe("runOne", () => {
     expect(result.tokenMeasurement).toBe("parsed");
     expect(result.tokens.input).toBe(321);
     expect(result.tokens.output).toBe(123);
+    expect(result.requestMetrics?.totalRequests).toBe(1);
+    expect(result.requestMetrics?.totalTokens).toBe(444);
   });
 
   test("regex verifier sees reconstructed text from JSON event output", async () => {
@@ -257,6 +289,53 @@ describe("runOne", () => {
         else process.env[name] = priors[name];
       }
     }
+  });
+
+  test("akm default prompt keeps stash guidance without rigid bash-step script", async () => {
+    const { spawn, invocations } = scriptedSpawn({ exitCode: 0, stdout: "ok" });
+    await runOne({
+      ...baseOptions,
+      workspace,
+      arm: "akm",
+      stashDir: "/tmp/some-stash",
+      taskTitle: "Solve fixture task",
+      spawn,
+    });
+
+    const prompt = invocations[0]?.cmd.at(-1);
+    expect(typeof prompt).toBe("string");
+    if (typeof prompt !== "string") return;
+
+    expect(prompt).toContain("You have access to a knowledge stash via the akm CLI tool");
+    expect(prompt).toContain("Start by discovering relevant stash resources for this task");
+    expect(prompt).toContain("Use README.md in the workspace for task-specific constraints and details");
+    expect(prompt).toContain("Follow README.md for required output format and file targets in the workspace.");
+    expect(prompt).toContain("record AKM feedback");
+    expect(prompt).toContain("Examples of useful AKM commands:");
+
+    // Regression guard for step 3: do not force exact step-by-step bash ordering.
+    expect(prompt).not.toContain("Step 1 — open a terminal and execute this bash command");
+    expect(prompt).not.toContain("DO NOT write commands.txt before running steps 1 and 2");
+    expect(prompt).not.toContain("bash: akm search");
+    expect(prompt).not.toContain("bash: akm show <ref>");
+  });
+
+  test("akm default prompt uses configured akmKeywords in high-level guidance", async () => {
+    const { spawn, invocations } = scriptedSpawn({ exitCode: 0, stdout: "ok" });
+    await runOne({
+      ...baseOptions,
+      workspace,
+      arm: "akm",
+      stashDir: "/tmp/some-stash",
+      akmKeywords: "azure cli",
+      spawn,
+    });
+
+    const prompt = invocations[0]?.cmd.at(-1);
+    expect(typeof prompt).toBe("string");
+    if (typeof prompt !== "string") return;
+    expect(prompt).toContain("keywords: azure cli");
+    expect(prompt).toContain("akm search azure cli");
   });
 
   // ── #271: operator-env isolation (OPENCODE_API_KEY/ANTHROPIC_API_KEY/AKM_CONFIG_DIR)
@@ -526,6 +605,18 @@ describe("driver helpers", () => {
     }
   });
 
+  test("createIsolationDirs keeps config/opencode isolated (no whole-dir symlink)", () => {
+    const dirs = createIsolationDirs();
+    try {
+      const isolatedOpencodeDir = path.join(dirs.configHome, "opencode");
+      const stat = fs.lstatSync(isolatedOpencodeDir);
+      expect(stat.isSymbolicLink()).toBe(false);
+      expect(stat.isDirectory()).toBe(true);
+    } finally {
+      fs.rmSync(dirs.root, { recursive: true, force: true });
+    }
+  });
+
   test("stripAkmStashDir deletes AKM_STASH_DIR in place (#261 synthetic-arm guard)", () => {
     const env: Record<string, string | undefined> = {
       AKM_STASH_DIR: "/tmp/operator-stash",
@@ -596,14 +687,32 @@ describe("driver helpers", () => {
 
   test("parseTokenUsage extracts numbers when present, missing otherwise", () => {
     // No matchable token line at all → measurement is "missing", not a real zero (issue #252).
-    expect(parseTokenUsage("")).toEqual({ input: 0, output: 0, text: "", measurement: "missing" });
-    expect(parseTokenUsage("noise")).toEqual({ input: 0, output: 0, text: "noise", measurement: "missing" });
+    expect(parseTokenUsage("")).toEqual({
+      input: 0,
+      output: 0,
+      text: "",
+      measurement: "missing",
+      requestMetrics: { totalRequests: 0, totalTokens: 0, steps: [], source: "missing" },
+    });
+    expect(parseTokenUsage("noise")).toEqual({
+      input: 0,
+      output: 0,
+      text: "noise",
+      measurement: "missing",
+      requestMetrics: { totalRequests: 0, totalTokens: 0, steps: [], source: "missing" },
+    });
     // Both keys present → "parsed" with the actual numbers.
     expect(parseTokenUsage("input_tokens: 123 output_tokens: 456")).toEqual({
       input: 123,
       output: 456,
       text: "input_tokens: 123 output_tokens: 456",
       measurement: "parsed",
+      requestMetrics: {
+        totalRequests: 1,
+        totalTokens: 579,
+        steps: [{ requestIndex: 1, input: 123, output: 456, total: 579 }],
+        source: "summary",
+      },
     });
     // Only one key present → still "parsed", missing key defaults to 0.
     expect(parseTokenUsage("input_tokens: 99")).toEqual({
@@ -611,12 +720,24 @@ describe("driver helpers", () => {
       output: 0,
       text: "input_tokens: 99",
       measurement: "parsed",
+      requestMetrics: {
+        totalRequests: 1,
+        totalTokens: 99,
+        steps: [{ requestIndex: 1, input: 99, output: 0, total: 99 }],
+        source: "summary",
+      },
     });
     expect(parseTokenUsage("output_tokens: 55")).toEqual({
       input: 0,
       output: 55,
       text: "output_tokens: 55",
       measurement: "parsed",
+      requestMetrics: {
+        totalRequests: 1,
+        totalTokens: 55,
+        steps: [{ requestIndex: 1, input: 0, output: 55, total: 55 }],
+        source: "summary",
+      },
     });
     // Newer opencode versions surface usage with camelCase keys in JSON-ish output.
     expect(parseTokenUsage('{"usage":{"inputTokens":321,"outputTokens":123}}')).toEqual({
@@ -624,6 +745,12 @@ describe("driver helpers", () => {
       output: 123,
       text: '{"usage":{"inputTokens":321,"outputTokens":123}}',
       measurement: "parsed",
+      requestMetrics: {
+        totalRequests: 1,
+        totalTokens: 444,
+        steps: [{ requestIndex: 1, input: 321, output: 123, total: 444 }],
+        source: "summary",
+      },
     });
   });
 

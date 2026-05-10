@@ -1,0 +1,26 @@
+id: workflow-compliance/repeated-fail-opencode-provider-token-eval
+title: "Configure anthropic provider token and default model (eval variant)"
+domain: workflow-compliance
+difficulty: hard
+slice: eval
+gold_ref: skill:opencode
+stash: noisy
+verifier: script
+memory_ability: procedural_lookup
+task_family: workflow-compliance/repeated-failure
+
+budget:
+  tokens: 25000
+  wallMs: 90000
+
+# Eval variant for transfer measurement after the train tasks evolve
+# `skill:opencode` to include provider/env wiring guidance.
+repeated_failure_group: opencode-provider-config
+workflow_failure_category: repeated-failure-reflection-trigger
+expected_workflows:
+  - akm-lookup-before-edit
+  - akm-correct-asset-use
+  - akm-negative-feedback-on-failure
+  - akm-reflect-after-repeated-failure
+abstention_case: false
+akm_keywords: "opencode config provider anthropic options apiKey env ANTHROPIC_API_KEY model"

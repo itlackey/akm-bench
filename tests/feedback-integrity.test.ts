@@ -348,6 +348,9 @@ function evolveInputWith(metrics: FeedbackIntegrityMetrics | undefined) {
       postPassRateStdev: 0,
       significanceThreshold: 0,
       interpretation: "improvement_detected" as "improvement_detected" | "no_improvement_detected",
+      directionalImprovement: true,
+      exceedsSignificanceThreshold: true,
+      matchesOrBeatsSynthetic: true,
       overSyntheticLift: 0.05,
       degradationCount: 0,
       degradations: [],
@@ -439,20 +442,30 @@ describe("renderEvolveReport — feedback_agreement headline + warning marker", 
       postPassRateStdev: 0.02,
       significanceThreshold: 0.08,
       interpretation: "no_improvement_detected",
+      directionalImprovement: true,
+      exceedsSignificanceThreshold: false,
+      matchesOrBeatsSynthetic: true,
     };
 
     const { markdown, json } = renderEvolveReport(input);
     expect(markdown).toContain("no_improvement_detected");
+    expect(markdown).toContain("directional improvement below detection threshold");
     expect(markdown).toContain("threshold 0.08");
     const parsed = json as unknown as {
       longitudinal: {
         interpretation: string;
+        directional_improvement: boolean;
+        exceeds_significance_threshold: boolean;
+        matches_or_beats_synthetic: boolean;
         pre_pass_rate_stdev: number;
         post_pass_rate_stdev: number;
         significance_threshold: number;
       };
     };
     expect(parsed.longitudinal.interpretation).toBe("no_improvement_detected");
+    expect(parsed.longitudinal.directional_improvement).toBe(true);
+    expect(parsed.longitudinal.exceeds_significance_threshold).toBe(false);
+    expect(parsed.longitudinal.matches_or_beats_synthetic).toBe(true);
     expect(parsed.longitudinal.pre_pass_rate_stdev).toBeCloseTo(0.04);
     expect(parsed.longitudinal.post_pass_rate_stdev).toBeCloseTo(0.02);
     expect(parsed.longitudinal.significance_threshold).toBeCloseTo(0.08);

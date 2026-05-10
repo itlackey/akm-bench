@@ -111,7 +111,7 @@ describe("loadOpencodeConfig", () => {
         myProvider: {
           npm: "@ai-sdk/openai-compatible",
           apiKey: "{env:MY_API_KEY}",
-          options: { baseURL: "http://localhost:1234/v1" },
+          options: { baseURL: "http://192.168.0.205:1234/v1" },
         },
       },
     });
@@ -136,7 +136,7 @@ describe("loadOpencodeConfig", () => {
       provider: {
         local: {
           npm: "@ai-sdk/openai-compatible",
-          options: { baseURL: "http://localhost:1234/v1" },
+          options: { baseURL: "http://192.168.0.205:1234/v1" },
         },
       },
     });
@@ -184,7 +184,7 @@ describe("collectEnvRefs", () => {
   });
 
   test("ignores non-env strings", () => {
-    expect(collectEnvRefs({ apiKey: "not-an-env-ref", baseURL: "http://localhost:1234/v1" })).toEqual([]);
+    expect(collectEnvRefs({ apiKey: "not-an-env-ref", baseURL: "http://192.168.0.205:1234/v1" })).toEqual([]);
   });
 });
 

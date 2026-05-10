@@ -89,10 +89,12 @@ function computeCorrectAssetLoaded(
   if (!task.goldRef) return null;
   const ref = task.goldRef;
 
-  // Search the events stream for any tool-call event that carries the ref.
-  // akm show emits an event to events.jsonl, so this path is the primary
-  // detection route when the structured event stream is available.
+  // Search the events stream for explicit load/show tool-call events that
+  // carry the ref. A feedback event mentioning a ref is not evidence of load.
   for (const event of runResult.events) {
+    if (event.eventType !== "show" && event.eventType !== "load" && event.eventType !== "tool_call") {
+      continue;
+    }
     const refField = event.ref;
     if (typeof refField === "string" && matchesRef(refField, ref)) return true;
     const meta = event.metadata;
@@ -110,7 +112,7 @@ function computeCorrectAssetLoaded(
   // Cap the scan at VERIFIER_STDOUT_SCAN_CAP so a runaway agent's GBs of
   // stdout cannot OOM the bench. When we truncate, push a warning so the
   // top-level report aggregates it under `warnings[]`.
-  const haystackFull = runResult.verifierStdout;
+  const haystackFull = runResult.agentStdout ?? runResult.verifierStdout;
   let haystack = haystackFull;
   if (haystack && haystack.length > VERIFIER_STDOUT_SCAN_CAP) {
     haystack = haystack.slice(0, VERIFIER_STDOUT_SCAN_CAP);

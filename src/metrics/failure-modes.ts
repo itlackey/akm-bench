@@ -179,7 +179,7 @@ export function aggregateFailureModes(entries: Array<{ taskId: string; mode: Fai
  * bench.
  */
 function collectTrace(runResult: RunResult): string {
-  const stdout = runResult.verifierStdout ?? "";
+  const stdout = runResult.agentStdout ?? runResult.verifierStdout ?? "";
   const capped = stdout.length > FAILURE_MODE_STDOUT_SCAN_CAP ? stdout.slice(0, FAILURE_MODE_STDOUT_SCAN_CAP) : stdout;
   return capped;
 }

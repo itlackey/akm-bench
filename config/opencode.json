@@ -4,9 +4,9 @@
   "provider": {
     "local": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "LM Studio (localhost)",
+      "name": "Don LM Studio (bench)",
       "options": {
-        "baseURL": "http://127.0.0.1:1234/v1",
+        "baseURL": "http://192.168.0.205:1234/v1",
         "timeout": 600000
       },
       "models": {
