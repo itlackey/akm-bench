@@ -70,6 +70,24 @@
       "description": "Per-run wallclock budget in milliseconds. Defaults to the runner's built-in default (120000) when omitted.",
       "minimum": 1
     },
+    "phase2ReflectTimeoutMs": {
+      "type": "integer",
+      "description": "Timeout in milliseconds for Phase 2 `akm reflect` calls. Defaults to 180000 and is independent from budgetWallMs.",
+      "minimum": 1
+    },
+    "phase2ReflectRetryTimeoutMs": {
+      "type": "integer",
+      "description": "Timeout in milliseconds for the one-time retry after a Phase 2 `akm reflect` timeout. Defaults to 120000.",
+      "minimum": 1
+    },
+    "phase2Enabled": {
+      "type": "boolean",
+      "description": "Track B only: when false, skip Phase 2 distill/reflect/proposal/index processing to isolate Phase 3 runtime behavior. Defaults to true."
+    },
+    "phase2SkipReflectOnAllNegative": {
+      "type": "boolean",
+      "description": "Track B stability guard. When true (default), skip initial Phase 2 reflect for refs with positive=0 and negative>=negative-threshold-count."
+    },
     "parallel": {
       "type": "integer",
       "description": "Number of (task, arm, seed) triples to run concurrently. Default 1 (sequential). Clamped to [1, 8].",

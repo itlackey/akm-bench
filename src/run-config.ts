@@ -27,6 +27,7 @@ import { benchMkdtemp } from "./tmp";
 export interface BenchRunConfigFile {
   $schema?: string;
   schemaVersion: 1;
+  track?: "utility" | "evolve";
   name?: string;
   description?: string;
   opencodeConfig?: Record<string, unknown>;
@@ -37,6 +38,10 @@ export interface BenchRunConfigFile {
   seeds?: number;
   budgetTokens?: number;
   budgetWallMs?: number;
+  phase2ReflectTimeoutMs?: number;
+  phase2ReflectRetryTimeoutMs?: number;
+  phase2Enabled?: boolean;
+  phase2SkipReflectOnAllNegative?: boolean;
   parallel?: number;
   forceParallel?: boolean;
   baseline?: string;
@@ -50,6 +55,8 @@ export interface BenchRunConfigFile {
 export interface ResolvedBenchRunConfig {
   /** Absolute path of the loaded config file (for error messages). */
   source: string;
+  /** Track to execute. Defaults to utility when omitted. */
+  track: "utility" | "evolve";
   /** Display name (config `name` field, or basename without extension). */
   name: string;
   /** Resolved providers, ready to forward into `runUtility`. */
@@ -67,6 +74,10 @@ export interface ResolvedBenchRunConfig {
   seedsPerArm?: number;
   budgetTokens?: number;
   budgetWallMs?: number;
+  phase2ReflectTimeoutMs?: number;
+  phase2ReflectRetryTimeoutMs?: number;
+  phase2Enabled?: boolean;
+  phase2SkipReflectOnAllNegative?: boolean;
   parallel?: number;
   forceParallel?: boolean;
   /** When supplied: `{ taskId: passRate }` map for delta rendering. */
@@ -295,6 +306,7 @@ function validateConfig(parsed: unknown, source: string): BenchRunConfigFile {
   const allowed = new Set([
     "$schema",
     "schemaVersion",
+    "track",
     "name",
     "description",
     "opencodeConfig",
@@ -305,6 +317,10 @@ function validateConfig(parsed: unknown, source: string): BenchRunConfigFile {
     "seeds",
     "budgetTokens",
     "budgetWallMs",
+    "phase2ReflectTimeoutMs",
+    "phase2ReflectRetryTimeoutMs",
+    "phase2Enabled",
+    "phase2SkipReflectOnAllNegative",
     "parallel",
     "forceParallel",
     "baseline",
@@ -332,6 +348,10 @@ function validateConfig(parsed: unknown, source: string): BenchRunConfigFile {
       }
     }
   }
+
+  if (obj.track !== undefined && obj.track !== "utility" && obj.track !== "evolve") {
+    throw new BenchConfigError(`bench run config: ${source}: "track" must be "utility" or "evolve"`, false);
+  }
   if (obj.arms !== undefined) {
     if (!Array.isArray(obj.arms) || obj.arms.length === 0) {
       throw new BenchConfigError(`bench run config: ${source}: "arms" must be a non-empty array`, false);
@@ -345,13 +365,26 @@ function validateConfig(parsed: unknown, source: string): BenchRunConfigFile {
       }
     }
   }
-  for (const numField of ["seeds", "budgetTokens", "budgetWallMs", "parallel"] as const) {
+  for (const numField of [
+    "seeds",
+    "budgetTokens",
+    "budgetWallMs",
+    "phase2ReflectTimeoutMs",
+    "phase2ReflectRetryTimeoutMs",
+    "parallel",
+  ] as const) {
     const val = obj[numField];
     if (val !== undefined) {
       if (typeof val !== "number" || !Number.isInteger(val) || val < 1) {
         throw new BenchConfigError(`bench run config: ${source}: "${numField}" must be a positive integer`, false);
       }
     }
+  }
+  if (obj.phase2Enabled !== undefined && typeof obj.phase2Enabled !== "boolean") {
+    throw new BenchConfigError(`bench run config: ${source}: "phase2Enabled" must be boolean`, false);
+  }
+  if (obj.phase2SkipReflectOnAllNegative !== undefined && typeof obj.phase2SkipReflectOnAllNegative !== "boolean") {
+    throw new BenchConfigError(`bench run config: ${source}: "phase2SkipReflectOnAllNegative" must be boolean`, false);
   }
   return obj as unknown as BenchRunConfigFile;
 }
@@ -434,6 +467,7 @@ export function loadBenchRunConfig(
 
   return {
     source: absPath,
+    track: config.track ?? "utility",
     name,
     opencodeConfig,
     model,
@@ -442,6 +476,14 @@ export function loadBenchRunConfig(
     ...(seedsPerArm !== undefined ? { seedsPerArm } : {}),
     ...(config.budgetTokens !== undefined ? { budgetTokens: config.budgetTokens } : {}),
     ...(config.budgetWallMs !== undefined ? { budgetWallMs: config.budgetWallMs } : {}),
+    ...(config.phase2ReflectTimeoutMs !== undefined ? { phase2ReflectTimeoutMs: config.phase2ReflectTimeoutMs } : {}),
+    ...(config.phase2ReflectRetryTimeoutMs !== undefined
+      ? { phase2ReflectRetryTimeoutMs: config.phase2ReflectRetryTimeoutMs }
+      : {}),
+    ...(config.phase2Enabled !== undefined ? { phase2Enabled: config.phase2Enabled } : {}),
+    ...(config.phase2SkipReflectOnAllNegative !== undefined
+      ? { phase2SkipReflectOnAllNegative: config.phase2SkipReflectOnAllNegative }
+      : {}),
     ...(parallel !== undefined ? { parallel } : {}),
     ...(config.forceParallel ? { forceParallel: true } : {}),
     ...(baselineByTaskId ? { baselineByTaskId } : {}),

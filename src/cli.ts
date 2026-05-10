@@ -231,7 +231,7 @@ utility flags:
   --tasks <slice>          train | eval | all  (default: all)
   --seeds <N>              seeds per arm  (default: 5)
   --budget-tokens <N>      per-run token cap (default: 30000)
-  --budget-wall-ms <N>     per-run wallclock cap in ms (default: 120000)
+  --budget-wall-ms <N>     per-run wallclock cap in ms (default: 600000)
   --parallel <N>           number of (task, arm, seed) triples to run concurrently
                            (default: 1 — sequential). Clamped to [1, 8]. Values > 4
                            print a warning unless --force-parallel is also set.
@@ -262,11 +262,14 @@ evolve flags:
   --tasks <domain>         domain id (e.g., docker-homelab) or 'all'. REQUIRED.
   --seeds <N>              seeds per arm (default: 5)
   --budget-tokens <N>      per-run token cap (default: 30000)
-  --budget-wall-ms <N>     per-run wallclock cap in ms (default: 120000)
+  --budget-wall-ms <N>     per-run wallclock cap in ms (default: 600000)
   --parallel <N>           same as utility --parallel (default: 1).
   --force-parallel         suppress the high-parallelism warning when --parallel > 4.
   --negative-threshold-count <N>  absolute negative-feedback count to evolve (default: 2)
   --negative-threshold-ratio <R>  ratio of negatives to total feedback (default: 0.5)
+  --phase2-reflect-timeout-ms <N> Phase 2 initial reflect timeout in ms (default: 180000)
+  --phase2-reflect-retry-timeout-ms <N> Phase 2 retry reflect timeout in ms after timeout (default: 120000)
+  --phase2-no-skip-all-negative    disable the default stability guard that skips reflect when positive=0 and negative>=threshold
   --opencode-config <path> path to a standard opencode JSON config file (same as utility).
   --json                   suppress the markdown summary on stderr.
   --results-dir <path>     directory where persistent JSON reports are written.
@@ -1062,9 +1065,9 @@ export interface ConfigCliOptions {
  * `<config.json>` dispatch — load a bench run config, resolve providers
  * and tasks, invoke `runUtility`, and emit the §13.3 envelope on stdout.
  *
- * Behaves identically to `runUtilityCli` from a stdout/stderr/exit-code
- * standpoint: JSON on stdout, optional markdown summary on stderr,
- * returns 0/2/78 mirroring the existing semantics.
+ * Behaves identically to `runUtilityCli` / `runEvolveCli` from a
+ * stdout/stderr/exit-code standpoint: JSON on stdout, optional markdown
+ * summary on stderr, returns 0/2/78 mirroring the existing semantics.
  */
 export async function runConfigCli(options: ConfigCliOptions): Promise<UtilityCliResult> {
   let resolved: ReturnType<typeof loadBenchRunConfig>;
@@ -1085,6 +1088,40 @@ export async function runConfigCli(options: ConfigCliOptions): Promise<UtilityCl
 
   writeRunBanner(resolved.model);
   const preflightMessages = runFixtureIndexPreflight(resolved.tasks, options.fixturesDir);
+
+  if (resolved.track === "evolve") {
+    const report = await withBenchFixturesDir(options.fixturesDir, () =>
+      runEvolve({
+        tasks: resolved.tasks,
+        model: resolved.model,
+        ...(resolved.seedsPerArm !== undefined ? { seedsPerArm: resolved.seedsPerArm } : {}),
+        ...(resolved.budgetTokens !== undefined ? { budgetTokens: resolved.budgetTokens } : {}),
+        ...(resolved.budgetWallMs !== undefined ? { budgetWallMs: resolved.budgetWallMs } : {}),
+        ...(resolved.phase2ReflectTimeoutMs !== undefined
+          ? { phase2ReflectTimeoutMs: resolved.phase2ReflectTimeoutMs }
+          : {}),
+        ...(resolved.phase2ReflectRetryTimeoutMs !== undefined
+          ? { phase2ReflectRetryTimeoutMs: resolved.phase2ReflectRetryTimeoutMs }
+          : {}),
+        ...(resolved.phase2Enabled !== undefined ? { phase2Enabled: resolved.phase2Enabled } : {}),
+        ...(resolved.phase2SkipReflectOnAllNegative !== undefined
+          ? { phase2SkipReflectOnAllNegative: resolved.phase2SkipReflectOnAllNegative }
+          : {}),
+        opencodeProviders: resolved.opencodeConfig,
+        ...(options.timestamp !== undefined ? { timestamp: options.timestamp } : {}),
+        ...(options.branch !== undefined ? { branch: options.branch } : {}),
+        ...(options.commit !== undefined ? { commit: options.commit } : {}),
+      }),
+    );
+    const { json, markdown } = renderEvolveReport(report);
+    const stdout = `${JSON.stringify(json, null, 2)}\n`;
+    let stderr = options.json ? "" : `${markdown}\n`;
+    stderr += `${preflightMessages.join("\n")}\n`;
+    const reportPath = withBenchResultsDir(options.resultsDir, () => writeBenchReportJson(json));
+    stderr += `bench: wrote report ${reportPath}\n`;
+    stderr += `bench: config=${resolved.name} track=evolve tasks=${resolved.tasks.length} model=${resolved.model}\n`;
+    return { exitCode: 0, stdout, stderr };
+  }
 
   const report = await withBenchFixturesDir(options.fixturesDir, () =>
     runUtility({
@@ -1125,6 +1162,9 @@ export interface EvolveCliOptions {
   budgetWallMs: number;
   model: string;
   negativeThreshold: { absoluteCount: number; ratio: number };
+  phase2ReflectTimeoutMs?: number;
+  phase2ReflectRetryTimeoutMs?: number;
+  phase2SkipReflectOnAllNegative?: boolean;
   /** Number of (task, arm, seed) triples to run concurrently. Default 1. */
   parallel?: number;
   /** Suppress the high-parallelism warning when parallel > 4. */
@@ -1173,6 +1213,15 @@ export async function runEvolveCli(options: EvolveCliOptions): Promise<UtilityCl
       budgetTokens: options.budgetTokens,
       budgetWallMs: options.budgetWallMs,
       negativeThreshold: options.negativeThreshold,
+      ...(options.phase2ReflectTimeoutMs !== undefined
+        ? { phase2ReflectTimeoutMs: options.phase2ReflectTimeoutMs }
+        : {}),
+      ...(options.phase2ReflectRetryTimeoutMs !== undefined
+        ? { phase2ReflectRetryTimeoutMs: options.phase2ReflectRetryTimeoutMs }
+        : {}),
+      ...(options.phase2SkipReflectOnAllNegative !== undefined
+        ? { phase2SkipReflectOnAllNegative: options.phase2SkipReflectOnAllNegative }
+        : {}),
       ...(options.opencodeProviders ? { opencodeProviders: options.opencodeProviders } : {}),
       ...(options.branch !== undefined ? { branch: options.branch } : {}),
       ...(options.commit !== undefined ? { commit: options.commit } : {}),
@@ -1293,7 +1342,7 @@ async function main(argv: string[]): Promise<number> {
           json: parsed.bool.has("json"),
           seedsPerArm: parseInt32(parsed.flags.get("seeds"), 5),
           budgetTokens: parseInt32(parsed.flags.get("budget-tokens"), 30000),
-          budgetWallMs: parseInt32(parsed.flags.get("budget-wall-ms"), 120000),
+          budgetWallMs: parseInt32(parsed.flags.get("budget-wall-ms"), 600000),
           model,
           parallel: parseInt32(parsed.flags.get("parallel"), 1),
           ...(parsed.bool.has("force-parallel") ? { forceParallel: true } : {}),
@@ -1345,7 +1394,7 @@ async function main(argv: string[]): Promise<number> {
           json: parsed.bool.has("json"),
           seedsPerArm: parseInt32(parsed.flags.get("seeds"), 5),
           budgetTokens: parseInt32(parsed.flags.get("budget-tokens"), 30000),
-          budgetWallMs: parseInt32(parsed.flags.get("budget-wall-ms"), 120000),
+          budgetWallMs: parseInt32(parsed.flags.get("budget-wall-ms"), 600000),
           model,
           parallel: parseInt32(parsed.flags.get("parallel"), 1),
           ...(parsed.bool.has("force-parallel") ? { forceParallel: true } : {}),
@@ -1353,6 +1402,13 @@ async function main(argv: string[]): Promise<number> {
             absoluteCount: parseInt32(parsed.flags.get("negative-threshold-count"), 2),
             ratio: parseFloatArg(parsed.flags.get("negative-threshold-ratio"), 0.5),
           },
+          ...(parsed.flags.get("phase2-reflect-timeout-ms") !== undefined
+            ? { phase2ReflectTimeoutMs: parseInt32(parsed.flags.get("phase2-reflect-timeout-ms"), 180000) }
+            : {}),
+          ...(parsed.flags.get("phase2-reflect-retry-timeout-ms") !== undefined
+            ? { phase2ReflectRetryTimeoutMs: parseInt32(parsed.flags.get("phase2-reflect-retry-timeout-ms"), 120000) }
+            : {}),
+          ...(parsed.bool.has("phase2-no-skip-all-negative") ? { phase2SkipReflectOnAllNegative: false } : {}),
           ...(opencodeProvidersEvolve ? { opencodeProviders: opencodeProvidersEvolve } : {}),
           ...(parsed.flags.get("results-dir") !== undefined ? { resultsDir: parsed.flags.get("results-dir") } : {}),
           ...(parsed.flags.get("fixtures-dir") !== undefined ? { fixturesDir: parsed.flags.get("fixtures-dir") } : {}),

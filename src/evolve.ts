@@ -62,7 +62,14 @@ const PHASE2_REFLECT_CONSTRAINED_TASK =
 const PHASE2_REFLECT_LINT_REPAIR_TASK =
   "Fix proposal lint issues only; preserve frontmatter/schema/ids; keep a minimal diff.";
 
+const PHASE2_REFLECT_RETRY_TASK =
+  "Apply a minimal targeted fix for the repeated-failure signal only; preserve frontmatter/schema/ids; avoid broad rewrites; keep changes under 12 lines.";
+
 const PHASE2_REFLECT_TIMEOUT_MS = 180000;
+const AKM_COMMAND_WATCHDOG_MS = 120000;
+const PHASE2_REFLECT_RETRY_DISABLE_THRESHOLD_MS = 240000;
+const PHASE2_REFLECT_RETRY_TIMEOUT_MS = 120000;
+const PHASE2_SKIP_REFLECT_ON_ALL_NEGATIVE = true;
 
 /** Result of an `akm` subprocess invocation. */
 export interface AkmCliResult {
@@ -82,8 +89,23 @@ export interface RunEvolveOptions {
   seedsPerArm?: number;
   /** Token budget per run. Defaults to 30000. */
   budgetTokens?: number;
-  /** Wallclock budget per run in ms. Defaults to 120000. */
+  /** Wallclock budget per run in ms. Defaults to 600000. */
   budgetWallMs?: number;
+  /**
+   * Phase 2 reflect timeout in ms. Defaults to 180000 and is intentionally
+   * independent from per-run agent budgetWallMs.
+   */
+  phase2ReflectTimeoutMs?: number;
+  /** Toggle Phase 2 distill/reflect/proposal processing. Defaults to true. */
+  phase2Enabled?: boolean;
+  /** Retry timeout for Phase 2 reflect timeout-retries. Defaults to 120000ms. */
+  phase2ReflectRetryTimeoutMs?: number;
+  /**
+   * Stability guard: skip initial Phase 2 reflect when a ref has all-negative
+   * Phase 1 feedback and crossed the absolute threshold (positive=0,
+   * negative>=threshold.absoluteCount). Defaults to true.
+   */
+  phase2SkipReflectOnAllNegative?: boolean;
   /** Injected agent-spawn for tests. */
   spawn?: SpawnFn;
   /** Injected akm subprocess for tests. */
@@ -132,6 +154,35 @@ export interface Phase1Diagnostics {
   refsToEvolve: string[];
 }
 
+export interface TimedPhase {
+  startedAt: string;
+  endedAt: string;
+  elapsedMs: number;
+}
+
+export interface TimedAkmCommand {
+  phase: "phase1" | "phase2";
+  command: string;
+  args: string[];
+  elapsedMs: number;
+  exitCode: number;
+  watchdogExceeded: boolean;
+}
+
+export interface EvolvePhaseTimings {
+  phase1: TimedPhase;
+  phase2: TimedPhase;
+  phase3: TimedPhase & {
+    arms: {
+      preElapsedMs: number;
+      postElapsedMs: number;
+      syntheticElapsedMs: number;
+    };
+  };
+  totalElapsedMs: number;
+  akmCommands: TimedAkmCommand[];
+}
+
 /** Aggregate evolve report. Renders to JSON + markdown via `renderEvolveReport`. */
 export interface EvolveRunReport {
   timestamp: string;
@@ -149,6 +200,8 @@ export interface EvolveRunReport {
   feedbackLog: FeedbackLogEntry[];
   /** Phase 1 per-ref totals + promoted refs (additive diagnostics). */
   phase1Diagnostics: Phase1Diagnostics;
+  /** Phase + per-command timings for timeout attribution. */
+  phaseTimings: EvolvePhaseTimings;
   /** Phase 2 proposal events recorded. */
   proposalLog: ProposalLogEntry[];
   /** Aggregate proposal-quality metrics. */
@@ -211,7 +264,11 @@ interface FeedbackCounts {
 export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunReport> {
   const seedsPerArm = options.seedsPerArm ?? 5;
   const budgetTokens = options.budgetTokens ?? 30000;
-  const budgetWallMs = options.budgetWallMs ?? 120000;
+  const budgetWallMs = options.budgetWallMs ?? 600000;
+  const phase2ReflectTimeoutMs = resolvePhase2ReflectTimeoutMs(options.phase2ReflectTimeoutMs);
+  const phase2ReflectRetryTimeoutMs = resolvePhase2ReflectRetryTimeoutMs(options.phase2ReflectRetryTimeoutMs);
+  const phase2Enabled = options.phase2Enabled ?? true;
+  const phase2SkipReflectOnAllNegative = options.phase2SkipReflectOnAllNegative ?? PHASE2_SKIP_REFLECT_ON_ALL_NEGATIVE;
   const negativeThreshold = options.negativeThreshold ?? { absoluteCount: 2, ratio: 0.5 };
   const materialiseStash = options.materialiseStash ?? true;
   const akmCli = options.akmCli ?? defaultAkmCli;
@@ -248,8 +305,10 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   const preStashes = new Map<string, LoadedFixtureStash>();
   const evolveDirByFixture = new Map<string, string>();
   const preDirByFixture = new Map<string, string>();
+  const preCacheDirByFixture = new Map<string, string>();
   /** Per-fixture XDG_CACHE_HOME dirs allocated for evolve-stash indexing. */
   const evolveCacheDirByFixture = new Map<string, string>();
+  const phase2XdgConfigRoot = benchMkdtemp("akm-evolve-xdg-config-");
   const phase2OpencodeConfigRoot = options.opencodeProviders ? benchMkdtemp("akm-evolve-opencode-") : undefined;
   const phase2OpencodeConfigPath = phase2OpencodeConfigRoot ? `${phase2OpencodeConfigRoot}/opencode.json` : undefined;
 
@@ -287,6 +346,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         const pre = loadFixtureStash(name, { skipIndex: false });
         preStashes.set(name, pre);
         preDirByFixture.set(name, pre.stashDir);
+        if (pre.indexCacheHome) preCacheDirByFixture.set(name, pre.indexCacheHome);
         stashDeregistrations.push(
           registerCleanup(() => {
             try {
@@ -314,6 +374,25 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   const fallbackEvolveDir = [...evolveDirByFixture.values()][0];
   const fallbackEvolveCacheDir = [...evolveCacheDirByFixture.values()][0];
   const opencodeConfigPath = phase2OpencodeConfigPath;
+  const phase2AkmConfigTemplate = loadPhase2AkmConfigTemplate();
+  function phase2XdgConfigHome(scope: string, stashDir?: string): string {
+    const dir = `${phase2XdgConfigRoot}/${sanitizePathComponent(scope)}`;
+    fs.mkdirSync(dir, { recursive: true });
+    const akmDir = `${dir}/akm`;
+    fs.mkdirSync(akmDir, { recursive: true });
+    const config = JSON.parse(JSON.stringify(phase2AkmConfigTemplate)) as Record<string, unknown>;
+    if (stashDir && stashDir.length > 0) config.stashDir = stashDir;
+    if (!config.agent || typeof config.agent !== "object") {
+      config.agent = { default: "opencode" };
+    } else {
+      const agent = config.agent as Record<string, unknown>;
+      if (typeof agent.default !== "string" || agent.default.trim().length === 0) {
+        agent.default = "opencode";
+      }
+    }
+    fs.writeFileSync(`${akmDir}/config.json`, JSON.stringify(config, null, 2), { mode: 0o600 });
+    return dir;
+  }
   function envForRef(ref: string | undefined): Record<string, string> {
     const baseEnv = { ...(process.env as Record<string, string>) };
     if (!materialiseStash) {
@@ -333,6 +412,46 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     // `opencode run`) can find the LLM provider configuration.
     if (opencodeConfigPath) baseEnv.OPENCODE_CONFIG = opencodeConfigPath;
     return baseEnv;
+  }
+
+  const runStartedAtMs = Date.now();
+  let phase1StartedAtMs = runStartedAtMs;
+  let phase1EndedAtMs = runStartedAtMs;
+  let phase2StartedAtMs = runStartedAtMs;
+  let phase2EndedAtMs = runStartedAtMs;
+  let phase3StartedAtMs = runStartedAtMs;
+  let phase3EndedAtMs = runStartedAtMs;
+  let phase3PreElapsedMs = 0;
+  let phase3PostElapsedMs = 0;
+  let phase3SyntheticElapsedMs = 0;
+  const akmCommandTimings: TimedAkmCommand[] = [];
+
+  async function invokeAkm(
+    phase: "phase1" | "phase2",
+    args: string[],
+    cwd: string,
+    env: Record<string, string>,
+  ): Promise<AkmCliResult> {
+    const startedAtMs = Date.now();
+    const result = await akmCli(args, cwd, env);
+    const elapsedMs = Date.now() - startedAtMs;
+    const command = args[0] ?? "unknown";
+    const watchdogExceeded = elapsedMs > AKM_COMMAND_WATCHDOG_MS;
+    akmCommandTimings.push({
+      phase,
+      command,
+      args: args.slice(),
+      elapsedMs,
+      exitCode: result.exitCode,
+      watchdogExceeded,
+    });
+    process.stderr.write(
+      `[evolve] ${phase} akm ${command} exit=${result.exitCode} elapsed_ms=${elapsedMs}${watchdogExceeded ? " watchdog_exceeded" : ""}\n`,
+    );
+    if (watchdogExceeded) {
+      warnings.push(`watchdog: ${phase} akm ${command} exceeded ${AKM_COMMAND_WATCHDOG_MS}ms (${elapsedMs}ms)`);
+    }
+    return result;
   }
 
   // ── Phase 1 pre-flight: copy pre-built index into each evolve cache. ──────
@@ -370,6 +489,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
 
   try {
     // ── Phase 1: accumulate signal on the train slice (akm arm only). ─────
+    phase1StartedAtMs = Date.now();
     phase1Report = await runUtility({
       tasks: trainTasks,
       arms: ["akm"],
@@ -409,7 +529,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       // crash) cannot leave `feedbackByRef` partially populated and let
       // Phase 2 proceed on corrupt state.
       try {
-        const cliResult = await akmCli(args, phase1Cwd, envForRef(goldRef));
+        const cliResult = await invokeAkm("phase1", args, phase1Cwd, envForRef(goldRef));
         feedbackLog.push({ taskId: run.taskId, seed: run.seed, goldRef, signal, ok: cliResult.exitCode === 0 });
         if (cliResult.exitCode !== 0) {
           warnings.push(`phase1: akm feedback for ${goldRef} (${signal}) failed: ${cliResult.stderr.trim()}`);
@@ -423,19 +543,26 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       else counts.negative += 1;
       phase1FeedbackByRef.set(goldRef, counts);
     }
+    phase1EndedAtMs = Date.now();
 
     // ── Phase 2: evolve. ────────────────────────────────────────────────────
+    phase2StartedAtMs = Date.now();
     for (const [ref, counts] of phase1FeedbackByRef.entries()) {
       if (crossesNegativeThreshold(counts, negativeThreshold)) refsToEvolve.push(ref);
     }
     refsToEvolve.sort();
 
-    // §7.4 leakage prevention (#267): Phase 1 feedback is tagged with
-    // `slice:train`. Distill excludes `slice:eval` tags so eval feedback
-    // never leaks into the LLM input while preserving train feedback.
-    for (const ref of refsToEvolve) {
+    if (phase2Enabled) {
+      // §7.4 leakage prevention (#267): Phase 1 feedback is tagged with
+      // `slice:train`. Distill excludes `slice:eval` tags so eval feedback
+      // never leaks into the LLM input while preserving train feedback.
+      for (const ref of refsToEvolve) {
+      const counts = phase1FeedbackByRef.get(ref) ?? { positive: 0, negative: 0 };
+      const fixtureName = refToFixture.get(ref) ?? "default";
+      const phase2StashDir = evolveDirByFixture.get(fixtureName);
       const evolveEnv: Record<string, string> = {
         ...envForRef(ref),
+        XDG_CONFIG_HOME: phase2XdgConfigHome(`phase2-${fixtureName}`, phase2StashDir),
       };
 
       const distillArgs = [
@@ -444,9 +571,15 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         "--exclude-tags",
         "slice:eval",
       ];
-      const distillResult = await akmCli(distillArgs, phase1Cwd, evolveEnv);
+      const distillResult = await invokeAkm("phase2", distillArgs, phase1Cwd, evolveEnv);
       if (distillResult.exitCode !== 0) {
         warnings.push(`phase2: akm distill ${ref} failed: ${distillResult.stderr.trim()}`);
+      }
+      if (phase2SkipReflectOnAllNegative && isAllNegativeThresholdRef(counts, negativeThreshold.absoluteCount)) {
+        warnings.push(
+          `phase2.reflect_skipped_all_negative: akm reflect ${ref} skipped (positive=0 negative=${counts.negative} threshold=${negativeThreshold.absoluteCount})`,
+        );
+        continue;
       }
       const reflectArgs = [
         "reflect",
@@ -454,33 +587,66 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         "--task",
         PHASE2_REFLECT_CONSTRAINED_TASK,
         "--timeout-ms",
-        String(Math.min(budgetWallMs, PHASE2_REFLECT_TIMEOUT_MS)),
+        String(phase2ReflectTimeoutMs),
       ];
-      const reflectResult = await akmCli(reflectArgs, phase1Cwd, evolveEnv);
+      const reflectResult = await invokeAkm("phase2", reflectArgs, phase1Cwd, evolveEnv);
       if (reflectResult.exitCode !== 0) {
+        const reflectFailure = summariseAkmFailure(reflectResult);
+        if (isLikelyTimeoutFailure(reflectFailure)) {
+          if (phase2ReflectRetryTimeoutMs >= PHASE2_REFLECT_RETRY_DISABLE_THRESHOLD_MS) {
+            warnings.push(
+              `phase2.reflect_retry_skipped: akm reflect ${ref} timed out and retry is disabled for retry timeout >= ${PHASE2_REFLECT_RETRY_DISABLE_THRESHOLD_MS}ms`,
+            );
+            warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${reflectFailure}`);
+            continue;
+          }
+          warnings.push(
+            `phase2.reflect_retry_timeout: akm reflect ${ref} timed out; retrying once with narrower task and timeout ${phase2ReflectRetryTimeoutMs}ms`,
+          );
+          const retryReflectResult = await invokeAkm(
+            "phase2",
+            [
+              "reflect",
+              ref,
+              "--task",
+              PHASE2_REFLECT_RETRY_TASK,
+              "--timeout-ms",
+              String(phase2ReflectRetryTimeoutMs),
+            ],
+            phase1Cwd,
+            evolveEnv,
+          );
+          if (retryReflectResult.exitCode !== 0) {
+            warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${summariseAkmFailure(retryReflectResult)}`);
+          }
+          continue;
+        }
         // `reflect` requires `agent.default` to be configured — a missing
         // config is non-fatal for the bench; we record and continue.
-        warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${summariseAkmFailure(reflectResult)}`);
+        warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${reflectFailure}`);
       }
-    }
+      }
 
-    // Walk the proposal queue per fixture (each evolveStash has its own
-    // proposal log on disk). When we materialised stashes we iterate every
-    // fixture that produced proposals; in the common single-fixture case
-    // this is one pass.
-    const proposalFixtures = materialiseStash ? [...evolveDirByFixture.keys()] : [undefined];
-    for (const fixtureName of proposalFixtures) {
+      // Walk the proposal queue per fixture (each evolveStash has its own
+      // proposal log on disk). When we materialised stashes we iterate every
+      // fixture that produced proposals; in the common single-fixture case
+      // this is one pass.
+      const proposalFixtures = materialiseStash ? [...evolveDirByFixture.keys()] : [undefined];
+      for (const fixtureName of proposalFixtures) {
+      let acceptedCountForFixture = 0;
       const proposalEnv: Record<string, string> = { ...(process.env as Record<string, string>) };
       if (materialiseStash && fixtureName) {
         const dir = evolveDirByFixture.get(fixtureName);
         if (dir) proposalEnv.AKM_STASH_DIR = dir;
         const cacheDir = evolveCacheDirByFixture.get(fixtureName);
         if (cacheDir) proposalEnv.XDG_CACHE_HOME = cacheDir;
+        proposalEnv.XDG_CONFIG_HOME = phase2XdgConfigHome(`phase2-${fixtureName}`, dir);
       } else if (!materialiseStash) {
         delete proposalEnv.AKM_STASH_DIR;
+        proposalEnv.XDG_CONFIG_HOME = phase2XdgConfigHome("phase2-default");
       }
       const fixtureLabel = fixtureName ?? "default";
-      const listResult = await akmCli(["proposal", "list", "--json"], phase1Cwd, proposalEnv);
+      const listResult = await invokeAkm("phase2", ["proposal", "list", "--json"], phase1Cwd, proposalEnv);
       if (listResult.exitCode !== 0) {
         const stderr = listResult.stderr.trim() || "<empty stderr>";
         warnings.push(
@@ -494,11 +660,12 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         const p = queue.shift();
         if (!p || processedProposalIds.has(p.id)) continue;
         processedProposalIds.add(p.id);
-        const showResult = await akmCli(["proposal", "show", p.id, "--json"], phase1Cwd, proposalEnv);
+        const showResult = await invokeAkm("phase2", ["proposal", "show", p.id, "--json"], phase1Cwd, proposalEnv);
         if (showResult.exitCode !== 0) {
           const stderr = showResult.stderr.trim() || "<empty stderr>";
           const showFailureReason = `proposal show failed (exit ${showResult.exitCode}): ${stderr}`;
-          const rejectResult = await akmCli(
+          const rejectResult = await invokeAkm(
+            "phase2",
             ["proposal", "reject", p.id, "--reason", showFailureReason],
             phase1Cwd,
             proposalEnv,
@@ -520,7 +687,8 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
 
         const showInfo = parseProposalShow(showResult.stdout);
         if (showInfo.status === "lint_pass") {
-          const acceptResult = await akmCli(["proposal", "accept", p.id], phase1Cwd, proposalEnv);
+          const acceptResult = await invokeAkm("phase2", ["proposal", "accept", p.id], phase1Cwd, proposalEnv);
+          if (acceptResult.exitCode === 0) acceptedCountForFixture += 1;
           proposalLog.push({
             proposalId: p.id,
             assetRef: p.assetRef,
@@ -545,14 +713,15 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
 
           if (showInfo.status === "lint_fail" && !repairedRefs.has(p.assetRef)) {
             repairedRefs.add(p.assetRef);
-            const repairReflectResult = await akmCli(
+            const repairReflectResult = await invokeAkm(
+              "phase2",
               [
                 "reflect",
                 p.assetRef,
                 "--task",
                 PHASE2_REFLECT_LINT_REPAIR_TASK,
                 "--timeout-ms",
-                String(Math.min(budgetWallMs, PHASE2_REFLECT_TIMEOUT_MS)),
+                String(phase2ReflectTimeoutMs),
               ],
               phase1Cwd,
               proposalEnv,
@@ -561,7 +730,12 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
               warnings.push(`phase2: lint-repair reflect ${p.assetRef} failed: ${summariseAkmFailure(repairReflectResult)}`);
             }
 
-            const refreshedListResult = await akmCli(["proposal", "list", "--json"], phase1Cwd, proposalEnv);
+            const refreshedListResult = await invokeAkm(
+              "phase2",
+              ["proposal", "list", "--json"],
+              phase1Cwd,
+              proposalEnv,
+            );
             if (refreshedListResult.exitCode !== 0) {
               const stderr = refreshedListResult.stderr.trim() || "<empty stderr>";
               warnings.push(
@@ -577,7 +751,8 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
             }
           }
 
-          const rejectResult = await akmCli(
+          const rejectResult = await invokeAkm(
+            "phase2",
             ["proposal", "reject", p.id, "--reason", rejectReason],
             phase1Cwd,
             proposalEnv,
@@ -604,22 +779,27 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       // Rebuild the index so accepted lessons surface in Phase 3.
       // Only needed when at least one proposal was accepted — if all were
       // rejected (or none generated) the index is unchanged.
-      const acceptedCount = proposalLog.filter((p) => p.decision === "accept").length;
-      if (acceptedCount > 0) {
-        process.stderr.write(`[evolve] rebuilding index after ${acceptedCount} accepted proposal(s)\n`);
-        const indexResult = await akmCli(["index"], phase1Cwd, proposalEnv);
+      if (acceptedCountForFixture > 0) {
+        process.stderr.write(`[evolve] rebuilding index after ${acceptedCountForFixture} accepted proposal(s) for ${fixtureLabel}\n`);
+        const indexResult = await invokeAkm("phase2", ["index"], phase1Cwd, proposalEnv);
         if (indexResult.exitCode !== 0) {
           warnings.push(`phase2: akm index rebuild failed: ${indexResult.stderr.trim()}`);
         }
       } else {
         process.stderr.write(`[evolve] skipping index rebuild — 0 accepted proposals\n`);
       }
+      }
+    } else {
+      warnings.push("phase2: disabled by config (phase2Enabled=false); skipping distill/reflect/proposal/index");
     }
+    phase2EndedAtMs = Date.now();
 
     // ── Phase 3: re-evaluate (eval slice). ─────────────────────────────────
     // pre arm: fresh snapshot of the starting fixture (no Phase 2 mutations
     // applied). post arm: the mutated evolveStash so accepted lessons reach
     // the eval slice. synthetic arm: no stash.
+    phase3StartedAtMs = Date.now();
+    const phase3PreStartedAtMs = Date.now();
     preReport = await runUtility({
       tasks: evalTasks,
       arms: ["akm"],
@@ -631,12 +811,15 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       ...(options.spawn ? { spawn: options.spawn } : {}),
       materialiseStash,
       ...(materialiseStash ? { stashDirByFixture: preDirByFixture } : {}),
+      ...(materialiseStash ? { indexCacheHomeByFixture: preCacheDirByFixture } : {}),
       ...(options.timestamp ? { timestamp: options.timestamp } : {}),
       ...(options.branch ? { branch: options.branch } : {}),
       ...(options.commit ? { commit: options.commit } : {}),
       ...(options.opencodeProviders ? { opencodeProviders: options.opencodeProviders } : {}),
     });
+    phase3PreElapsedMs = Date.now() - phase3PreStartedAtMs;
 
+    const phase3PostStartedAtMs = Date.now();
     postReport = await runUtility({
       tasks: evalTasks,
       arms: ["akm"],
@@ -650,12 +833,14 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       // was supplied.
       materialiseStash,
       ...(materialiseStash ? { stashDirByFixture: evolveDirByFixture } : {}),
+      ...(materialiseStash ? { indexCacheHomeByFixture: evolveCacheDirByFixture } : {}),
       ...(options.timestamp ? { timestamp: options.timestamp } : {}),
       ...(options.branch ? { branch: options.branch } : {}),
       ...(options.commit ? { commit: options.commit } : {}),
       ...(options.spawn ? { spawn: wrapSpawnWithArm(options.spawn, "post") } : {}),
       ...(options.opencodeProviders ? { opencodeProviders: options.opencodeProviders } : {}),
     });
+    phase3PostElapsedMs = Date.now() - phase3PostStartedAtMs;
 
     // synthetic: no stash. We pass a spawn wrapper that strips
     // AKM_STASH_DIR and injects the "Bring Your Own Skills" tag so test
@@ -663,6 +848,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     // per-task scratchpad prompt via the runner's `buildPrompt` seam so the
     // synthetic arm actually exercises the BYOS prompt path rather than
     // relying on the noakm default.
+    const phase3SyntheticStartedAtMs = Date.now();
     syntheticReport = await runUtility({
       tasks: evalTasks,
       arms: ["akm"],
@@ -679,6 +865,8 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       ...(options.spawn ? { spawn: wrapSpawnWithArm(options.spawn, "synthetic", undefined, true) } : {}),
       ...(options.opencodeProviders ? { opencodeProviders: options.opencodeProviders } : {}),
     });
+    phase3SyntheticElapsedMs = Date.now() - phase3SyntheticStartedAtMs;
+    phase3EndedAtMs = Date.now();
   } finally {
     // Deregister BEFORE running cleanup so a SIGINT during teardown
     // doesn't double-fire the cleanup fns (per cleanup.ts contract).
@@ -704,6 +892,11 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         /* swallow — best-effort tmp cleanup */
       }
     }
+    try {
+      fs.rmSync(phase2XdgConfigRoot, { recursive: true, force: true });
+    } catch {
+      /* swallow — best-effort tmp cleanup */
+    }
   }
 
   // ── Compute aggregates. ──────────────────────────────────────────────────
@@ -725,6 +918,30 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     lessons,
     postRuns: postReport.akmRuns ?? [],
   });
+  const phaseTimings: EvolvePhaseTimings = {
+    phase1: {
+      startedAt: new Date(phase1StartedAtMs).toISOString(),
+      endedAt: new Date(phase1EndedAtMs).toISOString(),
+      elapsedMs: Math.max(0, phase1EndedAtMs - phase1StartedAtMs),
+    },
+    phase2: {
+      startedAt: new Date(phase2StartedAtMs).toISOString(),
+      endedAt: new Date(phase2EndedAtMs).toISOString(),
+      elapsedMs: Math.max(0, phase2EndedAtMs - phase2StartedAtMs),
+    },
+    phase3: {
+      startedAt: new Date(phase3StartedAtMs).toISOString(),
+      endedAt: new Date(phase3EndedAtMs).toISOString(),
+      elapsedMs: Math.max(0, phase3EndedAtMs - phase3StartedAtMs),
+      arms: {
+        preElapsedMs: phase3PreElapsedMs,
+        postElapsedMs: phase3PostElapsedMs,
+        syntheticElapsedMs: phase3SyntheticElapsedMs,
+      },
+    },
+    totalElapsedMs: Math.max(0, Date.now() - runStartedAtMs),
+    akmCommands: akmCommandTimings,
+  };
 
   return {
     timestamp: options.timestamp ?? new Date().toISOString(),
@@ -740,6 +957,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         .sort((a, b) => a.ref.localeCompare(b.ref)),
       refsToEvolve: refsToEvolve.slice(),
     },
+    phaseTimings,
     proposalLog,
     proposals: proposalsMetrics,
     lessons,
@@ -1015,6 +1233,26 @@ function compactOneLine(value: string, maxLen: number): string {
   return `${compact.slice(0, Math.max(0, maxLen - 3))}...`;
 }
 
+function sanitizePathComponent(value: string): string {
+  const cleaned = value.replace(/[^A-Za-z0-9._-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return cleaned.length > 0 ? cleaned : "default";
+}
+
+function loadPhase2AkmConfigTemplate(): Record<string, unknown> {
+  const candidate = `${process.env.HOME ?? ""}/.config/akm/config.json`;
+  if (candidate.length > 0 && fs.existsSync(candidate)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(candidate, "utf8")) as Record<string, unknown>;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // ignore and fall through to minimal template
+    }
+  }
+  return { agent: { default: "opencode" } };
+}
+
 function summariseAkmFailure(result: AkmCliResult): string {
   const stderr = result.stderr.trim();
   if (stderr.length > 0) return compactOneLine(stderr, 400);
@@ -1033,6 +1271,31 @@ function summariseAkmFailure(result: AkmCliResult): string {
     // fall through to raw preview
   }
   return compactOneLine(stdout, 400);
+}
+
+function resolvePhase2ReflectTimeoutMs(value: number | undefined): number {
+  if (value === undefined) return PHASE2_REFLECT_TIMEOUT_MS;
+  if (!Number.isFinite(value)) return PHASE2_REFLECT_TIMEOUT_MS;
+  const normalized = Math.trunc(value);
+  if (normalized < 1) return PHASE2_REFLECT_TIMEOUT_MS;
+  return normalized;
+}
+
+function resolvePhase2ReflectRetryTimeoutMs(value: number | undefined): number {
+  if (value === undefined) return PHASE2_REFLECT_RETRY_TIMEOUT_MS;
+  if (!Number.isFinite(value)) return PHASE2_REFLECT_RETRY_TIMEOUT_MS;
+  const normalized = Math.trunc(value);
+  if (normalized < 1) return PHASE2_REFLECT_RETRY_TIMEOUT_MS;
+  return normalized;
+}
+
+function isAllNegativeThresholdRef(counts: FeedbackCounts, thresholdAbsoluteCount: number): boolean {
+  return counts.positive === 0 && counts.negative >= thresholdAbsoluteCount;
+}
+
+function isLikelyTimeoutFailure(summary: string): boolean {
+  const lower = summary.toLowerCase();
+  return lower.includes("timed out") || lower.includes("timeout");
 }
 
 /**

@@ -33,7 +33,7 @@ const EXPECTED_REFLECT_CONSTRAINED_TASK =
 const EXPECTED_REFLECT_LINT_REPAIR_TASK =
   "Fix proposal lint issues only; preserve frontmatter/schema/ids; keep a minimal diff.";
 
-const EXPECTED_REFLECT_TIMEOUT_MS = "120000";
+const EXPECTED_REFLECT_TIMEOUT_MS = "180000";
 
 function asReadableStream(text: string): ReadableStream<Uint8Array> {
   const bytes = new TextEncoder().encode(text);
@@ -227,7 +227,7 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });
 
-  test("threshold gates distill+reflect", async () => {
+  test("threshold gates distill and defaults to skip reflect for all-negative refs", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
       fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
@@ -249,7 +249,34 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     const reflectCalls = observed.calls.filter((c) => c[0] === "reflect");
     // Loser crosses threshold; winner does not.
     expect(distillCalls.map((c) => c[1])).toEqual(["skill:loser"]);
-    expect(reflectCalls.map((c) => c[1])).toEqual(["skill:loser"]);
+    expect(reflectCalls.length).toBe(0);
+    expect(report.phase1Diagnostics.refsToEvolve).toEqual(["skill:loser"]);
+    expect(report.phase1Diagnostics.perRefFeedback).toEqual([
+      { ref: "skill:loser", positive: 0, negative: 3 },
+      { ref: "skill:winner", positive: 3, negative: 0 },
+    ]);
+    expect(report.warnings.some((w) => w.includes("phase2.reflect_skipped_all_negative"))).toBe(true);
+  });
+
+  test("can disable all-negative reflect skip and run constrained reflect", async () => {
+    const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({ observed, proposalQueue: [] });
+    await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+      phase2SkipReflectOnAllNegative: false,
+    });
+    const reflectCalls = observed.calls.filter((c) => c[0] === "reflect");
+    expect(reflectCalls.length).toBe(1);
     expect(reflectCalls[0]).toEqual([
       "reflect",
       "skill:loser",
@@ -258,11 +285,70 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
       "--timeout-ms",
       EXPECTED_REFLECT_TIMEOUT_MS,
     ]);
-    expect(report.phase1Diagnostics.refsToEvolve).toEqual(["skill:loser"]);
-    expect(report.phase1Diagnostics.perRefFeedback).toEqual([
-      { ref: "skill:loser", positive: 0, negative: 3 },
-      { ref: "skill:winner", positive: 3, negative: 0 },
-    ]);
+  });
+
+  test("phase2ReflectTimeoutMs overrides the default reflect timeout", async () => {
+    const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const akmCli = buildFakeAkmCli({ observed, proposalQueue: [] });
+    await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+      phase2ReflectTimeoutMs: 240000,
+      phase2SkipReflectOnAllNegative: false,
+    });
+    const reflectCalls = observed.calls.filter((c) => c[0] === "reflect");
+    expect(reflectCalls.length).toBe(1);
+    expect(reflectCalls[0]?.includes("240000")).toBe(true);
+  });
+
+  test("reflect timeout triggers a one-time retry with narrowed task", async () => {
+    const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
+    const tasks = [
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+    ];
+    const spawn = buildFakeSpawn({});
+    const inner = buildFakeAkmCli({ observed, proposalQueue: [] });
+    let firstReflect = true;
+    const akmCli: AkmCliFn = async (args, cwd, env) => {
+      if (args[0] === "reflect" && args[1] === "skill:loser" && firstReflect) {
+        firstReflect = false;
+        observed.calls.push(args);
+        observed.envSeen.push({ ...env });
+        return {
+          exitCode: 124,
+          stdout: "",
+          stderr: 'agent CLI "opencode" timed out after 180000ms',
+        };
+      }
+      return inner(args, cwd, env);
+    };
+
+    const report = await runEvolve({
+      tasks,
+      model: "test-model",
+      seedsPerArm: 2,
+      spawn,
+      akmCli,
+      materialiseStash: false,
+      phase2SkipReflectOnAllNegative: false,
+    });
+
+    const reflectCalls = observed.calls.filter((c) => c[0] === "reflect" && c[1] === "skill:loser");
+    expect(reflectCalls.length).toBe(2);
+    expect(reflectCalls[0]?.[3]).toBe(EXPECTED_REFLECT_CONSTRAINED_TASK);
+    expect(reflectCalls[1]?.[3]).toContain("Apply a minimal targeted fix");
+    expect(reflectCalls[1]?.includes("120000")).toBe(true);
+    expect(report.warnings.some((w) => w.includes("phase2.reflect_retry_timeout"))).toBe(true);
   });
 
   test("lint_pass=true → accept, lint_pass=false → reject", async () => {
@@ -1049,6 +1135,9 @@ describe("computeLongitudinalMetrics", () => {
     expect(longi.postPassRateStdev).toBe(0);
     expect(longi.significanceThreshold).toBe(0);
     expect(longi.interpretation).toBe("improvement_detected");
+    expect(longi.directionalImprovement).toBe(true);
+    expect(longi.exceedsSignificanceThreshold).toBe(true);
+    expect(longi.matchesOrBeatsSynthetic).toBe(true);
     expect(longi.overSyntheticLift).toBeCloseTo(0.5, 2);
     expect(longi.degradationCount).toBe(0);
   });
@@ -1071,6 +1160,7 @@ describe("computeLongitudinalMetrics", () => {
     // 1/5 = 0.2; drop of 0.1 is below threshold. No degradation.
     expect(longi.degradationCount).toBe(0);
     expect(longi.interpretation).toBe("no_improvement_detected");
+    expect(longi.directionalImprovement).toBe(false);
   });
 
   test("requires warm-cold delta to exceed 2x within-condition stdev", () => {
@@ -1089,6 +1179,9 @@ describe("computeLongitudinalMetrics", () => {
     expect(longi.postPassRateStdev).toBeCloseTo(0.07, 2);
     expect(longi.significanceThreshold).toBeCloseTo(0.16, 2);
     expect(longi.interpretation).toBe("no_improvement_detected");
+    expect(longi.directionalImprovement).toBe(true);
+    expect(longi.exceedsSignificanceThreshold).toBe(false);
+    expect(longi.matchesOrBeatsSynthetic).toBe(true);
   });
 });
 

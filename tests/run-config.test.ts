@@ -151,6 +151,94 @@ describe("loadBenchRunConfig", () => {
     expect(resolved.model).toBe("config/model");
   });
 
+  test("track: evolve is preserved in the resolved config", () => {
+    const refConfig = path.join(workDir, "opencode.json");
+    writeOpencodeConfigFile(refConfig, "ref/model");
+    const cfgPath = path.join(workDir, "config.json");
+    fs.writeFileSync(
+      cfgPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        track: "evolve",
+        opencodeConfigRef: "./opencode.json",
+        tasks: ["drillbit/backup-policy"],
+      }),
+    );
+    const resolved = loadBenchRunConfig(cfgPath);
+    expect(resolved.track).toBe("evolve");
+  });
+
+  test("phase2ReflectTimeoutMs is parsed and exposed on resolved config", () => {
+    const refConfig = path.join(workDir, "opencode.json");
+    writeOpencodeConfigFile(refConfig, "ref/model");
+    const cfgPath = path.join(workDir, "config.json");
+    fs.writeFileSync(
+      cfgPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        track: "evolve",
+        opencodeConfigRef: "./opencode.json",
+        tasks: ["drillbit/backup-policy"],
+        phase2ReflectTimeoutMs: 240000,
+      }),
+    );
+    const resolved = loadBenchRunConfig(cfgPath);
+    expect(resolved.phase2ReflectTimeoutMs).toBe(240000);
+  });
+
+  test("phase2ReflectRetryTimeoutMs is parsed and exposed on resolved config", () => {
+    const refConfig = path.join(workDir, "opencode.json");
+    writeOpencodeConfigFile(refConfig, "ref/model");
+    const cfgPath = path.join(workDir, "config.json");
+    fs.writeFileSync(
+      cfgPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        track: "evolve",
+        opencodeConfigRef: "./opencode.json",
+        tasks: ["drillbit/backup-policy"],
+        phase2ReflectRetryTimeoutMs: 90000,
+      }),
+    );
+    const resolved = loadBenchRunConfig(cfgPath);
+    expect(resolved.phase2ReflectRetryTimeoutMs).toBe(90000);
+  });
+
+  test("phase2SkipReflectOnAllNegative is parsed and exposed on resolved config", () => {
+    const refConfig = path.join(workDir, "opencode.json");
+    writeOpencodeConfigFile(refConfig, "ref/model");
+    const cfgPath = path.join(workDir, "config.json");
+    fs.writeFileSync(
+      cfgPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        track: "evolve",
+        opencodeConfigRef: "./opencode.json",
+        tasks: ["drillbit/backup-policy"],
+        phase2SkipReflectOnAllNegative: false,
+      }),
+    );
+    const resolved = loadBenchRunConfig(cfgPath);
+    expect(resolved.phase2SkipReflectOnAllNegative).toBe(false);
+  });
+
+  test("rejects non-boolean phase2SkipReflectOnAllNegative", () => {
+    const refConfig = path.join(workDir, "opencode.json");
+    writeOpencodeConfigFile(refConfig, "ref/model");
+    const cfgPath = path.join(workDir, "config.json");
+    fs.writeFileSync(
+      cfgPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        track: "evolve",
+        opencodeConfigRef: "./opencode.json",
+        tasks: ["drillbit/backup-policy"],
+        phase2SkipReflectOnAllNegative: "no",
+      }),
+    );
+    expect(() => loadBenchRunConfig(cfgPath)).toThrow(/phase2SkipReflectOnAllNegative/);
+  });
+
   test("BENCH_OPENCODE_MODEL env wins over both", () => {
     const refConfig = path.join(workDir, "opencode.json");
     writeOpencodeConfigFile(refConfig, "ref/model");

@@ -1,0 +1,19 @@
+{
+  "$schema": "./bench-run-config.schema.json",
+  "schemaVersion": 1,
+  "track": "evolve",
+  "name": "evolve-transfer-opencode-shredder",
+  "description": "Focused evolve transfer benchmark for workflow-compliance opencode tasks using shredder/qwen/qwen3.6-35b-a3b.",
+  "tasks": [
+    "workflow-compliance/repeated-fail-opencode-disable-provider",
+    "workflow-compliance/repeated-fail-opencode-provider-token-train",
+    "workflow-compliance/repeated-fail-opencode-provider-token-eval"
+  ],
+  "arms": ["akm"],
+  "seeds": 1,
+  "budgetTokens": 25000,
+  "budgetWallMs": 600000,
+  "phase2ReflectTimeoutMs": 240000,
+  "parallel": 1,
+  "opencodeConfigRef": "./opencode.shredder.json"
+}
