@@ -18,6 +18,7 @@ Part of the broader akm ecosystem:
 - [itlackey/akm-stash](https://github.com/itlackey/akm-stash) -- the official onboarding stash with ready-made skills, workflows, commands, and knowledge assets
 - [itlackey/akm-registry](https://github.com/itlackey/akm-registry) -- the official searchable registry index used for discovery
 - [itlackey/akm-plugins](https://github.com/itlackey/akm-plugins) -- optional editor and agent integrations, including OpenCode support
+- [itlackey/akm-eval](https://github.com/itlackey/akm-eval) -- eval framework for running benchmark packs through authoritative upstream harnesses
 
 ## What You Need
 
