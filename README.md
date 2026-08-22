@@ -306,6 +306,43 @@ Typical filename:
 results/bench-report-utility-main-<commit>-<timestamp>-<model>.json
 ```
 
+## Harbor A/B (experimental, in progress)
+
+Everything above describes the legacy Bun harness. Separately, we are re-basing
+akm-bench on [Harbor](https://github.com/harbor-framework/harbor) so that akm can be
+A/B'd inside standard benchmark task containers instead of a bespoke runner.
+
+The first milestone (P0) is a Harbor custom agent that runs opencode **with the
+akm-opencode plugin enabled**, so it can be compared against the stock
+`opencode` agent on the same task:
+
+- `harbor/akm_opencode.py` -- the custom agent (`harbor.akm_opencode:AkmOpenCode`)
+- `harbor/jobs/p0-smoke.yaml` -- both arms, one task, one job
+- `harbor/seed-library/` -- the smoke-fixture akm bundle seeded into the container
+- `harbor/tests/` -- unit tests; no Docker, no network, no credentials
+
+**This path has not been executed live yet.** Nothing below has run in a
+container: it is Harbor 0.22.0 source reading plus host-side simulation. It does
+not affect any of the workflows documented above.
+
+P0 answers exactly one question -- "can the model reach `akm_*` tools inside a
+task container" -- and is **not** evidence that akm improves task performance.
+Two traps are worth knowing before you read any output:
+
+- **Zero `akm_*` calls does not mean "the model chose not to use akm."** The
+  plugin's failure paths are warn-only and exit 0, so a plugin that never loaded
+  produces a green, akm-free trial that looks identical to a model that
+  declined. The agent now raises `AkmPluginNotLoadedError` rather than scoring
+  such a trial -- check that first.
+- **The two arms are not identical containers with one flag flipped.** The
+  runbook carries the full asymmetry list (warm-vs-cold opencode first boot,
+  autoupdate mechanism, disk, setup wall-clock) and says which entries are the
+  treatment and which are confounds.
+
+See **`docs/harbor-p0.md`** for prerequisites, the exact commands, how to
+confirm the model really called `akm_*` tools, the network-policy and
+CLI-pinning caveats, and the list of things still unverified.
+
 ## More Detail
 
 See `docs/operator-guide.md` for:
