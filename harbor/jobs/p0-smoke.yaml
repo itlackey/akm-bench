@@ -22,7 +22,11 @@
 job_name: akm-p0-smoke
 
 # Where trial directories are written, relative to the working directory.
-# Results land in <jobs_dir>/<job_name>/<task>/<trial>/.
+# Results land in <jobs_dir>/<job_name>/<trial>/ -- trial dirs are DIRECT
+# children of the job dir, with NO intervening per-task directory level.
+# VERIFIED against Harbor v0.22.0 source (see tb2-ab.yaml's jobs_dir comment
+# for the exact citation); bin/check-harbor-contract re-asserts it on every
+# Harbor bump. analysis/src/loader.ts walks exactly this two-level shape.
 jobs_dir: jobs
 
 # One attempt per (task x agent). P0 only asks "did akm_* tools get called",
@@ -113,6 +117,18 @@ agents:
     # the two arms' network policy identical.
     extra_allowed_hosts:
       - registry.npmjs.org
+
+    # Belt-and-braces with `opencode_config.autoupdate: false` above, and
+    # deliberately symmetric with the treatment arm: AkmOpenCode.AKM_ENV sets
+    # OPENCODE_DISABLE_AUTOUPDATE=true in the treatment process env (a SECOND,
+    # independent mechanism for the same intent), which this arm has no
+    # equivalent of without this. Two different mechanisms enforcing the same
+    # thing are not provably equivalent in opencode 1.18.21 -- if the config
+    # key were ever weaker than the env var, only this arm would attempt an
+    # autoupdate network call, which is a confound (a network call and a
+    # latency difference on the control arm only), not a convenience.
+    env:
+      OPENCODE_DISABLE_AUTOUPDATE: "true"
 
     # Harbor's default agent-setup timeout is 360s, which the treatment arm
     # will blow through. Set on both arms so the phase budgets match; the

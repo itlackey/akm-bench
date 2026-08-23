@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -31,7 +33,10 @@ from harbor.agents.installed.opencode import OpenCode  # noqa: E402
 from harbor.environments.base import ExecResult  # noqa: E402
 from harbor.models.agent.context import AgentContext  # noqa: E402
 
+import harbor.akm_opencode as akm_opencode  # noqa: E402  (module, for monkeypatching)
 from harbor.akm_opencode import (  # noqa: E402
+    AKM_ACCUMULATING_ARM_NAME,
+    AKM_ARM_NAME,
     AKM_BUNDLE_DIR,
     AKM_CLI_SPEC,
     AKM_CLI_VERSION,
@@ -39,6 +44,7 @@ from harbor.akm_opencode import (  # noqa: E402
     AKM_PLUGIN_VERSION,
     AKM_ROOT,
     AKM_SEED_DIR,
+    AKM_STASH_ROOT_DIR,
     AKM_TOOLS,
     DEFAULT_SEED_LIBRARY_DIR,
     OPENCODE_VERSION,
@@ -63,6 +69,47 @@ OPENCODE_DECLARED_PERMISSION_KEYS = frozenset(
 REPO_ROOT = Path(__file__).resolve().parents[2]
 JOB_CONFIG_PATH = REPO_ROOT / "harbor" / "jobs" / "p0-smoke.yaml"
 SEED_LIBRARY_DIR = REPO_ROOT / "harbor" / "seed-library"
+
+
+@pytest.fixture(autouse=True)
+def isolate_default_stash_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """No test may depend on whether harbor/stashes/ happens to exist.
+
+    Another workflow may be concurrently populating harbor/stashes/ in this
+    same tree (see docs/plans/benchmark-harness-decisions.md D7 and the P0
+    doc), so its presence or absence on disk is not something this suite can
+    treat as stable. Pinning DEFAULT_STASH_ROOT to a guaranteed-nonexistent
+    path for every test -- unless a test explicitly overrides it -- is what
+    makes "the default agent has no stash configured" a fact about the code
+    instead of a fact about the checkout's current directory listing.
+    """
+    monkeypatch.setattr(
+        akm_opencode, "DEFAULT_STASH_ROOT", tmp_path / "unused-default-stash-root"
+    )
+
+
+def run_shell(
+    script: str, extra_env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run a generated shell fragment through a REAL bash, no container.
+
+    Used only for the stash-selection logic: a purely textual assertion
+    ("the string 'printenv AKM_TASK_STASH' appears somewhere") cannot prove
+    the `[ -d ... ]` / `if` branching actually resolves to the right
+    directory or actually exits non-zero on an unknown stash -- exactly the
+    "fails loudly, never silently" contract this exists to guarantee. PATH is
+    inherited (for bash/node itself); no other ambient env leaks in, so a
+    stray AKM_TASK_STASH in the invoking shell can never contaminate a test.
+    """
+    env = {"PATH": os.environ.get("PATH", "")}
+    env.update(extra_env or {})
+    return subprocess.run(
+        ["bash", "-c", script],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
 
 
 # --------------------------------------------------------------------------
@@ -151,10 +198,66 @@ def test_subclasses_opencode():
 
 
 def test_name_is_a_distinct_ab_arm_label():
-    # AgentInfo.name comes from name(), and JobStatistics groups arms by it.
-    # Inheriting OpenCode.name() would collapse this arm into the control arm.
+    # Inheriting OpenCode.name() would collapse this agent into the control arm.
     assert AkmOpenCode.name() == "akm-opencode"
     assert AkmOpenCode.name() != OpenCode.name()
+
+
+def test_name_stays_callable_on_the_CLASS():
+    # BaseAgent.handoff() is a classmethod that calls cls.name(); turning
+    # name() into an instance method would make that raise TypeError instead
+    # of the intended NotImplementedError.
+    assert isinstance(inspect.getattr_static(AkmOpenCode, "name"), staticmethod)
+
+
+def test_arm_name_separates_static_from_accumulating(tmp_path: Path):
+    """Decision D7: the two akm arms must never share an identity.
+
+    Harbor's agent identity is (AgentInfo.name, AgentInfo.version) and
+    nothing else -- not the class, not the import path, not the kwargs. Both
+    akm arms are this same class at the same pins, so version() is identical
+    on both; the NAME is the only field left that can keep them apart in
+    result.json. Without this, every grouping keyed off agent_info (Harbor's
+    own evals key, JobStatistics, the viewer grid, the D4 pass_at_k
+    cross-check) silently merges them into one bucket.
+    """
+    static = make_agent(tmp_path)
+    accumulating = make_agent(tmp_path, shared_bundle_path="/shared/akm-bundle")
+
+    assert static.arm_name() == AKM_ARM_NAME
+    assert accumulating.arm_name() == AKM_ACCUMULATING_ARM_NAME
+    assert static.arm_name() != accumulating.arm_name()
+
+    # ...and version() genuinely cannot do this job on its own.
+    assert static.version() == accumulating.version()
+
+
+def test_agent_info_carries_the_per_arm_name(tmp_path: Path):
+    """AgentInfo is the ONLY agent identity that reaches result.json."""
+    static = make_agent(tmp_path).to_agent_info()
+    accumulating = make_agent(
+        tmp_path, shared_bundle_path="/shared/akm-bundle"
+    ).to_agent_info()
+
+    assert static.name == AKM_ARM_NAME
+    assert accumulating.name == AKM_ACCUMULATING_ARM_NAME
+    assert (static.name, static.version) != (
+        accumulating.name,
+        accumulating.version,
+    )
+
+
+def test_agent_info_model_info_is_split_the_way_harbor_splits_it(tmp_path: Path):
+    """The bare model in .name, the provider in .provider -- never joined.
+
+    analysis/src/loader.ts rebuilds `provider/name` from these two fields;
+    an analysis fixture that puts the joined form in .name would agree with a
+    shape Harbor never writes.
+    """
+    info = make_agent(tmp_path, model_name="anthropic/claude-sonnet-4-5").to_agent_info()
+    assert info.model_info is not None
+    assert info.model_info.name == "claude-sonnet-4-5"
+    assert info.model_info.provider == "anthropic"
 
 
 def test_import_path_matches_the_job_config(agent: AkmOpenCode):
@@ -688,6 +791,340 @@ def test_install_fails_fast_when_the_seed_library_is_missing(tmp_path: Path):
 
 
 # --------------------------------------------------------------------------
+# Stash selection (cross-workflow contract with the corpus workflow)
+# --------------------------------------------------------------------------
+
+
+def test_stash_root_defaults_to_none_when_the_default_dir_is_absent(
+    agent: AkmOpenCode,
+):
+    # isolate_default_stash_root pins DEFAULT_STASH_ROOT to a path that does
+    # not exist, so the default agent -- no stash_root kwarg -- must resolve
+    # to no stash configured at all, exactly like every pre-stash-selection
+    # test in this file.
+    assert agent._stash_root is None
+
+
+def test_stash_root_default_resolution_picks_up_an_existing_default_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    default_root = tmp_path / "harbor-stashes"
+    default_root.mkdir()
+    monkeypatch.setattr(akm_opencode, "DEFAULT_STASH_ROOT", default_root)
+
+    agent = make_agent(tmp_path)  # no stash_root kwarg: pure default resolution
+    assert agent._stash_root == default_root
+
+
+def test_stash_root_explicit_kwarg_wins_over_the_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    default_root = tmp_path / "default-stashes"
+    default_root.mkdir()
+    monkeypatch.setattr(akm_opencode, "DEFAULT_STASH_ROOT", default_root)
+
+    explicit_root = tmp_path / "explicit-stashes"
+    agent = make_agent(tmp_path, stash_root=explicit_root)
+    assert agent._stash_root == explicit_root
+    assert agent._stash_root != default_root
+
+
+def test_install_uploads_the_stash_root_once_when_configured(tmp_path: Path):
+    stash_root = tmp_path / "stashes"
+    (stash_root / "az-cli").mkdir(parents=True)
+    agent = make_agent(tmp_path, stash_root=stash_root)
+    env = FakeEnvironment()
+    asyncio.run(agent.install(env))
+
+    assert (str(stash_root), AKM_STASH_ROOT_DIR) in env.uploads
+    # Uploaded exactly once, not once per potential stash inside it.
+    assert env.uploads.count((str(stash_root), AKM_STASH_ROOT_DIR)) == 1
+    root_commands = "\n".join(env.commands_for_user("root"))
+    assert f"mkdir -p {AKM_STASH_ROOT_DIR}" in root_commands
+    assert f"chown -R agent {AKM_STASH_ROOT_DIR}" in root_commands
+
+
+def test_install_uploads_no_stash_root_when_not_configured(installed):
+    # The default (isolated) agent: no upload targets AKM_STASH_ROOT_DIR at
+    # all -- not even an empty one -- when stash_root was never configured.
+    _, env = installed
+    assert all(target != AKM_STASH_ROOT_DIR for _, target in env.uploads)
+
+
+def test_install_fails_fast_when_a_configured_stash_root_is_missing(tmp_path: Path):
+    agent = make_agent(tmp_path, stash_root=tmp_path / "does-not-exist")
+    with pytest.raises(RuntimeError, match="stash root not found"):
+        asyncio.run(agent.install(FakeEnvironment()))
+
+
+def test_seed_bundle_command_matches_the_original_exactly_when_no_stash_root(
+    tmp_path: Path,
+):
+    """The default-fallback path: byte-identical to the pre-stash-selection
+    command, with zero container-side branching, when stash_root is None."""
+    agent = make_agent(tmp_path)
+    assert agent._stash_root is None
+    command = agent._build_seed_bundle_command()
+
+    assert "printenv AKM_TASK_STASH" not in command
+    assert "AKM_TASK_STASH" not in command
+    assert AKM_STASH_ROOT_DIR not in command
+    assert (
+        "set -euo pipefail; [ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; "
+        f"akm bundle create --dir {AKM_BUNDLE_DIR} --set-default && "
+        f'for d in {AKM_SEED_DIR}/*/; do [ -d "$d" ] || continue; '
+        f'cp -a "$d" {AKM_BUNDLE_DIR}/; done && '
+        f"for d in {AKM_BUNDLE_DIR}/env {AKM_BUNDLE_DIR}/secrets; do "
+        '[ -d "$d" ] && chmod 700 "$d"; done; '
+        "akm index --full"
+    ) == command
+
+
+def test_seed_bundle_command_embeds_stash_selection_when_configured(tmp_path: Path):
+    stash_root = tmp_path / "stashes"
+    stash_root.mkdir()
+    agent = make_agent(tmp_path, stash_root=stash_root)
+    command = agent._build_seed_bundle_command()
+
+    assert "printenv AKM_TASK_STASH" in command
+    assert AKM_STASH_ROOT_DIR in command
+    assert "AKM-BOOTSTRAP FATAL" in command
+    # Seeds from the resolved variable, not the literal default dir, once
+    # selection is in play.
+    assert '"$AKM_SEED_SRC"/*/' in command
+    assert f"for d in {AKM_SEED_DIR}/*/" not in command
+
+
+# -- real-bash execution of the selection logic --------------------------
+#
+# A textual "the string 'printenv AKM_TASK_STASH' appears" assertion cannot
+# prove the `[ -d ... ]` / `if` branching actually resolves the right
+# directory, or actually fails loudly on an unknown one. These run the
+# generated fragment through a real bash against real tmp directories.
+
+
+def test_stash_select_falls_back_to_the_seed_dir_when_akm_task_stash_is_unset(
+    tmp_path: Path,
+):
+    seed_dir = tmp_path / "seed"
+    stash_root = tmp_path / "stashes"
+    seed_dir.mkdir()
+    stash_root.mkdir()
+    script = AkmOpenCode._build_stash_select_command(str(seed_dir), str(stash_root))
+
+    result = run_shell(script + '; echo "RESOLVED=$AKM_SEED_SRC"')
+    assert result.returncode == 0, result.stderr
+    assert f"RESOLVED={seed_dir}" in result.stdout
+
+
+def test_stash_select_falls_back_when_akm_task_stash_is_the_empty_string(
+    tmp_path: Path,
+):
+    seed_dir = tmp_path / "seed"
+    stash_root = tmp_path / "stashes"
+    seed_dir.mkdir()
+    stash_root.mkdir()
+    script = AkmOpenCode._build_stash_select_command(str(seed_dir), str(stash_root))
+
+    result = run_shell(
+        script + '; echo "RESOLVED=$AKM_SEED_SRC"', extra_env={"AKM_TASK_STASH": ""}
+    )
+    assert result.returncode == 0, result.stderr
+    assert f"RESOLVED={seed_dir}" in result.stdout
+
+
+def test_stash_select_uses_the_named_stash_when_present_under_the_root(
+    tmp_path: Path,
+):
+    seed_dir = tmp_path / "seed"
+    stash_root = tmp_path / "stashes"
+    seed_dir.mkdir()
+    (stash_root / "az-cli").mkdir(parents=True)
+    script = AkmOpenCode._build_stash_select_command(str(seed_dir), str(stash_root))
+
+    result = run_shell(
+        script + '; echo "RESOLVED=$AKM_SEED_SRC"',
+        extra_env={"AKM_TASK_STASH": "az-cli"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert f"RESOLVED={stash_root / 'az-cli'}" in result.stdout
+
+
+def test_stash_select_fails_loudly_for_a_stash_not_in_the_uploaded_root(
+    tmp_path: Path,
+):
+    """The core cross-workflow guarantee: never silently fall back.
+
+    An AKM_TASK_STASH naming a stash absent from the uploaded root must abort
+    setup, not quietly seed a different (default or wrong-task) library --
+    that would corrupt the arm by measuring against the wrong knowledge base
+    while result.json still claims the requested stash.
+    """
+    seed_dir = tmp_path / "seed"
+    stash_root = tmp_path / "stashes"
+    seed_dir.mkdir()
+    stash_root.mkdir()
+    (stash_root / "az-cli").mkdir()  # a real stash exists, just not this one
+    script = AkmOpenCode._build_stash_select_command(str(seed_dir), str(stash_root))
+
+    result = run_shell(script, extra_env={"AKM_TASK_STASH": "does-not-exist"})
+    assert result.returncode == 1
+    assert "AKM-BOOTSTRAP FATAL" in result.stderr
+    assert "AKM_TASK_STASH=does-not-exist" in result.stderr
+    assert "not found under" in result.stderr
+    assert str(stash_root) in result.stderr
+
+
+# --------------------------------------------------------------------------
+# The accumulating arm (shared_bundle_path, decision D7)
+# --------------------------------------------------------------------------
+
+
+def test_shared_bundle_path_sets_akm_bundle_dir(tmp_path: Path):
+    agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle")
+    assert agent._akm_env["AKM_BUNDLE_DIR"] == "/mnt/shared/bundle"
+
+
+def test_shared_bundle_path_wins_over_the_akm_bundle_dir_kwarg(tmp_path: Path):
+    agent = make_agent(
+        tmp_path,
+        akm_bundle_dir="/srv/library",
+        shared_bundle_path="/mnt/shared/bundle",
+    )
+    assert agent._akm_env["AKM_BUNDLE_DIR"] == "/mnt/shared/bundle"
+
+
+def test_shared_bundle_path_skips_the_seed_library_precondition(tmp_path: Path):
+    # The static arm's precondition (seed_library_dir must exist) has nothing
+    # to do with this arm, which never reads it.
+    agent = make_agent(
+        tmp_path,
+        shared_bundle_path="/mnt/shared/bundle",
+        seed_library_dir=tmp_path / "does-not-exist",
+    )
+    env = FakeEnvironment()
+    asyncio.run(agent.install(env))  # must not raise
+    assert env.uploads == []
+
+
+def test_shared_bundle_path_uploads_nothing_and_never_seeds(tmp_path: Path):
+    agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle")
+    env = FakeEnvironment()
+    asyncio.run(agent.install(env))
+
+    assert env.uploads == []
+    text = env.all_commands_text
+    assert "akm bundle create" not in text
+    assert "cp -a" not in text
+    assert "akm index --full" not in text
+
+
+def test_shared_bundle_path_indexes_only_when_the_bundle_has_no_index_yet(
+    tmp_path: Path,
+):
+    agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle")
+    env = FakeEnvironment()
+    asyncio.run(agent.install(env))
+
+    index_command = next(c for c in env.commands if "akm info --format json" in c)
+    assert "akm info --format json -q > /tmp/akm-shared-info.json" in index_command
+    assert "HAS_INDEX" in index_command
+    assert 'if [ "$HAS_INDEX" != "1" ]; then akm index; fi' in index_command
+    # Bare `akm index`, never the seeding arm's `--full` sweep.
+    assert "akm index --full" not in index_command
+
+
+def test_shared_bundle_index_command_runs_index_when_entry_count_is_zero(
+    tmp_path: Path,
+):
+    """Real bash + a fake akm on PATH: proves the conditional actually fires,
+    not just that its text is present."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    called_log = tmp_path / "index-called.log"
+    fake_akm = fake_bin / "akm"
+    fake_akm.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "info" ]; then echo \'{"indexStats":{"entryCount":0}}\'; '
+        f'elif [ "$1" = "index" ]; then echo called >> {called_log}; fi\n'
+    )
+    fake_akm.chmod(0o755)
+
+    script = AkmOpenCode._build_shared_bundle_index_command()
+    result = run_shell(script, extra_env={"PATH": f"{fake_bin}:{os.environ['PATH']}"})
+    assert result.returncode == 0, result.stderr
+    assert called_log.exists()
+
+
+def test_shared_bundle_index_command_skips_index_when_already_indexed(tmp_path: Path):
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    called_log = tmp_path / "index-called.log"
+    fake_akm = fake_bin / "akm"
+    fake_akm.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "info" ]; then echo \'{"indexStats":{"entryCount":42}}\'; '
+        f'elif [ "$1" = "index" ]; then echo called >> {called_log}; fi\n'
+    )
+    fake_akm.chmod(0o755)
+
+    script = AkmOpenCode._build_shared_bundle_index_command()
+    result = run_shell(script, extra_env={"PATH": f"{fake_bin}:{os.environ['PATH']}"})
+    assert result.returncode == 0, result.stderr
+    assert not called_log.exists()
+
+
+def test_shared_bundle_path_self_check_skips_the_per_type_seed_count_probe(tmp_path: Path):
+    """The accumulating arm skips the STATIC arm's per-type seed-count
+    assertions (which describe a fixture it never writes) but still gets a
+    lighter, arm-appropriate probe: AKM_BUNDLE_DIR resolved to the shared
+    mount, and a non-empty index (S8 fix -- previously this arm's self-check
+    proved nothing at all about whether the bundle resolved)."""
+    agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle")
+    self_check = agent._build_self_check_command()
+
+    assert "AKM_SEED_MIN_ENTRIES" not in self_check
+    assert "AKM_SEED_EXPECTED_BY_TYPE" not in self_check
+    assert "defaultBundle" not in self_check
+    # The lighter probe IS present:
+    assert "akm info assertions failed" in self_check
+    assert "/tmp/akm-info.json" in self_check
+    assert "akm info OK (accumulating)" in self_check
+    assert "entryCount=\"+n+\" (want >0)" in self_check
+
+
+def test_shared_bundle_path_self_check_keeps_every_plugin_and_pin_probe(
+    tmp_path: Path,
+):
+    agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle")
+    self_check = agent._build_self_check_command()
+
+    for probe in (
+        "command -v akm",  # 1 / 1b
+        "akm search knowledge/",  # 3
+        "akm curate",  # 4
+        "akm feedback",  # 5
+        "akm-opencode is not in the opencode",  # 6
+        "akm-cli version skew",  # 7
+        "pin bypass",  # 7b
+        PLUGIN_RESOLVED_MARKER,  # 8
+        PLUGIN_FAILED_MARKER,  # 8
+    ):
+        assert probe in self_check
+
+
+def test_default_arm_self_check_still_includes_the_seed_count_probe(
+    agent: AkmOpenCode,
+):
+    # Pins the other side of the branch: nothing about adding the
+    # accumulating arm may weaken the static arm's self-check.
+    self_check = agent._build_self_check_command()
+    assert "AKM_SEED_MIN_ENTRIES" in self_check
+    assert "AKM_SEED_EXPECTED_BY_TYPE" in self_check
+    assert "akm info assertions failed" in self_check
+
+
+# --------------------------------------------------------------------------
 # Run-phase proof (the plugin was actually live during the MEASURED run)
 # --------------------------------------------------------------------------
 
@@ -950,6 +1387,19 @@ def test_job_config_control_arm_mirrors_the_treatment_defaults(arms):
         assert control_config[key] == value
 
 
+def test_job_config_control_arm_disables_opencode_autoupdate_via_env_too(arms):
+    """S16 hygiene fix: AkmOpenCode.AKM_ENV sets OPENCODE_DISABLE_AUTOUPDATE
+    in the treatment process env as a SECOND mechanism alongside
+    opencode_config.autoupdate=false; without the same env var on the
+    control arm, only the treatment arm would be protected if the config key
+    ever proved weaker than the env var in a given opencode release -- a
+    confound (a network call and latency difference), not a convenience.
+    """
+    control, _ = arms
+    assert control.get("env", {}).get("OPENCODE_DISABLE_AUTOUPDATE") == "true"
+    assert AkmOpenCode.AKM_ENV["OPENCODE_DISABLE_AUTOUPDATE"] == "true"
+
+
 def test_job_config_arms_share_model_network_and_timeouts(arms):
     control, treatment = arms
     assert control["model_name"] == treatment["model_name"]
@@ -1040,3 +1490,335 @@ def test_self_check_probes_the_akm_cli_pin_bypass(tmp_path: Path) -> None:
     # Absent must fall through rather than abort: the guard is -x, not a hard
     # existence assertion.
     assert 'if [ -x "$CFG_AKM" ]; then' in command
+
+
+def test_stash_select_rejects_a_traversing_stash_name(tmp_path: Path):
+    """A name with a `/` must be rejected, not pasted into the path.
+
+    `[ -d "$root/../seed" ]` is TRUE for a directory that is emphatically not
+    in the uploaded stash root, so without an explicit guard the one outcome
+    the cross-workflow contract forbids -- silently seeding something other
+    than the named stash -- is reachable through a traversing name. Here
+    `../seed` would have resolved to a real, existing directory.
+    """
+    seed_dir = tmp_path / "seed"
+    stash_root = tmp_path / "stashes"
+    seed_dir.mkdir()
+    stash_root.mkdir()
+    script = AkmOpenCode._build_stash_select_command(str(seed_dir), str(stash_root))
+
+    for name in ("../seed", "/etc", "a/b"):
+        result = run_shell(
+            script + '; echo "RESOLVED=$AKM_SEED_SRC"',
+            extra_env={"AKM_TASK_STASH": name},
+        )
+        assert result.returncode == 1, f"{name!r} was accepted: {result.stdout}"
+        assert "AKM-BOOTSTRAP FATAL" in result.stderr
+        assert "not a plain stash name" in result.stderr
+        assert "RESOLVED=" not in result.stdout
+
+
+def test_stash_select_rejects_dot_and_dotdot(tmp_path: Path):
+    """`.` and `..` contain no `/`, so the `*/*` traversal guard alone lets
+    them through -- and both resolve to REAL, existing directories that are
+    not the named stash: `"$root/."` is the stash root itself (the seed loop
+    would then merge every stash together), and `"$root/.."` is the stash
+    root's PARENT (inside AKM_ROOT, whose subtree includes bundle/, config/,
+    data/, state/, cache/, seed/). This is the gap the alphanumeric-first-
+    character guard closes, alongside the `*/*` check the previous test
+    covers.
+    """
+    seed_dir = tmp_path / "seed"
+    stash_root = tmp_path / "stashes"
+    seed_dir.mkdir()
+    stash_root.mkdir()
+    (stash_root / "real-stash").mkdir()
+    script = AkmOpenCode._build_stash_select_command(str(seed_dir), str(stash_root))
+
+    for name in (".", ".."):
+        result = run_shell(
+            script + '; echo "RESOLVED=$AKM_SEED_SRC"',
+            extra_env={"AKM_TASK_STASH": name},
+        )
+        assert result.returncode == 1, f"{name!r} was accepted: {result.stdout}"
+        assert "AKM-BOOTSTRAP FATAL" in result.stderr
+        assert "not a plain stash name" in result.stderr
+        assert "RESOLVED=" not in result.stdout
+
+    # A genuine stash name starting with a letter/digit is unaffected.
+    ok = run_shell(
+        script + '; echo "RESOLVED=$AKM_SEED_SRC"',
+        extra_env={"AKM_TASK_STASH": "real-stash"},
+    )
+    assert ok.returncode == 0, ok.stderr
+    assert f"RESOLVED={stash_root / 'real-stash'}" in ok.stdout
+
+
+def test_shared_bundle_path_redirects_data_state_cache_config_dirs(tmp_path: Path):
+    """S3/S9 fix: without this, AKM_DATA_DIR stayed container-local, so the
+    accumulating arm's ranker state (and the "skip if already indexed" guard
+    in _build_shared_bundle_index_command) never actually persisted across
+    trials regardless of what the mounted bundle held.
+    """
+    agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle")
+    assert agent._akm_env["AKM_BUNDLE_DIR"] == "/mnt/shared/bundle"
+    assert agent._akm_env["AKM_DATA_DIR"] == "/mnt/shared/bundle/.akm-bench-data"
+    assert agent._akm_env["AKM_STATE_DIR"] == "/mnt/shared/bundle/.akm-bench-state"
+    assert agent._akm_env["AKM_CACHE_DIR"] == "/mnt/shared/bundle/.akm-bench-cache"
+    assert agent._akm_env["AKM_CONFIG_DIR"] == "/mnt/shared/bundle/.akm-bench-config"
+    # All four are INSIDE the shared mount (not a sibling outside it, which
+    # would not be backed by the host and would not persist).
+    for key in ("AKM_DATA_DIR", "AKM_STATE_DIR", "AKM_CACHE_DIR", "AKM_CONFIG_DIR"):
+        assert agent._akm_env[key].startswith("/mnt/shared/bundle/")
+
+    dirs_command = agent._build_akm_dirs_command("agent")
+    for key in ("AKM_DATA_DIR", "AKM_STATE_DIR", "AKM_CACHE_DIR", "AKM_CONFIG_DIR"):
+        assert agent._akm_env[key] in dirs_command
+    assert "chown -R agent /mnt/shared/bundle/.akm-bench-data" in dirs_command
+
+
+def test_shared_bundle_path_trailing_slash_is_normalized(tmp_path: Path):
+    agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle/")
+    assert agent._akm_env["AKM_BUNDLE_DIR"] == "/mnt/shared/bundle"
+    assert agent._akm_env["AKM_DATA_DIR"] == "/mnt/shared/bundle/.akm-bench-data"
+
+
+def test_shared_bundle_index_command_fails_loudly_when_a_task_requests_a_stash(
+    tmp_path: Path,
+):
+    """S12 fix: the accumulating arm has ONE shared bundle for every task and
+    no per-task stash selection. A task that declares AKM_TASK_STASH must not
+    be silently run against whatever the shared bundle happens to contain.
+    """
+    script = AkmOpenCode._build_shared_bundle_index_command()
+    result = run_shell(script, extra_env={"AKM_TASK_STASH": "some-stash"})
+    assert result.returncode == 1
+    assert "AKM-BOOTSTRAP FATAL" in result.stderr
+    assert "AKM_TASK_STASH=some-stash" in result.stderr
+    assert "akm-accumulating arm" in result.stderr
+
+
+def test_shared_bundle_index_command_runs_normally_without_a_stash_request(
+    tmp_path: Path,
+):
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_akm = fake_bin / "akm"
+    fake_akm.write_text('#!/bin/sh\n[ "$1" = "info" ] && echo \'{"indexStats":{"entryCount":1}}\'\n')
+    fake_akm.chmod(0o755)
+
+    script = AkmOpenCode._build_shared_bundle_index_command()
+    result = run_shell(script, extra_env={"PATH": f"{fake_bin}:{os.environ['PATH']}"})
+    assert result.returncode == 0, result.stderr
+
+
+def test_wrap_shared_lock_uses_a_lock_file_inside_the_shared_mount(tmp_path: Path):
+    agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle")
+    wrapped = agent._wrap_shared_lock("echo hi")
+    assert wrapped.startswith("flock ")
+    assert "/mnt/shared/bundle/.akm-bench-setup.lock" in wrapped
+    assert "echo hi" in wrapped
+
+
+def test_wrap_shared_lock_actually_serializes_concurrent_execs(tmp_path: Path):
+    """Not just textual: prove `flock` genuinely excludes a second, concurrent
+    execution of the wrapped command from running while the first holds the
+    lock -- the actual defect (S4) was that Harbor's `n_concurrent` gates only
+    the agent.run() phase, never agent.setup()/install(), so two trials'
+    installs could otherwise race on the same shared bundle.
+    """
+    shared = tmp_path / "shared-bundle"
+    shared.mkdir()
+    agent = make_agent(tmp_path, shared_bundle_path=str(shared))
+
+    # A "critical section" that is very likely to interleave WITHOUT a lock:
+    # read a counter, sleep, increment, write it back. Run it twice
+    # concurrently, flock-wrapped; the final value must reflect two
+    # serialized increments, never a lost update from an interleaved race.
+    counter = shared / "counter"
+    counter.write_text("0")
+    bump = (
+        f"n=$(cat {counter}); sleep 0.2; "
+        f"echo $((n + 1)) > {counter}"
+    )
+    wrapped = agent._wrap_shared_lock(bump)
+
+    import threading
+
+    results = []
+
+    def run_once():
+        results.append(run_shell(wrapped))
+
+    threads = [threading.Thread(target=run_once) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+
+    for r in results:
+        assert r.returncode == 0, r.stderr
+    assert counter.read_text().strip() == "2", (
+        "expected two serialized increments (flock should have prevented "
+        f"the interleaved read-modify-write race); got {counter.read_text()!r}"
+    )
+
+
+def test_install_flock_wraps_the_shared_bundle_steps_only_for_the_accumulating_arm(
+    tmp_path: Path,
+):
+    agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle")
+    env = FakeEnvironment()
+    asyncio.run(agent.install(env))
+
+    # Harbor's own exec plumbing prepends `set -o pipefail; ` ahead of
+    # whatever command string this agent hands it, so check containment (and
+    # that `flock` is the OUTERMOST wrapper of the payload) rather than a
+    # literal prefix.
+    index_cmd = next(c for c in env.commands if "akm info --format json" in c)
+    assert "flock /mnt/shared/bundle/.akm-bench-setup.lock -c " in index_cmd
+
+    self_check_cmd = next(c for c in env.commands if "AKM-BOOTSTRAP FATAL" in c and "akm info" in c)
+    assert "flock /mnt/shared/bundle/.akm-bench-setup.lock -c " in self_check_cmd
+
+
+def test_install_does_not_flock_wrap_the_static_arm(installed):
+    _, env = installed
+    assert "flock " not in env.all_commands_text
+
+
+def test_link_binaries_command_refuses_to_overwrite_a_real_pre_existing_file(
+    tmp_path: Path,
+):
+    """S7 fix: `ln -sf` force-replaces whatever is already at the target with
+    no check. Simulate `/usr/local/bin` with a tmp dir (never write to the
+    real one in a test) by substituting the literal path in the generated
+    script -- this still exercises the REAL guard logic the production
+    command contains, just against a safe target.
+    """
+    fake_local_bin = tmp_path / "usr-local-bin"
+    fake_local_bin.mkdir()
+    akm_src = tmp_path / "akm-real"
+    node_src = tmp_path / "node-real"
+    akm_src.write_text("#!/bin/sh\n")
+    node_src.write_text("#!/bin/sh\n")
+    akm_src.chmod(0o755)
+    node_src.chmod(0o755)
+
+    script = AkmOpenCode._build_link_binaries_command(str(akm_src), str(node_src))
+    templated = script.replace("/usr/local/bin", str(fake_local_bin))
+
+    # Case 1: neither target exists yet -- the common, expected case at this
+    # bootstrap step. Must NOT abort (regression guard against the set -e
+    # pitfall of a bare `[ -e ] && [ ! -L ] && fail` list).
+    ok = run_shell(templated)
+    assert ok.returncode == 0, ok.stderr
+    assert (fake_local_bin / "akm").is_symlink()
+    assert (fake_local_bin / "node").is_symlink()
+
+    # Case 2: a REAL (non-symlink) file already at the node target -- as a
+    # task image that ships its own pinned Node toolchain would leave one.
+    (fake_local_bin / "akm").unlink()
+    (fake_local_bin / "node").unlink()
+    (fake_local_bin / "node").write_text("#!/bin/sh\necho pinned-toolchain-node\n")
+    (fake_local_bin / "node").chmod(0o755)
+
+    blocked = run_shell(templated)
+    assert blocked.returncode == 1
+    assert "AKM-BOOTSTRAP FATAL" in blocked.stderr
+    assert "already exists and is not a symlink" in blocked.stderr
+    # Must not have been silently replaced.
+    assert "pinned-toolchain-node" in (fake_local_bin / "node").read_text()
+
+
+def test_link_binaries_command_allows_overwriting_a_pre_existing_symlink(
+    tmp_path: Path,
+):
+    fake_local_bin = tmp_path / "usr-local-bin"
+    fake_local_bin.mkdir()
+    akm_src = tmp_path / "akm-real"
+    node_src = tmp_path / "node-real"
+    akm_src.write_text("#!/bin/sh\n")
+    node_src.write_text("#!/bin/sh\n")
+    akm_src.chmod(0o755)
+    node_src.chmod(0o755)
+    (fake_local_bin / "node").symlink_to(tmp_path / "some-older-node")
+
+    script = AkmOpenCode._build_link_binaries_command(str(akm_src), str(node_src))
+    templated = script.replace("/usr/local/bin", str(fake_local_bin))
+
+    result = run_shell(templated)
+    assert result.returncode == 0, result.stderr
+    assert (fake_local_bin / "node").resolve() == node_src.resolve()
+
+
+def test_seed_bundle_command_uses_the_akm_bundle_dir_override(tmp_path: Path):
+    """S19 fix: the seed-bundle command used to hardcode the module-level
+    AKM_BUNDLE_DIR constant, so an operator-supplied `akm_bundle_dir` kwarg
+    seeded ``/opt/akm/bundle`` while every exec's AKM_BUNDLE_DIR env var
+    pointed at the override -- a config the self-check would eventually
+    catch, but only as a confusing bundleDir mismatch instead of the seed
+    actually landing in the right place.
+    """
+    agent = make_agent(tmp_path, akm_bundle_dir="/srv/library")
+    assert agent._akm_env["AKM_BUNDLE_DIR"] == "/srv/library"
+    command = agent._build_seed_bundle_command()
+    assert "/srv/library" in command
+    assert AKM_BUNDLE_DIR not in command
+
+    dirs_command = agent._build_akm_dirs_command("agent")
+    assert "/srv/library" in dirs_command
+    assert "chown -R agent /srv/library" in dirs_command
+
+
+def test_trajectory_is_relabelled_per_arm_not_per_class(tmp_path: Path):
+    """The trajectory's agent name must agree with result.json's agent_info.
+
+    `_convert_events_to_trajectory` uses arm_name(), so the accumulating arm's
+    trajectory.json says `akm-opencode-accumulating` -- the same label
+    `agent_info.name` carries -- rather than the class-wide `akm-opencode`.
+    """
+    events = [
+        {
+            "type": "step_start",
+            "part": {"type": "step-start"},
+            "sessionID": "session-1",
+        },
+        {"type": "text", "part": {"type": "text", "text": "hello"}},
+        {
+            "type": "step_finish",
+            "part": {"type": "step-finish"},
+            "tokens": {"input": 1, "output": 1},
+            "cost": 0.0,
+        },
+    ]
+    agent = make_agent(tmp_path, shared_bundle_path="/shared/akm-bundle")
+    trajectory = agent._convert_events_to_trajectory(events)
+    if trajectory is None:
+        pytest.skip("OpenCode's parser produced no trajectory for this event shape")
+    assert trajectory.agent.name == AKM_ACCUMULATING_ARM_NAME
+    assert trajectory.agent.name == agent.to_agent_info().name
+
+
+def test_install_purges_non_directories_from_uploaded_stash_root() -> None:
+    """The stash root is uploaded verbatim and only the treatment arm gets it,
+    so any file at its top level (README, gold-ref map) is an arm-asymmetric
+    answer-key channel. install() must scrub non-directories from the uploaded
+    root, leaving stash content untouched."""
+    source = inspect.getsource(akm_opencode)
+    assert '-mindepth 1 -maxdepth 1 ! -type d -exec rm -f {} +' in source
+    # The purge must target the uploaded root, not the seed dir.
+    purge_idx = source.index("-mindepth 1 -maxdepth 1 ! -type d")
+    window = source[purge_idx - 600 : purge_idx]
+    assert "AKM_STASH_ROOT_DIR" in window
+
+
+def test_repo_stash_root_contains_only_directories() -> None:
+    """Repo-hygiene twin of the in-container purge: harbor/stashes/ must hold
+    stash directories only. Metadata (gold-ref map, README) lives in
+    harbor/stashes-meta/, which is never uploaded."""
+    stash_root = Path(__file__).resolve().parent.parent / "stashes"
+    if not stash_root.is_dir():
+        pytest.skip("harbor/stashes not present in this checkout")
+    stray = [p.name for p in stash_root.iterdir() if not p.is_dir()]
+    assert stray == [], f"non-directory entries at stash root would leak into treatment containers: {stray}"

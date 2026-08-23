@@ -40,6 +40,23 @@ adds exactly five things:
    self-check cannot cover this: it proves the plugin loads in an
    *install-time* session, and resolution is redone at every session start.
 
+6. **Per-task stash selection.** ``stash_root`` names a host directory with
+   one subdirectory per named stash; when set (or defaulted — see
+   ``stash_root`` in ``__init__``), the whole root is uploaded ONCE at install
+   time and the choice of *which* stash to seed from is made
+   container-side, at bundle-seed time, by reading the ``AKM_TASK_STASH`` env
+   var a converted task sets via ``[environment] env`` in its ``task.toml``.
+   This is one half of a cross-workflow contract with the corpus conversion
+   workflow; see ``_build_stash_select_command()``. A named stash absent from
+   the uploaded root fails setup loudly rather than silently seeding the
+   wrong (or default) library.
+
+7. **The accumulating arm.** ``shared_bundle_path`` switches this agent from
+   "seed a pristine per-trial copy" to "point at a shared, mutable bundle and
+   let it accumulate across trials" — decision D7 of
+   ``docs/plans/benchmark-harness-decisions.md``. See the ``AkmOpenCode``
+   class docstring for the operational requirements this arm imposes.
+
 Invocation
 ----------
 The module must be importable by dotted path; Harbor's ``import_symbol`` uses a
@@ -87,6 +104,7 @@ from typing import Any, override
 from harbor.agents.installed.opencode import OpenCode
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
+from harbor.models.trial.result import AgentInfo
 from harbor.models.trajectories import Trajectory
 
 # ---------------------------------------------------------------------------
@@ -109,6 +127,23 @@ AKM_PLUGIN_VERSION = "0.9.202808220049"
 
 AKM_CLI_SPEC = f"akm-cli@{AKM_CLI_VERSION}"
 AKM_PLUGIN_SPEC = f"akm-opencode@{AKM_PLUGIN_VERSION}"
+
+#: Arm label reported by ``to_agent_info()`` for the static (per-trial seeded)
+#: arm, and the suffix appended for the accumulating one.
+#:
+#: These exist because Harbor's agent identity is ``(AgentInfo.name,
+#: AgentInfo.version)`` and NOTHING else -- not the class, not the import
+#: path, not the kwargs. Both akm arms are the same class at the same
+#: opencode + plugin pins, so without a per-arm name their ``result.json``
+#: rows are byte-identical and every grouping keyed off ``agent_info``
+#: (Harbor's own ``evals`` key, ``JobStatistics``, the viewer's comparison
+#: grid, the D4 ``pass_at_k`` cross-check, and any naive
+#: ``(name, version, model)`` tuple downstream) SILENTLY MERGES the static and
+#: accumulating arms into one bucket whose mean describes neither. Decision D7
+#: of ``docs/plans/benchmark-harness-decisions.md`` forbids exactly that
+#: pooling ("do not pool it with the static arm").
+AKM_ARM_NAME = "akm-opencode"
+AKM_ACCUMULATING_ARM_NAME = f"{AKM_ARM_NAME}-accumulating"
 
 #: The plugin hard-gates on semver range ``^0.9.0``
 #: (akm-plugins ``claude/shared/akm-version.ts:37``). The install-time
@@ -138,6 +173,15 @@ AKM_STATE_DIR = f"{AKM_ROOT}/state"
 #: Where ``seed-library/`` is uploaded to inside the container.
 AKM_SEED_DIR = f"{AKM_ROOT}/seed"
 
+#: Where ``stash_root`` (one subdirectory per named stash) is uploaded to
+#: inside the container. Selection among its subdirectories happens
+#: CONTAINER-SIDE, at bundle-seed time -- see ``_build_stash_select_command()``
+#: -- keyed off the ``AKM_TASK_STASH`` env var a converted task sets via
+#: ``[environment] env`` in its ``task.toml``. This is the akm-bench half of
+#: the cross-workflow contract; the corpus workflow owns the other half (task
+#: conversion writing ``AKM_TASK_STASH`` and populating ``harbor/stashes/``).
+AKM_STASH_ROOT_DIR = f"{AKM_ROOT}/stashes"
+
 #: XDG roots used only during install(), for the cache-warming opencode boot.
 #:
 #: These deliberately do NOT match the values Harbor's ``run()`` exports
@@ -153,6 +197,14 @@ INSTALL_XDG_STATE_HOME = f"{AKM_ROOT}/opencode-install/state"
 #: Host-side seed bundle, resolved relative to this module so it survives being
 #: imported from any working directory.
 DEFAULT_SEED_LIBRARY_DIR = Path(__file__).resolve().parent / "seed-library"
+
+#: Host-side stash root: one subdirectory per named stash. Resolved relative
+#: to this module, same rationale as ``DEFAULT_SEED_LIBRARY_DIR``. Unlike that
+#: constant, this directory is OPTIONAL and may not exist at all -- the corpus
+#: workflow that populates it may not have run yet -- so the default is
+#: applied only when the directory is actually there (see ``stash_root`` in
+#: ``__init__``); a missing default is silently ``None``, never an error.
+DEFAULT_STASH_ROOT = Path(__file__).resolve().parent / "stashes"
 
 # ---------------------------------------------------------------------------
 # opencode permissions and tool enablement
@@ -281,6 +333,68 @@ class AkmOpenCode(OpenCode):
     ``populate_context_post_run()`` IS overridden, but only to chain
     ``super()`` — which is how token and cost accounting reaches
     ``results.json`` — before asserting the run-phase plugin proof.
+
+    The accumulating arm (``shared_bundle_path``)
+    ---------------------------------------------
+    Passing ``shared_bundle_path`` switches this instance from the default
+    "static" arm (a pristine per-trial bundle, seeded fresh in every
+    container) to the "accumulating" arm: ``AKM_BUNDLE_DIR``, ``AKM_DATA_DIR``,
+    ``AKM_STATE_DIR``, ``AKM_CACHE_DIR`` and ``AKM_CONFIG_DIR`` are ALL
+    pointed at hidden, namespaced siblings inside the same directory that
+    persists ACROSS trials (see ``__init__``), seeding is skipped entirely,
+    and ``akm index`` runs only when that directory has no index yet. This is
+    decision D7 in ``docs/plans/benchmark-harness-decisions.md`` — isolating
+    retrieval value (the static arm) from learning value (this one). Every
+    one of those five directories must move together: pointing only
+    ``AKM_BUNDLE_DIR`` at the shared mount while leaving the other four at
+    their container-local defaults would silently defeat the "learning"
+    claim — the index and the ranker's learned state would still be wiped
+    with the container on every trial regardless of what the mounted bundle
+    held.
+
+    Operational requirements this arm imposes, none of which this class can
+    enforce from inside a single trial:
+
+    * **A job-level mount.** ``shared_bundle_path`` must resolve to the SAME
+      host location across every trial in the job — a Harbor ``--mounts``
+      entry or an extra compose volume, configured at the job level, not by
+      this agent. Without it, "shared" is a lie: each trial gets a fresh
+      container filesystem and the path is empty every time.
+    * **A pre-populated bundle.** Because seeding is skipped entirely, the
+      mounted directory must already be a valid, seeded akm bundle before the
+      first trial runs — this agent only *indexes* it (once, if needed), it
+      never scaffolds or seeds it. Populating it is the job setup's
+      responsibility, not this agent's.
+    * **Order dependence.** Trials are NOT statistically independent: trial N
+      can see everything trials 1..N-1 wrote (or failed to clean up) via
+      ``akm_remember`` / ``akm_feedback`` / session hints. Do not pool this
+      arm's trials with the static arm's, and do not treat its per-trial
+      rewards as i.i.d. samples — aggregate and analyze it as an ordered
+      sequence, not a set.
+    * **Concurrent SETUP is a real race, and this class now closes it
+      itself.** Harbor's per-agent ``n_concurrent`` gates ONLY the
+      ``agent.run()`` phase (``AGENT_START``/``AGENT_END``) — verified
+      against ``trial/queue.py`` and ``trial/trial.py`` — never
+      ``agent.setup()``/``install()``. Setting ``n_concurrent: 1`` on this
+      arm in the job config is therefore necessary but not sufficient: with
+      a job-level ``n_concurrent_trials > 1``, multiple accumulating-arm
+      trials can still run ``install()`` concurrently against the same
+      mounted bundle. Every install step that reads or writes the shared
+      bundle (the index command, and the self-check's search/curate/feedback
+      probes) is wrapped in ``flock`` on a lock file inside the shared mount
+      (``_wrap_shared_lock()``), which serializes them across containers
+      regardless of ``n_concurrent_trials`` — but the job-level
+      ``n_concurrent: 1`` recommendation still stands for the ``agent.run()``
+      phase itself, which this class cannot serialize (that phase is where
+      the model calls ``akm_remember`` / ``akm_feedback`` live, and Harbor
+      gives no hook to flock around a phase it, not this agent, controls the
+      boundaries of).
+    * **No per-task stash.** A converted task's ``AKM_TASK_STASH`` (the
+      cross-workflow contract; see ``_build_stash_select_command``) has no
+      effect on this arm — there is ONE shared bundle for every task in the
+      job, by construction. Running a stash-bearing task on this arm fails
+      setup loudly (``_build_shared_bundle_index_command``) rather than
+      silently ignoring the requested stash.
     """
 
     #: Overridable defaults. These sit at the LOWEST precedence layer, so a job
@@ -381,6 +495,8 @@ class AkmOpenCode(OpenCode):
         akm_env: dict[str, str] | None = None,
         akm_bundle_dir: str | None = None,
         seed_library_dir: str | Path | None = None,
+        stash_root: str | Path | None = None,
+        shared_bundle_path: str | None = None,
         **kwargs,
     ):
         # Pin opencode-ai unless the job overrode it. BaseInstalledAgent takes
@@ -398,9 +514,54 @@ class AkmOpenCode(OpenCode):
         self._akm_cli_spec = akm_cli_spec or AKM_CLI_SPEC
         self._seed_library_dir = Path(seed_library_dir or DEFAULT_SEED_LIBRARY_DIR)
 
+        # Host dir with one subdirectory per stash. An explicit stash_root
+        # (even a nonexistent one -- install() is what validates it) always
+        # wins; otherwise fall back to DEFAULT_STASH_ROOT only if it actually
+        # exists. Unlike the seed library, a missing default is NOT an error:
+        # harbor/stashes/ may not exist at all (the corpus workflow that
+        # populates it owns that half of the contract), and plain per-trial
+        # seeding must keep working when it doesn't.
+        if stash_root is not None:
+            self._stash_root: Path | None = Path(stash_root)
+        elif DEFAULT_STASH_ROOT.is_dir():
+            self._stash_root = DEFAULT_STASH_ROOT
+        else:
+            self._stash_root = None
+
+        # The accumulating arm. See the class docstring's "accumulating arm"
+        # section for what this changes and what it requires of the job.
+        self._shared_bundle_path = shared_bundle_path
+
         self._akm_env = {**self.AKM_ENV, **(akm_env or {})}
         if akm_bundle_dir:
             self._akm_env["AKM_BUNDLE_DIR"] = akm_bundle_dir
+        if self._shared_bundle_path:
+            # Wins over akm_bundle_dir: this is the more specific, more
+            # consequential lever (it also changes install()'s seeding and
+            # self-check behavior), so it should not lose to a more generic
+            # override quietly set alongside it.
+            #
+            # AKM_BUNDLE_DIR alone is NOT enough to make this arm's "learning"
+            # claim (decision D7) true. AKM_DATA_DIR (index.db + the
+            # usage_events table the ranker actually reads), AKM_STATE_DIR and
+            # AKM_CACHE_DIR would otherwise stay at their /opt/akm/...
+            # CONTAINER-LOCAL defaults -- wiped with the container every
+            # trial -- so a fresh trial got a fresh, empty index and ZERO
+            # learned ranking signal regardless of what the mounted bundle
+            # held, and `_build_shared_bundle_index_command()`'s "skip if
+            # already indexed" guard could never see a non-zero entryCount
+            # and therefore could never take its skip branch. Redirecting all
+            # four into hidden, namespaced siblings INSIDE the same
+            # host-backed mount as AKM_BUNDLE_DIR (not a sibling directory
+            # outside it -- only the mount target itself is guaranteed to
+            # persist across trials) fixes both: the index genuinely persists,
+            # and so does the ranker's learned state.
+            shared_root = self._shared_bundle_path.rstrip("/") or "/"
+            self._akm_env["AKM_BUNDLE_DIR"] = shared_root
+            self._akm_env["AKM_DATA_DIR"] = f"{shared_root}/.akm-bench-data"
+            self._akm_env["AKM_STATE_DIR"] = f"{shared_root}/.akm-bench-state"
+            self._akm_env["AKM_CACHE_DIR"] = f"{shared_root}/.akm-bench-cache"
+            self._akm_env["AKM_CONFIG_DIR"] = f"{shared_root}/.akm-bench-config"
 
         # True only for the duration of install(). See exec_as_agent().
         self._install_phase = False
@@ -469,14 +630,47 @@ class AkmOpenCode(OpenCode):
     @staticmethod
     @override
     def name() -> str:
-        """The A/B grouping key.
+        """The AGENT name (not the arm label -- see ``arm_name()``).
 
-        ``BaseAgent.to_agent_info()`` builds ``AgentInfo(name=self.name(), ...)``
-        and ``JobStatistics`` groups arms by ``trial_result.agent_info.name``.
-        Inheriting ``OpenCode.name()`` would report this arm as ``"opencode"``
-        and merge it into the control arm.
+        Inheriting ``OpenCode.name()`` would report this agent as
+        ``"opencode"`` and merge it into the control arm. Kept a
+        ``staticmethod`` to match ``BaseAgent.name()``'s declaration, which
+        ``BaseAgent.handoff()`` calls as ``cls.name()`` -- an instance method
+        here would turn that ``NotImplementedError`` into a ``TypeError``.
         """
-        return "akm-opencode"
+        return AKM_ARM_NAME
+
+    def arm_name(self) -> str:
+        """The A/B grouping key, which is per-INSTANCE, not per-class.
+
+        ``shared_bundle_path`` selects between two arms that decision D7
+        requires be analyzed separately (static = retrieval value,
+        accumulating = learning value), and Harbor's agent identity is
+        ``(AgentInfo.name, AgentInfo.version)`` and nothing else. Both arms
+        run this same class at the same pins, so ``version()`` is identical
+        too -- the name is the only field left that can separate them in
+        ``result.json``. See ``AKM_ARM_NAME`` for what merges if it does not.
+        """
+        return (
+            AKM_ACCUMULATING_ARM_NAME
+            if self._shared_bundle_path
+            else AKM_ARM_NAME
+        )
+
+    @override
+    def to_agent_info(self) -> AgentInfo:
+        """Report ``arm_name()`` as ``AgentInfo.name``.
+
+        ``AgentInfo`` is the only agent identity that reaches
+        ``result.json``, so this is the single point where the static and
+        accumulating arms become distinguishable to Harbor, to the viewer,
+        and to every downstream consumer. Everything else about the
+        inherited ``to_agent_info()`` (version, model info, the
+        ``MODEL_CONNECTION``-aware provider resolution) is left untouched.
+        """
+        info = super().to_agent_info()
+        info.name = self.arm_name()
+        return info
 
     @override
     def version(self) -> str | None:
@@ -504,7 +698,9 @@ class AkmOpenCode(OpenCode):
         """
         trajectory = super()._convert_events_to_trajectory(events)
         if trajectory is not None:
-            trajectory.agent.name = self.name()
+            # arm_name(), not name(): the trajectory must agree with
+            # result.json's agent_info about which ARM produced it.
+            trajectory.agent.name = self.arm_name()
         return trajectory
 
     # -- run-phase proof ----------------------------------------------------
@@ -689,11 +885,26 @@ class AkmOpenCode(OpenCode):
         below is therefore its own tripwire, and any command whose failure is
         acceptable carries an explicit ``|| true``.
         """
-        if not self._seed_library_dir.is_dir():
+        # The seed library precondition only applies to the static (per-trial
+        # seeded) arm. The accumulating arm skips seeding entirely -- see the
+        # class docstring -- so requiring this fixture would be an unrelated
+        # dependency that has nothing to do with whether that arm can run.
+        if self._shared_bundle_path is None and not self._seed_library_dir.is_dir():
             raise RuntimeError(
                 f"akm seed library not found at {self._seed_library_dir}. "
                 "It ships alongside this module at harbor/seed-library; pass "
                 "seed_library_dir=<path> if it lives elsewhere."
+            )
+        if (
+            self._shared_bundle_path is None
+            and self._stash_root is not None
+            and not self._stash_root.is_dir()
+        ):
+            raise RuntimeError(
+                f"akm stash root not found at {self._stash_root}. It must be a "
+                "directory with one subdirectory per stash. Pass "
+                "stash_root=<path> pointing at a directory that exists, or "
+                "omit the kwarg to use the plain seed-library default."
             )
 
         self._install_phase = True
@@ -752,25 +963,85 @@ class AkmOpenCode(OpenCode):
             command=self._build_link_binaries_command(akm_bin, node_bin),
         )
 
-        # 5. Upload the seed library. docker cp requires the destination
-        #    directory to exist, and lands files root-owned, hence the mkdir
-        #    before and the chown after.
-        await self.exec_as_root(
-            environment, command=f"mkdir -p {shlex.quote(AKM_SEED_DIR)}"
-        )
-        await environment.upload_dir(self._seed_library_dir, AKM_SEED_DIR)
-        await self.exec_as_root(
-            environment,
-            command=f"chown -R {owner} {shlex.quote(AKM_SEED_DIR)}",
-        )
+        if self._shared_bundle_path is None:
+            # 5. Upload the seed library. docker cp requires the destination
+            #    directory to exist, and lands files root-owned, hence the
+            #    mkdir before and the chown after.
+            await self.exec_as_root(
+                environment, command=f"mkdir -p {shlex.quote(AKM_SEED_DIR)}"
+            )
+            await environment.upload_dir(self._seed_library_dir, AKM_SEED_DIR)
+            await self.exec_as_root(
+                environment,
+                command=f"chown -R {owner} {shlex.quote(AKM_SEED_DIR)}",
+            )
 
-        # 6. Scaffold, seed and index the bundle. All local and deterministic:
-        #    no LLM, no network, no TTY.
-        await self.exec_as_agent(
-            environment,
-            command=self._build_seed_bundle_command(),
-            env=self._install_env,
-        )
+            # 5b. Upload the stash root, once, if configured. Selection among
+            #     its subdirectories happens container-side, in
+            #     _build_seed_bundle_command() -> _build_stash_select_command().
+            if self._stash_root is not None:
+                await self.exec_as_root(
+                    environment,
+                    command=f"mkdir -p {shlex.quote(AKM_STASH_ROOT_DIR)}",
+                )
+                await environment.upload_dir(self._stash_root, AKM_STASH_ROOT_DIR)
+                await self.exec_as_root(
+                    environment,
+                    command=f"chown -R {owner} {shlex.quote(AKM_STASH_ROOT_DIR)}",
+                )
+                # Defense in depth against answer-key leakage: the stash root
+                # is uploaded verbatim, and ONLY the treatment arm receives it.
+                # Any file sitting at the root of harbor/stashes/ (a README, a
+                # gold-ref map, conversion notes) would therefore be readable
+                # by the akm arm and not the baseline -- an arm-asymmetric
+                # information channel that can name gold refs or abstention
+                # answers. Repo hygiene keeps metadata in harbor/stashes-meta/
+                # (see its README), and this purge guarantees the invariant
+                # in-container even if a stray file lands at the root later.
+                # Stash CONTENT (files inside <root>/<stash>/) is untouched.
+                await self.exec_as_root(
+                    environment,
+                    command=(
+                        f"find {shlex.quote(AKM_STASH_ROOT_DIR)} "
+                        "-mindepth 1 -maxdepth 1 ! -type d -exec rm -f {} +"
+                    ),
+                )
+
+            # 6. Scaffold, seed and index the bundle. All local and
+            #    deterministic: no LLM, no network, no TTY.
+            await self.exec_as_agent(
+                environment,
+                command=self._build_seed_bundle_command(),
+                env=self._install_env,
+            )
+        else:
+            # 6'. The accumulating arm (decision D7). No upload, no scaffold,
+            #     no seed copy -- AKM_BUNDLE_DIR (set in __init__) already
+            #     points every exec at the shared, mounted bundle, which the
+            #     job's own setup is responsible for having pre-populated.
+            #     The only thing this agent still owns is making sure THIS
+            #     container's akm has an index of it at least once. See the
+            #     class docstring's "accumulating arm" section.
+            #
+            #     Wrapped in the shared flock: Harbor's per-agent
+            #     `n_concurrent` gates ONLY the agent.run() phase
+            #     (AGENT_START/AGENT_END), never agent.setup()/install() --
+            #     verified against `trial/queue.py` and `trial/trial.py`. A
+            #     job-level `n_concurrent_trials > 1` therefore lets multiple
+            #     accumulating-arm trials run install() concurrently even
+            #     with `n_concurrent: 1` set on this arm in the job config,
+            #     racing `akm index` (and, in the self-check below, `akm
+            #     feedback`) against the SAME shared, mounted bundle -- the
+            #     exact interleaving corruption `n_concurrent: 1` is supposed
+            #     to prevent. `flock` on a lock file INSIDE the shared mount
+            #     (host-backed, so it serializes across containers, not just
+            #     within one) closes that gap at the shell level regardless
+            #     of what `n_concurrent_trials` is set to.
+            await self.exec_as_agent(
+                environment,
+                command=self._wrap_shared_lock(self._build_shared_bundle_index_command()),
+                env=self._install_env,
+            )
 
         # 7. Pre-warm both opencode plugin caches while egress is still open.
         #    opencode installs npm plugins at SESSION START, i.e. during
@@ -784,10 +1055,16 @@ class AkmOpenCode(OpenCode):
             env=self._install_env,
         )
 
-        # 8. Fail the trial loudly rather than shipping a half-alive arm.
+        # 8. Fail the trial loudly rather than shipping a half-alive arm. On
+        #    the accumulating arm, probes 3-5 (search/curate/feedback -- see
+        #    _build_self_check_command) read AND WRITE the shared bundle, so
+        #    this exec is flock-wrapped for the same reason step 6' is.
+        self_check_command = self._build_self_check_command()
+        if self._shared_bundle_path:
+            self_check_command = self._wrap_shared_lock(self_check_command)
         await self.exec_as_agent(
             environment,
-            command=self._build_self_check_command(),
+            command=self_check_command,
             env={
                 **self._install_env,
                 "AKM_SEED_EXPECTED_BY_TYPE": json.dumps(SEED_EXPECTED_BY_TYPE),
@@ -798,26 +1075,64 @@ class AkmOpenCode(OpenCode):
 
     # -- shell command builders (pure; unit-tested without a container) ------
 
-    @staticmethod
-    def _build_akm_dirs_command(quoted_owner: str) -> str:
-        dirs = " ".join(
-            shlex.quote(d)
-            for d in (
-                AKM_ROOT,
-                AKM_BUNDLE_DIR,
-                AKM_CONFIG_DIR,
-                AKM_DATA_DIR,
-                AKM_CACHE_DIR,
-                AKM_STATE_DIR,
-                AKM_SEED_DIR,
-                INSTALL_XDG_DATA_HOME,
-                INSTALL_XDG_STATE_HOME,
-            )
+    def _build_akm_dirs_command(self, quoted_owner: str) -> str:
+        """Create (and chown) every akm directory this instance will use.
+
+        The fixed ``/opt/akm/...`` paths are always created, even for the
+        accumulating arm (harmless -- just unused by it, since its
+        ``AKM_ENV`` overrides point elsewhere). Two cases additionally need a
+        directory OUTSIDE ``AKM_ROOT``, which the fixed list can't cover:
+
+        * The accumulating arm redirects ``AKM_DATA_DIR`` / ``STATE_DIR`` /
+          ``CACHE_DIR`` / ``CONFIG_DIR`` into the shared, host-backed mount
+          alongside ``AKM_BUNDLE_DIR`` (see ``__init__``) -- those four must
+          exist there too, or the first ``akm`` invocation in that mount
+          fails with ENOENT instead of ever reaching the self-check.
+        * An operator-supplied ``akm_bundle_dir`` override (static arm only)
+          points ``AKM_BUNDLE_DIR`` somewhere other than the module's
+          ``AKM_BUNDLE_DIR`` constant; without creating/chowning THAT path
+          too, ``_build_seed_bundle_command()`` (which now targets the same
+          override -- see its docstring) fails the same way.
+        """
+        dirs = [
+            AKM_ROOT,
+            AKM_BUNDLE_DIR,
+            AKM_CONFIG_DIR,
+            AKM_DATA_DIR,
+            AKM_CACHE_DIR,
+            AKM_STATE_DIR,
+            AKM_SEED_DIR,
+            AKM_STASH_ROOT_DIR,
+            INSTALL_XDG_DATA_HOME,
+            INSTALL_XDG_STATE_HOME,
+        ]
+        if self._shared_bundle_path:
+            extra_owned = [
+                d
+                for d in (
+                    self._akm_env["AKM_DATA_DIR"],
+                    self._akm_env["AKM_STATE_DIR"],
+                    self._akm_env["AKM_CACHE_DIR"],
+                    self._akm_env["AKM_CONFIG_DIR"],
+                )
+                if d not in dirs
+            ]
+        elif self._akm_env["AKM_BUNDLE_DIR"] != AKM_BUNDLE_DIR:
+            extra_owned = [self._akm_env["AKM_BUNDLE_DIR"]]
+        else:
+            extra_owned = []
+
+        all_dirs = " ".join(shlex.quote(d) for d in (*dirs, *extra_owned))
+        chown_extra = (
+            f" && chown -R {quoted_owner} " + " ".join(shlex.quote(d) for d in extra_owned)
+            if extra_owned
+            else ""
         )
         return (
             "set -euo pipefail; "
-            f"install -d -m 0755 {dirs} && "
+            f"install -d -m 0755 {all_dirs} && "
             f"chown -R {quoted_owner} {shlex.quote(AKM_ROOT)}"
+            f"{chown_extra}"
         )
 
     def _build_install_akm_cli_command(self) -> str:
@@ -898,23 +1213,158 @@ class AkmOpenCode(OpenCode):
         # why pinning PATH on this arm only would be a confound. The final
         # `test -x` follows the symlinks, so a dangling link fails setup here
         # instead of degrading the plugin at run time.
+        #
+        # Refuse to `ln -sf` OVER a pre-existing non-symlink at either target
+        # path first. `ln -sf` force-replaces whatever is already there with
+        # no check, and nothing upstream of this guarantees the task image
+        # doesn't already ship a real binary at /usr/local/bin/node (the
+        # standard nodejs base-image location for a pinned toolchain version).
+        # Silently repointing it to this arm's nvm-installed Node would
+        # change which Node runtime the agent runs under -- a confound on
+        # this arm ONLY, not the control arm, which never touches this path.
+        # A pre-existing SYMLINK is fine to replace (idempotent across a
+        # retried setup); only a real file or directory is refused.
         akm = shlex.quote(akm_bin)
         node = shlex.quote(node_bin)
+        # Guarded with an explicit `if`, not a bare `&&` chain: under
+        # `set -e`, a standalone `[ -e "$x" ] && [ ! -L "$x" ] && fail` list
+        # would itself exit non-zero (and abort the whole script) the moment
+        # `[ -e "$x" ]` is false -- which is the NORMAL case on a fresh
+        # container, since neither target exists yet before the ln -sf
+        # below. `if ... ; then ... ; fi` is the construct `set -e` actually
+        # exempts from that trap.
+        guard = (
+            'for _akm_bench_target in /usr/local/bin/akm /usr/local/bin/node; do '
+            'if [ -e "$_akm_bench_target" ] && [ ! -L "$_akm_bench_target" ]; then '
+            'echo "AKM-BOOTSTRAP FATAL: $_akm_bench_target already exists and '
+            'is not a symlink -- refusing to overwrite it. The task image '
+            'likely ships its own toolchain there (a pinned Node runtime is '
+            'the common case for /usr/local/bin/node); force-replacing it '
+            'would change which runtime the agent runs under on this arm '
+            'ONLY, which is exactly the kind of treatment-only confound '
+            'AKM_ENV deliberately avoids for PATH. Use a base image that '
+            'does not pre-populate /usr/local/bin/{akm,node}." >&2; exit 1; '
+            "fi; done; "
+        )
         return (
             "set -euo pipefail; "
             "install -d -m 0755 /usr/local/bin && "
-            f"ln -sf {akm} /usr/local/bin/akm && "
+            + guard
+            + f"ln -sf {akm} /usr/local/bin/akm && "
             f"ln -sf {node} /usr/local/bin/node && "
             "test -x /usr/local/bin/akm && test -x /usr/local/bin/node"
         )
 
     @staticmethod
-    def _build_seed_bundle_command() -> str:
-        bundle = shlex.quote(AKM_BUNDLE_DIR)
+    def _build_stash_select_command(seed_dir: str, stash_root_dir: str) -> str:
+        """Resolve ``AKM_SEED_SRC`` container-side, from ``AKM_TASK_STASH``.
+
+        This is the akm-bench half of the cross-workflow contract: a
+        converted task names its stash by setting ``AKM_TASK_STASH`` via
+        ``[environment] env`` in its ``task.toml`` (the corpus workflow's
+        half). Selection is deliberately done HERE, at bundle-seed time
+        inside the container, rather than in Python at install time, because
+        the whole stash root is uploaded exactly ONCE and Harbor's task env
+        vars are only visible container-side.
+
+        Three cases, and only three:
+
+        * ``AKM_TASK_STASH`` unset (or empty) -> ``AKM_SEED_SRC`` stays
+          ``seed_dir``, i.e. the plain default. This is the common case for
+          any task that does not opt into a stash.
+        * ``AKM_TASK_STASH=<name>`` and ``<stash_root_dir>/<name>`` exists ->
+          ``AKM_SEED_SRC`` becomes that directory.
+        * ``AKM_TASK_STASH=<name>`` and ``<stash_root_dir>/<name>`` does NOT
+          exist -> loud setup failure. Falling back to ``seed_dir`` here
+          would silently seed the WRONG library for the task under test,
+          which is worse than not running the trial at all — the contract
+          explicitly forbids it.
+
+        ``<name>`` must be a plain directory name, checked in two steps
+        before it is ever pasted into a path:
+
+        1. Reject any value containing ``/`` (``../seed``, ``/etc``,
+           ``a/b``) — the shell ``case`` pattern ``*/*`` matches a ``/``
+           anywhere in the string, so this already catches every traversal
+           attempt that contains one, including ``../seed``.
+        2. Reject any value that does NOT start with an alphanumeric
+           character. This is the case ``*/*`` cannot catch: ``.`` and
+           ``..`` contain no ``/`` at all, yet ``[ -d "$root/." ]`` resolves
+           to the stash root itself (silently merging every stash together
+           when the seed loop below iterates its subdirectories) and
+           ``[ -d "$root/.." ]`` resolves to the stash root's PARENT — inside
+           ``AKM_ROOT``, whose subtree is `bundle/`, `config/`, `data/`,
+           `state/`, `cache/`, `seed/`, `stashes/` (copying `bundle/` and
+           friends into the target bundle right alongside the intended
+           content). Both are real directories that exist, so the `[ -d ]`
+           test alone cannot reject them — hence the separate check.
+
+        The contract is "a stash IN the uploaded root, or a loud failure",
+        and both of the above are directories that are emphatically not (or
+        not only) the named stash — so without these two guards, the case
+        the contract calls out as forbidden (silently seeding something
+        other than the named stash) is reachable through a traversing or
+        dot-only name.
+
+        Pure string building, parameterized on the real directories so it can
+        be unit-tested against a real bash and real tmp directories, since a
+        purely textual assertion cannot prove the ``[ -d ... ]`` branch
+        actually resolves the right thing.
+        """
+        seed = shlex.quote(seed_dir)
+        stash_dir = shlex.quote(stash_root_dir)
+        return (
+            f"AKM_SEED_SRC={seed}; "
+            'AKM_TASK_STASH_NAME="$(printenv AKM_TASK_STASH || true)"; '
+            'if [ -n "$AKM_TASK_STASH_NAME" ]; then '
+            'case "$AKM_TASK_STASH_NAME" in */*) '
+            'echo "AKM-BOOTSTRAP FATAL: AKM_TASK_STASH=$AKM_TASK_STASH_NAME '
+            'is not a plain stash name (it contains a /); a stash must be a '
+            f'direct subdirectory of {stash_dir}" >&2; exit 1 ;; esac; '
+            'case "$AKM_TASK_STASH_NAME" in '
+            '[A-Za-z0-9]*) ;; '
+            '*) echo "AKM-BOOTSTRAP FATAL: AKM_TASK_STASH=$AKM_TASK_STASH_NAME '
+            'is not a plain stash name (must start with a letter or digit -- '
+            'this rejects \\".\\", \\"..\\" and hidden-style names, which are '
+            f'real directories under {stash_dir} but are not a named stash)" '
+            '>&2; exit 1 ;; esac; '
+            f'AKM_STASH_CANDIDATE={stash_dir}/"$AKM_TASK_STASH_NAME"; '
+            'if [ -d "$AKM_STASH_CANDIDATE" ]; then '
+            'AKM_SEED_SRC="$AKM_STASH_CANDIDATE"; else '
+            'echo "AKM-BOOTSTRAP FATAL: AKM_TASK_STASH=$AKM_TASK_STASH_NAME '
+            f'not found under {stash_dir} (uploaded stash_root); refusing to '
+            'silently fall back to the default seed library -- that would '
+            'seed the wrong library for this task and corrupt this arm" >&2; '
+            'exit 1; fi; fi'
+        )
+
+    def _build_seed_bundle_command(self) -> str:
+        # `self._akm_env["AKM_BUNDLE_DIR"]`, NOT the module constant: the
+        # `akm_bundle_dir` kwarg (static arm only -- the accumulating arm
+        # always wins that override, see __init__) points every exec's
+        # AKM_BUNDLE_DIR at the override, so the bundle actually SEEDED here
+        # must be the same path or the self-check's `bundleDir !== want`
+        # probe fails every trial with a config the operator explicitly
+        # asked for. Byte-identical to the module constant when no override
+        # was given.
+        bundle = shlex.quote(self._akm_env["AKM_BUNDLE_DIR"])
         seed = shlex.quote(AKM_SEED_DIR)
+        if self._stash_root is None:
+            # No stash root configured for this instance: byte-identical to
+            # the pre-stash-selection command, seeding from AKM_SEED_DIR
+            # directly with no container-side branching at all.
+            select_prefix = ""
+            seed_source = seed
+        else:
+            select_prefix = (
+                self._build_stash_select_command(AKM_SEED_DIR, AKM_STASH_ROOT_DIR)
+                + "; "
+            )
+            seed_source = '"$AKM_SEED_SRC"'
         return (
             "set -euo pipefail; "
             "[ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; "
+            + select_prefix +
             # `akm setup` is never used: it hard-fails on a non-TTY without
             # --yes. `bundle create` is the low-level primitive. --set-default
             # is REQUIRED; without it a --dir with an existing default is
@@ -924,7 +1374,7 @@ class AkmOpenCode(OpenCode):
             # layout by merging into the scaffolded dirs and skips the seed's
             # own README.md at the root (which akm would otherwise not index,
             # but which has no business in a bundle).
-            f'for d in {seed}/*/; do [ -d "$d" ] || continue; '
+            f'for d in {seed_source}/*/; do [ -d "$d" ] || continue; '
             f'cp -a "$d" {bundle}/; done && '
             # `cp -a` relaxes pre-existing 0700 dirs to 0755. The current seed
             # ships neither env/ nor secrets/, but the scaffold creates them and
@@ -935,6 +1385,90 @@ class AkmOpenCode(OpenCode):
             # write, but an explicit full index makes the install-time state
             # deterministic.
             "akm index --full"
+        )
+
+    def _wrap_shared_lock(self, command: str) -> str:
+        """Serialize ``command`` against every OTHER trial's setup phase that
+        touches this accumulating arm's shared bundle, via ``flock`` on a
+        lock file INSIDE the shared, host-backed mount.
+
+        Only meaningful (and only ever called) when ``self._shared_bundle_path``
+        is set. The lock file lives at ``<shared_bundle_path>/.akm-bench-setup.lock``
+        rather than somewhere container-local specifically because it must be
+        visible to and shared by every trial's container, and the mounted
+        bundle directory is the one path guaranteed to be backed by the SAME
+        host file across all of them (see the class docstring's "a job-level
+        mount" requirement). ``flock -c '<command>'`` acquires the lock,
+        forks a shell to run ``<command>``, waits for it, and releases the
+        lock -- so this wraps one shell invocation per call, not the whole
+        install() phase; call it around each shared-bundle-touching exec
+        individually rather than once around all of them, since Harbor
+        issues install()'s steps as separate execs.
+
+        If the base image lacks ``flock`` (util-linux), this fails loudly
+        with "command not found" rather than silently running unserialized
+        -- consistent with every other precondition in this module.
+        """
+        assert self._shared_bundle_path is not None
+        lock_path = f"{self._shared_bundle_path.rstrip('/') or '/'}/.akm-bench-setup.lock"
+        return f"flock {shlex.quote(lock_path)} -c {shlex.quote(command)}"
+
+    @staticmethod
+    def _build_shared_bundle_index_command() -> str:
+        """The accumulating arm's entire "seeding" step: index, maybe.
+
+        No ``bundle create``, no seed copy -- the mounted directory at
+        ``AKM_BUNDLE_DIR`` (set to ``shared_bundle_path`` in ``__init__``,
+        which every ``exec_as_agent`` call carries automatically) must
+        already be a valid, populated akm bundle; see the class docstring.
+        This command's only job is to make sure THIS container's akm has an
+        index of it, without redundantly rebuilding one that another trial
+        already built -- an unconditional ``akm index --full`` on every trial
+        would still be correct, but wastefully re-embeds the same content
+        every single trial as the bundle grows.
+
+        Since ``__init__`` now redirects ``AKM_DATA_DIR`` into the same
+        shared, host-backed mount as ``AKM_BUNDLE_DIR``, ``akm info``'s
+        ``indexStats.entryCount`` here reflects the REAL persisted index
+        across trials -- not a fresh, always-empty container-local one -- so
+        the skip branch below can actually fire once another trial has
+        already indexed the bundle.
+
+        Also asserts the accumulating-arm half of the cross-workflow stash
+        contract: a converted task naming a per-task stash via
+        ``AKM_TASK_STASH`` has no effect on this arm at all (there is one
+        shared bundle for every task, by construction -- see the class
+        docstring), so running such a task here would silently measure it
+        against whatever the shared bundle happens to contain instead of
+        the stash it declared. Fail loudly rather than let that pass
+        unnoticed, the same "loud failure over silent corruption" contract
+        ``_build_stash_select_command`` enforces for the static arm.
+        """
+        has_index_js = (
+            'const fs=require("fs");'
+            "let n=0;"
+            'try{const i=JSON.parse(fs.readFileSync("/tmp/akm-shared-info.json","utf8"));'
+            'n=(i.indexStats||{}).entryCount||0;}catch(e){n=0;}'
+            'process.stdout.write(n>0?"1":"0");'
+        )
+        return (
+            "set -euo pipefail; "
+            "[ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; "
+            'AKM_TASK_STASH_NAME="$(printenv AKM_TASK_STASH || true)"; '
+            'if [ -n "$AKM_TASK_STASH_NAME" ]; then '
+            'echo "AKM-BOOTSTRAP FATAL: AKM_TASK_STASH=$AKM_TASK_STASH_NAME is '
+            'set on this task, but the akm-accumulating arm uses ONE shared '
+            'bundle for every task in the job and has no per-task stash '
+            'selection -- silently ignoring the requested stash would measure '
+            'this trial against whatever the shared bundle happens to contain '
+            'instead of the stash the task declared, which is worse than not '
+            'running the trial at all. Either drop this task from the '
+            'akm-accumulating arm dataset, or remove AKM_TASK_STASH from its '
+            'task.toml [environment] env." >&2; exit 1; fi; '
+            "akm info --format json -q > /tmp/akm-shared-info.json 2>/dev/null "
+            "|| true; "
+            f"HAS_INDEX=\"$(node -e '{has_index_js}')\"; "
+            'if [ "$HAS_INDEX" != "1" ]; then akm index; fi'
         )
 
     def _build_warm_caches_command(self) -> str:
@@ -993,14 +1527,41 @@ class AkmOpenCode(OpenCode):
             "-- warmup >/dev/null 2>&1 || true"
         )
 
-    @staticmethod
-    def _build_self_check_command() -> str:
+    def _build_self_check_command(self) -> str:
         """Assert the bootstrap actually took. Any failure aborts the trial.
 
         Every JS fragment below is single-quote-free so it can be embedded in a
         single-quoted ``node -e`` argument.
+
+        Probe 2 (the seed-count assertions, ``info_js`` below) runs its FULL
+        per-type form only for the static per-trial-seeded arm.
+        ``AKM_SEED_EXPECTED_BY_TYPE`` / ``AKM_SEED_MIN_ENTRIES`` describe the
+        seed-library fixture that arm writes; the accumulating arm
+        (``shared_bundle_path`` set) never writes it -- it only indexes a
+        bundle the job's own setup is responsible for pre-populating (see
+        the class docstring) -- so asserting those per-type counts would
+        fail every accumulating-arm trial for a reason that has nothing to
+        do with whether the plugin works. It still gets a LIGHTER form of
+        the same probe (``info_js_accumulating`` below): ``bundleDir``
+        resolved to the shared mount, and a non-empty index. Both are
+        arm-agnostic facts (unlike the per-type counts, they don't depend on
+        what the shared bundle happens to contain) and both were previously
+        skipped entirely, which meant the single most consequential question
+        for this arm -- did ``AKM_BUNDLE_DIR`` actually resolve to the
+        mounted path, and is there anything indexed at all -- went
+        unverified until probes 3-5 failed with an error that named the
+        wrong cause (an empty knowledge/ enumeration, not "the mount is
+        empty or misconfigured"). Every OTHER probe -- akm on PATH (1, 1b),
+        the read/rank/mutate paths (3, 4, 5), the plugin cache (6),
+        CLI-version skew (7), the pin-bypass hole (7b), and the run-phase
+        log line (8) -- still gates this arm exactly as it gates the static
+        one, and inherits the same coupling to the seed library's specific
+        content (a ``knowledge/`` prefix with >=4 entries; a
+        ``knowledge/deployment-runbook`` ref) that the static arm has --
+        the shared bundle must contain equivalent content, which is exactly
+        why every job config that uses this arm suggests pre-populating the
+        mount from ``harbor/seed-library/``.
         """
-        bundle = shlex.quote(AKM_BUNDLE_DIR)
         info_js = (
             "const fs=require(\"fs\");"
             "const i=JSON.parse(fs.readFileSync(\"/tmp/akm-info.json\",\"utf8\"));"
@@ -1019,6 +1580,28 @@ class AkmOpenCode(OpenCode):
             "if((byType[k]||0)<wantByType[k])throw new Error(\"byType.\"+k+\"=\"+"
             "(byType[k]||0)+\" want>=\"+wantByType[k]);}"
             "console.log(\"akm info OK: entries=\"+n+\" bundle=\"+i.bundleDir);"
+        )
+        # The accumulating arm's lighter probe 2: bundleDir resolved to the
+        # shared mount, and SOMETHING is indexed. No defaultBundle check
+        # (this agent never runs `bundle create --set-default` for this arm
+        # -- see the class docstring) and no per-type counts (the shared
+        # bundle's content is the job setup's responsibility, not a fixture
+        # this agent controls the shape of).
+        info_js_accumulating = (
+            "const fs=require(\"fs\");"
+            "const i=JSON.parse(fs.readFileSync(\"/tmp/akm-info.json\",\"utf8\"));"
+            "const want=process.env.AKM_BUNDLE_DIR;"
+            "if(i.bundleDir!==want)throw new Error(\"bundleDir=\"+i.bundleDir+"
+            "\" want=\"+want+\" -- AKM_BUNDLE_DIR did not resolve to the shared "
+            "mount\");"
+            "const stats=i.indexStats||{};"
+            "const n=stats.entryCount;"
+            "if(!(n>0))throw new Error(\"indexStats.entryCount=\"+n+\" (want >0); "
+            "the shared bundle must be pre-populated and indexed before the "
+            "first trial runs -- see the accumulating-arm operational "
+            "requirements in AkmOpenCode's class docstring\");"
+            "console.log(\"akm info OK (accumulating): entries=\"+n+\" bundle=\"+"
+            "i.bundleDir);"
         )
         # FTS does NOT stem: `akm search "deploy"` returns zero hits against
         # deployment-runbook. Health checks must use prefix enumeration.
@@ -1041,6 +1624,15 @@ class AkmOpenCode(OpenCode):
             "if(hoisted!==global_)throw new Error(\"akm-cli skew: in-process=\"+"
             "hoisted+\" global=\"+global_);"
             "console.log(\"akm-cli versions agree: \"+hoisted);"
+        )
+        # 2) config, bundle and index agree, and the seed landed. The
+        #    accumulating arm gets the lighter `info_js_accumulating` form
+        #    instead -- see the docstring above.
+        active_info_js = info_js if self._shared_bundle_path is None else info_js_accumulating
+        seed_count_probe = (
+            "akm info --format json -q > /tmp/akm-info.json || "
+            'fail "akm info failed"; '
+            f"node -e '{active_info_js}' || fail \"akm info assertions failed\"; "
         )
         return (
             "set -euo pipefail; "
@@ -1068,10 +1660,7 @@ class AkmOpenCode(OpenCode):
             '"$AKM_CLI_VERSION_PREFIX"*) ;; '
             '*) fail "akm --version=$AKM_GLOBAL_VERSION does not satisfy '
             '${AKM_CLI_VERSION_PREFIX}x" ;; esac; '
-            # 2) config, bundle and index agree, and the seed landed.
-            "akm info --format json -q > /tmp/akm-info.json || "
-            'fail "akm info failed"; '
-            f"node -e '{info_js}' || fail \"akm info assertions failed\"; "
+            + seed_count_probe +
             # 3) read path.
             f"akm search {shlex.quote('knowledge/')} --format json -q "
             '> /tmp/akm-search.json || fail "akm search failed"; '

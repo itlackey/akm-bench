@@ -6,6 +6,7 @@ bench-results/
 config/opencode.local.json
 src/*.json
 **/__pycache__/
+**/.pytest_cache/
 results/bench-report-*.json
 !results/reference/
 tests/tmp-report-output/

@@ -447,14 +447,14 @@ result. Two of these are the treatment; the rest are cost or confound.
 | # | Asymmetry | Class |
 |---|---|---|
 | 1 | **Warm vs. cold opencode first boot.** Install step 7 boots a full opencode session on the treatment arm to warm `~/.cache/opencode` and `~/.config/opencode`. The control arm's `install()` ends at `opencode --version`, so its *first real session* — plugin-manager bootstrap, `@opencode-ai/plugin` install, models.dev registry fetch — happens **inside the measured agent phase**. | **Confound, favours treatment** |
-| 2 | **`OPENCODE_DISABLE_AUTOUPDATE=true`** is in `AKM_ENV`, so it reaches the treatment arm's process env only. The control arm has `"autoupdate": false` in `opencode.json` and no such variable. Two different mechanisms for the same intent; if one is weaker, the arms diverge. | Confound, direction unknown |
-| 3 | **~432MB of extra disk** under `/opt/akm` and in the global npm prefix, plus `/usr/local/bin/akm` and `/usr/local/bin/node` symlinks, on the treatment arm only. | Confound (disk-pressure only) |
-| 4 | **Extra setup wall-clock** on the treatment arm — npm install, bundle seed, `akm index --full`, the warm boot, the self-check. This is charged to the *setup* phase, not the agent phase, so it does not enter the measurement. | Cost, not validity |
-| 5 | **The `AKM_*` environment** (`AKM_BUNDLE_DIR`, `AKM_AUTO_CURATE`, timeouts, `AKM_EVENT_SOURCE`, …) on the treatment process. | **Intended — this is the treatment** |
-| 6 | **The `plugin` array and the `tools` map** in `opencode.json`. | **Intended — this is the treatment** |
+| 2 | **~432MB of extra disk** under `/opt/akm` and in the global npm prefix, plus `/usr/local/bin/akm` and `/usr/local/bin/node` symlinks, on the treatment arm only. | Confound (disk-pressure only) |
+| 3 | **Extra setup wall-clock** on the treatment arm — npm install, bundle seed, `akm index --full`, the warm boot, the self-check. This is charged to the *setup* phase, not the agent phase, so it does not enter the measurement. | Cost, not validity |
+| 4 | **The `AKM_*` environment** (`AKM_BUNDLE_DIR`, `AKM_AUTO_CURATE`, timeouts, `AKM_EVENT_SOURCE`, …) on the treatment process. | **Intended — this is the treatment** |
+| 5 | **The `plugin` array and the `tools` map** in `opencode.json`. | **Intended — this is the treatment** |
 
-Two former entries on this list have been removed from the agent and should
-**not** be described as present; re-check both before a run rather than trusting
+Three former entries on this list have been removed from the agent (or, for
+the second one, closed by editing the job config) and should **not** be
+described as present; re-check all three before a run rather than trusting
 this paragraph:
 
 - **A hard `PATH` replacement.** `AKM_ENV` used to set
@@ -470,9 +470,17 @@ this paragraph:
 - **Five invalid `akm_*` keys inside `permission`.** See the previous section;
   verify with the render script there and expect `keys only in treatment` to be
   `['plugin', 'tools']`.
+- **`OPENCODE_DISABLE_AUTOUPDATE=true` reaching only the treatment arm's
+  process env.** `AKM_ENV` sets it there; `p0-smoke.yaml`'s control arm now
+  carries the same variable via its own `env:` block (alongside its
+  pre-existing `opencode_config.autoupdate: false`), specifically so this is
+  no longer two different, possibly-unequal mechanisms on the two arms.
+  Verify with `grep -A2 'env:' harbor/jobs/p0-smoke.yaml` and expect
+  `OPENCODE_DISABLE_AUTOUPDATE: "true"` under the control arm's block, not
+  only the treatment arms'.
 
-If either check comes back the other way, the A/B is confounded and the run is
-not valid evidence.
+If any of these checks comes back the other way, the A/B is confounded and
+the run is not valid evidence.
 
 ### `models.dev` reachability
 

@@ -1,0 +1,411 @@
+# Terminal-Bench 2.0 three-arm A/B: baseline (stock opencode) vs akm-static
+# (pristine per-trial akm bundle) vs akm-accumulating (shared, mutable akm
+# bundle across trials). Three arms is decision D7 of
+# docs/plans/benchmark-harness-decisions.md -- it isolates akm's RETRIEVAL
+# value (akm-static) from its LEARNING value (akm-accumulating), at the cost
+# of roughly tripling run count relative to a two-arm baseline/treatment A/B.
+#
+# Read harbor/akm_opencode.py (the AkmOpenCode class docstring, especially
+# "The accumulating arm" section) and docs/harbor-p0.md before editing this
+# file -- both explain WHY each field below is shaped the way it is, in more
+# depth than fits in inline comments here. This file follows
+# harbor/jobs/p0-smoke.yaml's structure and conventions; that file has the
+# two-arm version of most of what's below with even more detail.
+#
+#   PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/tb2-ab.yaml
+#
+# PYTHONPATH is REQUIRED. Harbor resolves `import_path` with a plain
+# importlib.import_module -- no sys.path manipulation, no file-path support --
+# so `harbor.akm_opencode:AkmOpenCode` only resolves when the repo root is
+# importable. See docs/harbor-p0.md's "PYTHONPATH trap" section.
+#
+# BEFORE YOU RUN, edit:
+#   1. every `model_name:` below (there are three, one per arm -- they MUST
+#      match exactly, or the A/B compares different models instead of
+#      different akm configurations)
+#   2. `environment.mounts[0].source` -- an absolute host path for the
+#      akm-accumulating arm's shared bundle
+#   3. pre-populate that host path with a valid, seeded akm bundle (e.g. a
+#      copy of harbor/seed-library/ run through `akm bundle create` +
+#      `akm index --full`) before the first trial -- AkmOpenCode with
+#      shared_bundle_path set only INDEXES a shared bundle, it never seeds
+#      one. An empty mount is not a null treatment; it is a broken one.
+#   4. the `datasets:` block's task_names / n_tasks -- see the COST WARNING
+#      near the bottom before running against the full 89-task set
+#
+# NOT resolved by this file -- decision D3 (network policy for the akm arms)
+# is still OPEN in docs/plans/benchmark-harness-decisions.md. Terminal-Bench
+# 2.0 tasks commonly restrict egress per-task. `extra_allowed_hosts` below
+# only reaches the AGENT phase (not agent setup) and is a silent no-op on any
+# task whose environment.network_mode is "public" (Harbor's default) --
+# see docs/harbor-p0.md's "Network policy: what extra_allowed_hosts does and
+# does not do" section for the full four-part explanation, including the
+# `none`-mode trap where adding an allowlist entry can cut off the model API
+# instead of the intended plugin-fetch host. Re-check each TB2 task's network
+# mode before trusting that the npm-registry allowlist below is doing
+# anything on it.
+
+job_name: akm-tb2-ab
+
+# Results land in <jobs_dir>/<job_name>/<trial>/, where <trial> is
+# `<task-name[:32]>__<shortuuid7>`. VERIFIED against Harbor v0.22.0 source:
+# `Job` passes `trials_dir=self.job_dir` (job.py) and `Trial.__init__` builds
+# `TrialPaths(trial_dir=config.trials_dir / config.trial_name)` (trial/trial.py),
+# so trial dirs are DIRECT children of the job dir -- there is NO intervening
+# per-task directory, and a `<job>/*/*/result.json` glob matches nothing.
+# analysis/src/loader.ts walks exactly this shape, and
+# bin/check-harbor-contract re-asserts it on every Harbor bump.
+jobs_dir: jobs
+
+# Attempts per (task x agent). >1 is what lets Harbor's own pass_at_k serve as
+# an independent sanity check on our statistics (decision D4) -- pass_at_k's
+# k-set starts at 2 (harbor/utils/pass_at_k.py::_eligible_k_values), so this
+# needs to be >=2 for that cross-check to produce anything at all. 5 is a
+# starting point, not a validated choice -- see the COST WARNING below before
+# raising it on the full task set.
+n_attempts: 5
+
+# Job-level concurrency ceiling. The akm-accumulating arm below pins its OWN
+# agents[].n_concurrent to 1 regardless of this value (shared-bundle writes
+# race at higher concurrency -- decision D7), so this number mostly governs
+# how fast the baseline and akm-static arms run. Harbor has no per-arm
+# override of n_concurrent_trials itself, only the per-agent ceiling under it
+# (models/job/config.py: validate_agent_concurrency_limits raises if any
+# agent.n_concurrent exceeds this).
+n_concurrent_trials: 4
+
+quiet: false
+
+# No global scaling. Every phase budget that matters is pinned per-agent
+# below (override_setup_timeout_sec / override_timeout_sec), identically on
+# all three arms, so a multiplier here could not silently favor one arm over
+# another the way it could if budgets came from task defaults instead.
+timeout_multiplier: 1.0
+
+environment:
+  type: docker
+  force_build: false
+  delete: true
+
+  # The akm-accumulating arm's persistent bundle. Harbor's
+  # EnvironmentConfig.mounts has no per-agent scoping (trial.py:
+  # Trial._agent_env_mounts appends config.environment.mounts to every
+  # trial's container regardless of which agent runs in it), so this mount
+  # reaches the baseline and akm-static containers too. That is harmless --
+  # nothing in those two arms' env points AKM_BUNDLE_DIR at this path -- but
+  # be aware of it if you are auditing what's mounted where.
+  #
+  # `--mounts` is also available as a CLI flag (`harbor run --mounts '<json>'`
+  # or the deprecated alias `--mounts-json`; see harbor/cli/jobs.py:885-895)
+  # taking the exact same Docker-Compose-service-volume-shaped JSON as this
+  # yaml block (ServiceVolumeConfig in
+  # harbor/models/trial/config.py). This file uses the yaml form so the mount
+  # travels with the job config under version control instead of living only
+  # on an operator's command line, where it is easy to forget on a rerun.
+  # This has been verified against the local Docker environment backend only
+  # (decision D7's consequences); cloud sandbox backends are unverified.
+  mounts:
+    - type: bind
+      # >>> EDIT ME <<< absolute host path, pre-populated with a seeded akm
+      # bundle (see point 3 in the header comment above). Must be the SAME
+      # path across the whole job -- that sameness across trials is the
+      # entire mechanism that makes "accumulating" mean anything.
+      source: /ABSOLUTE/PATH/TO/akm-tb2-shared-bundle
+      target: /shared/akm-bundle
+
+agents:
+  # ------------------------------------------------------------------ BASELINE
+  # Stock opencode, no akm. Byte-identical permission block and opencode-ai
+  # pin to the other two arms -- p0-smoke.yaml's control arm, unchanged, is
+  # the source of truth for why each of these keys is here; this just repeats
+  # it as the first of three arms instead of one of two.
+  - name: opencode
+
+    # >>> EDIT ME <<< must be byte-identical to the OTHER TWO arms'
+    # model_name below. `-m/--model` on the command line will NOT fill this
+    # in for a multi-agent job file -- see docs/harbor-p0.md.
+    model_name: PROVIDER/MODEL
+
+    kwargs:
+      # opencode-ai npm pin. Repeated verbatim from OPENCODE_VERSION in
+      # harbor/akm_opencode.py; the control arm cannot import that constant.
+      # All three arms in this file must carry the same value.
+      version: "1.18.21"
+
+      opencode_config:
+        "$schema": https://opencode.ai/config.json
+        autoupdate: false
+        # The COMPLETE set of keys opencode 1.18.21's Config.permission
+        # declares (@opencode-ai/sdk dist/gen/types.gen.d.ts:1161-1169) --
+        # mirrors AkmOpenCode.SHARED_PERMISSIONS. There is no
+        # read/write/grep/glob/list/patch key in that schema; an invented key
+        # grants nothing. This block is belt-and-braces (Harbor's
+        # OpenCode.run() already passes --dangerously-skip-permissions) and
+        # must stay byte-identical across all three arms for exactly that
+        # reason -- braces on some arms only would entangle "plugin present"
+        # with "permissions granted".
+        permission:
+          edit: allow
+          bash: allow
+          webfetch: allow
+          doom_loop: allow
+          external_directory: allow
+
+    # Kept identical across all three arms even though this arm has no plugin
+    # to fetch -- see the D3 note in the header comment. Asymmetric network
+    # policy would itself be a confound.
+    extra_allowed_hosts:
+      - registry.npmjs.org
+
+    # Belt-and-braces with opencode_config.autoupdate: false above, and
+    # deliberately symmetric with the two treatment arms: AkmOpenCode.AKM_ENV
+    # sets OPENCODE_DISABLE_AUTOUPDATE=true in their process env, a SECOND
+    # mechanism for the same intent that this arm otherwise has no
+    # equivalent of. If the config key were ever weaker than the env var in
+    # opencode 1.18.21, only this arm would attempt an autoupdate network
+    # call at session start -- a confound (network + latency), not a
+    # convenience.
+    env:
+      OPENCODE_DISABLE_AUTOUPDATE: "true"
+
+    # Identical across all three arms (see AKM-STATIC below for why the
+    # number is this large -- it is sized for the treatment arms' install,
+    # not this one, which will simply finish early).
+    override_setup_timeout_sec: 2700
+
+    # Identical across all three arms. Without this, the AGENT-phase budget
+    # comes from each TB2 task's own [agent] timeout_sec, which the treatment
+    # arms have to share with plugin session-start work this arm never pays
+    # -- an asymmetric budget here would make a treatment-only timeout read
+    # as "akm failed the task".
+    override_timeout_sec: 1800
+
+    # NO exclude_logs on any arm in this file. See akm-static below and
+    # docs/harbor-p0.md step 0: the run-phase opencode log is load-bearing
+    # evidence for the treatment arms' run-phase proof, and Harbor applies
+    # exclude_logs AFTER include_logs (harbor/utils/path_filter.py), so an
+    # exclude can never be rescued by an include. Collecting logs
+    # identically on all three arms keeps the evidence base symmetric even
+    # though only the treatment arms strictly need it.
+
+  # ---------------------------------------------------------------- AKM-STATIC
+  # opencode + akm-opencode, a PRISTINE per-trial bundle (seeded fresh in
+  # every container). Decision D7's first treatment arm: isolates akm's
+  # RETRIEVAL value from its LEARNING value (that's akm-accumulating, below).
+  #
+  # Deliberately terse: AkmOpenCode force-injects the plugin array, the
+  # `tools` map and the permission block (see _force_config() in
+  # harbor/akm_opencode.py), so this arm cannot silently degrade into a
+  # no-plugin run just because this file forgot something -- and if the
+  # plugin fails to load at run time anyway, populate_context_post_run()
+  # errors the trial instead of scoring it (AkmPluginNotLoadedError).
+  - import_path: harbor.akm_opencode:AkmOpenCode
+
+    # >>> EDIT ME <<< must equal the other two arms' model_name exactly.
+    model_name: PROVIDER/MODEL
+
+    kwargs:
+      # Same opencode pin as the other two arms. AkmOpenCode defaults to its
+      # own OPENCODE_VERSION constant when this is omitted; stated explicitly
+      # so all three arms are visibly pinned together in one file.
+      version: "1.18.21"
+      #
+      # NOT set here, on purpose:
+      #   opencode_config -- AkmOpenCode force-merges `plugin`, `tools` and
+      #     `permission` into the highest-precedence layer of
+      #     OpenCode._build_register_config_command(); anything set here
+      #     merges UNDER those, so this key is for genuinely extra config
+      #     only.
+      #   stash_root -- per the cross-workflow contract at the bottom of this
+      #     file, this defaults to harbor/stashes/ (the corpus-conversion
+      #     workflow's output) when that directory exists, and to the plain
+      #     seed-library (harbor/seed-library/) when it does not. A
+      #     converted TB2 task selects ITS stash by setting AKM_TASK_STASH in
+      #     its own task.toml [environment] env -- this job config does not,
+      #     and should not, name one.
+      #   akm_plugin_spec / akm_cli_spec -- pinned by AKM_PLUGIN_SPEC /
+      #     AKM_CLI_SPEC module constants in harbor/akm_opencode.py. Override
+      #     only to test a different plugin build.
+
+    # Required: opencode installs npm plugins at SESSION START (during
+    # agent.run(), under the agent-phase network policy). install() also
+    # pre-warms the plugin cache as a second, independent mitigation -- see
+    # docs/harbor-p0.md. Subject to the D3 caveat in this file's header.
+    extra_allowed_hosts:
+      - registry.npmjs.org
+
+    # This arm's install() does: node + opencode-ai, then
+    # `npm i -g akm-cli` (~432MB), bundle seed + index, a full opencode boot
+    # (with this arm's real config and model name) to warm both plugin
+    # caches, then the self-check. Harbor's 360s default is nowhere near
+    # enough. Identical across all three arms -- see BASELINE above.
+    override_setup_timeout_sec: 2700
+
+    # Byte-identical to the other two arms. See BASELINE above for why an
+    # asymmetric budget here would be a confound, not a convenience.
+    override_timeout_sec: 1800
+
+    # NO exclude_logs -- here it is load-bearing, not merely tidy:
+    # opencode's log under XDG_DATA_HOME carries the "AKM CLI resolved" /
+    # "AKM CLI resolution failed" lines that AkmOpenCode._assert_plugin_ran()
+    # requires before it will let a treatment trial score at all. Excluding
+    # "opencode/xdg-data/**" would turn every akm-static AND akm-accumulating
+    # trial into a hard error on any non-mounted/cloud environment (it is
+    # inert on local Docker only, per docs/harbor-p0.md step 0).
+
+    # Operator escape hatch. Values here reach the container as a Trial
+    # scoped exec-env overlay (BaseEnvironment._merge_env applies it LAST),
+    # so anything set here overrides AkmOpenCode.AKM_ENV's defaults. Left
+    # empty because the defaults are already the benchmark-correct ones.
+    env: {}
+
+  # ----------------------------------------------------------- AKM-ACCUMULATING
+  # opencode + akm-opencode, a SHARED mutable bundle across trials. Decision
+  # D7's second treatment arm -- the "akm learns" story. Read AkmOpenCode's
+  # class docstring ("The accumulating arm" section, harbor/akm_opencode.py)
+  # before running this: it lists the operational requirements this job
+  # config exists to satisfy. Each is repeated below as an inline comment at
+  # the field that satisfies it.
+  #
+  # ARM IDENTITY -- how this arm stays separate from akm-static above.
+  #
+  # Harbor's agent identity is (agent_info.name, agent_info.version) and
+  # NOTHING else: not the class, not the import path, not the kwargs. Both
+  # akm arms are the same class at the same opencode + plugin pins, so
+  # version() is byte-identical on both. Two independent guards keep them
+  # apart, and BOTH are exercised by tests:
+  #
+  #   1. AkmOpenCode.arm_name() -- setting shared_bundle_path (below) makes
+  #      to_agent_info() report `akm-opencode-accumulating` instead of
+  #      `akm-opencode`, so this arm is distinct in every result.json, in
+  #      trajectory.json, and to Harbor's own groupings (the `evals` key,
+  #      JobStatistics, the viewer's comparison grid, and the decision-D4
+  #      pass_at_k cross-check).
+  #   2. analysis/src/loader.ts::deriveArm -- folds a digest of
+  #      `config.agent.kwargs` into the arm label, so the two stay apart even
+  #      in results written before guard 1 existed, and so any FUTURE kwarg
+  #      that changes an arm without changing its name (stash_root,
+  #      akm_plugin_spec, seed_library_dir, ...) also splits correctly.
+  #
+  # Decision D7 requires this separation: "do not pool it with the static
+  # arm". Before both guards existed, a three-arm run of this file collapsed
+  # into TWO rows whose treatment mean described neither arm.
+  - import_path: harbor.akm_opencode:AkmOpenCode
+
+    # >>> EDIT ME <<< must equal the other two arms' model_name exactly.
+    model_name: PROVIDER/MODEL
+
+    # REQUIRED to be 1. Concurrent trials writing into the same mounted
+    # bundle race on akm's own state (decision D7's "order dependence"
+    # consequence) -- n_concurrent: 1 is what makes "accumulating" mean "an
+    # ordered sequence trial N can see everything trial 1..N-1 wrote" instead
+    # of "corrupted by interleaving", for the agent.run() phase specifically.
+    # It does NOT cover agent.setup()/install() -- Harbor's n_concurrent gates
+    # only AGENT_START/AGENT_END -- so AkmOpenCode additionally flocks its own
+    # setup steps that touch the shared bundle (see
+    # AkmOpenCode._wrap_shared_lock and the COST WARNING below); this field
+    # and that flock together are what make the "ordered sequence" property
+    # hold for the whole trial, not just its measured phase. This is a
+    # per-AGENT field
+    # (AgentConfig.n_concurrent in harbor/models/trial/config.py), NOT a
+    # kwarg -- AkmOpenCode.__init__ has no n_concurrent parameter, so putting
+    # this under kwargs: would silently do nothing and this arm would
+    # inherit the job-level n_concurrent_trials above instead.
+    n_concurrent: 1
+
+    kwargs:
+      version: "1.18.21"
+
+      # This is the entire switch: it moves AkmOpenCode from "seed a
+      # pristine per-trial copy" to "point AKM_BUNDLE_DIR at a shared,
+      # mutable path and only index it (never seed it)". MUST equal
+      # environment.mounts[0].target above exactly -- if these two values
+      # diverge, this arm's akm process writes into a container-local path
+      # nothing mounted, every trial's "accumulation" vanishes when the
+      # container is deleted, and the arm silently degrades into a second,
+      # slower akm-static run.
+      shared_bundle_path: /shared/akm-bundle
+
+    extra_allowed_hosts:
+      - registry.npmjs.org
+
+    # Identical to the other two arms. This arm's install() never seeds a
+    # bundle (only indexes one, and only if no trial has indexed it yet), so
+    # in practice it needs less setup time than akm-static -- but the number
+    # is kept identical rather than tuned down, on the same "asymmetric
+    # budget is itself a confound" logic as BASELINE above.
+    override_setup_timeout_sec: 2700
+    override_timeout_sec: 1800
+
+    # NO exclude_logs -- same reason as akm-static above.
+
+    env: {}
+
+# ============================================================================
+# COST WARNING -- read before touching n_tasks, task_names, or n_attempts
+# ============================================================================
+# terminal-bench@2.0 ships 89 tasks. This job runs THREE arms over every task
+# selected below, so total trial count is:
+#
+#     (tasks selected) x 3 arms x n_attempts (5 above)
+#
+# At the full 89 tasks that is 89 x 3 x 5 = 1,335 trials. The
+# akm-accumulating arm is additionally pinned to n_concurrent: 1, which
+# serializes that arm's agent.run() phase (Harbor's own AGENT_START/AGENT_END
+# gate) REGARDLESS of n_concurrent_trials above -- but Harbor's n_concurrent
+# gates ONLY that phase, never agent.setup()/install() (verified against
+# trial/queue.py and trial/trial.py), so with n_concurrent_trials > 1 that
+# arm's SETUP phases could still run concurrently against the same shared
+# bundle if AkmOpenCode did not separately close that gap. It does:
+# AkmOpenCode._wrap_shared_lock() flocks every setup step that touches the
+# shared bundle (the index command and the self-check's search/curate/
+# feedback probes) on a lock file inside the mount, so those are serialized
+# too, across containers, regardless of n_concurrent_trials. Net effect: all
+# 89 x 5 = 445 accumulating-arm trials' bundle-touching work (setup's
+# index/self-check AND the measured run) is effectively serialized -- only
+# each trial's non-bundle-touching setup steps (container build, Node /
+# opencode-ai / akm-cli install, symlink creation) may still overlap across
+# trials, which is harmless since those never touch the shared mount. Budget
+# wall-clock, not just API spend, around that arm specifically either way.
+#
+# Subset before any full sweep. Three equivalent ways, in order of how
+# reproducible they are:
+#   - `task_names:` / `exclude_task_names:` in the datasets block below
+#     (glob-matched against task name; models/job/config.py
+#     DatasetConfig._filter_task_ids)
+#   - `n_tasks:` in the datasets block (applied AFTER task_names filtering)
+#   - the CLI's `-i/--include-task-name`, `-x/--exclude-task-name`,
+#     `-l/--n-tasks` flags (harbor/cli/jobs.py), which override this file's
+#     dataset selection without editing it -- useful for a quick smoke run,
+#     but the selection then lives on a command line instead of in version
+#     control
+# swebench-ab.yaml's version of this warning is worse (500 tasks, not 89) --
+# read it too before running both in the same budget cycle.
+
+datasets:
+  - name: terminal-bench
+    version: "2.0"
+    # >>> EDIT ME <<< left commented out, the dataset resolves to all 89
+    # tasks -- a real, expensive default. See the COST WARNING above.
+    # task_names:
+    #   - <task-name-or-glob>
+    # exclude_task_names:
+    #   - <task-name-or-glob>
+    # n_tasks: 10
+
+# ============================================================================
+# Cross-workflow contract
+# (docs/plans/benchmark-harness-decisions.md D7; also stated in the system
+# prompt that produced this file as "CROSS-WORKFLOW CONTRACT")
+# ============================================================================
+# A converted TB2 task MAY set `[environment] env = { AKM_TASK_STASH =
+# "<stash-name>" }` in its own task.toml. AkmOpenCode reads that variable
+# CONTAINER-SIDE, at bundle-seed time, ONLY on the akm-static arm (the
+# akm-accumulating arm skips seeding entirely) -- and fails setup loudly,
+# rather than silently falling back to the default seed library, if the
+# named stash is not present under the uploaded stash_root. Nothing in THIS
+# file references individual stashes; stash selection is the converted
+# task's responsibility, not this job config's. harbor/stashes/ may not exist
+# yet in this tree at all -- AkmOpenCode's stash_root kwarg defaults to None
+# in that case, and this file does not set stash_root, so that default
+# applies unchanged.

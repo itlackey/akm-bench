@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Thin wrapper so `bin/akm-bench-analyze` works from any cwd, mirroring
+# `bin/akm-bench`'s convention of resolving paths relative to this script's
+# own location rather than the caller's cwd.
+#
+# The real CLI lives at analysis/src/cli.ts (implementation brief §6 / plan
+# phase P1) — see that file for usage.
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(dirname "${script_dir}")"
+
+exec bun run "${repo_root}/analysis/src/cli.ts" "$@"
