@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/docker-homelab--bridge-network"
+version = "1.0.0"
+description = "Attach two services to a custom internal bridge network"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "docker-homelab/bridge-network"
+domain = "docker-homelab"
+slice = "train"
+difficulty = "medium"
+stash = "docker-homelab"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "skills/docker-homelab"
+gold_ref_legacy = "skill:docker-homelab"
+memory_ability = "procedural_lookup"
+task_family = "docker-homelab/compose-basics"
+akm_keywords = "docker compose network bridge internal"
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "docker-homelab"

@@ -1,0 +1,55 @@
+{
+  "_schema": "top-level key = legacy gold_ref string (pre-0.9 'type:name' grammar) as it appears verbatim in fixtures/corpus/tasks/*/*/task.yaml. Value = array of {stash, ref09} pairs, one per distinct stash: value that legacy ref was paired with across the 46-task corpus (a legacy ref string can be reused unqualified against more than one stash \u2014 e.g. skill:opencode exists in both the noisy and multi-domain fixtures). ref09 is the exact akm 0.9.1 conceptId, copied verbatim from `akm search \"\" --shape agent` output after `akm index --full` on a hermetic copy of the named stash \u2014 never guessed. ref09: null + unresolvable: true means the asset could not be resolved (see reason).",
+  "_resolution_command": "AKM_FORCE_INIT_TMP_STASH=1 AKM_BUNDLE_DIR=<scratch>/bundle AKM_CONFIG_DIR=<scratch>/config AKM_DATA_DIR=<scratch>/data AKM_CACHE_DIR=<scratch>/cache AKM_STATE_DIR=<scratch>/state bun /home/user/akm/src/cli.ts search \"\" --limit 500 --shape agent",
+  "_coverage": "43 of 46 task.yaml files declare a gold_ref (grep '^gold_ref:' fixtures/corpus/tasks/*/*/task.yaml | wc -l == 43). Those 43 task instances collapse to 7 distinct legacy ref strings and 8 distinct (legacy ref, stash) pairs, all enumerated below; as of the execution-validation pass all 8 resolve to a ref09 that `akm show` exits 0 on. The remaining 3 tasks (_example/example-task, workflow-compliance/abstention-rust-async-haiku, workflow-compliance/tempting-shortcut-arithmetic) carry no gold_ref by design (abstention_case tasks -- the correct behaviour is to load nothing) and are not entries here; their converted task.toml omits the gold_ref key entirely rather than writing an empty string.",
+  "map": {
+    "skill:az-cli": [
+      {
+        "stash": "az-cli",
+        "ref09": "skills/az-cli"
+      }
+    ],
+    "skill:docker": [
+      {
+        "stash": "noisy",
+        "ref09": "skills/docker"
+      }
+    ],
+    "skill:docker-homelab": [
+      {
+        "stash": "docker-homelab",
+        "ref09": "skills/docker-homelab"
+      }
+    ],
+    "skill:drillbit": [
+      {
+        "stash": "drillbit",
+        "ref09": "skills/drillbit"
+      }
+    ],
+    "skill:inkwell": [
+      {
+        "stash": "inkwell",
+        "ref09": "skills/inkwell"
+      }
+    ],
+    "skill:opencode": [
+      {
+        "stash": "noisy",
+        "ref09": "skills/opencode"
+      },
+      {
+        "stash": "multi-domain",
+        "ref09": "skills/opencode"
+      }
+    ],
+    "workflow:configure-inkwell-service": [
+      {
+        "stash": "inkwell",
+        "ref09": "workflows/configure-inkwell-service",
+        "note": "RESOLVED in the execution-validation pass (2026-08-23). The fixture copy (fixtures/stashes/inkwell/) still fails akm 0.9.1 workflow-asset validation -- frontmatter 'steps' not a list, param 'service_name' not a JSON-Schema object, '## Step: ...' body headings not matching declared step ids -- and is therefore excluded from the index. The harbor/stashes/inkwell copy was migrated to the 0.9.1 workflow schema (type: workflow, steps: [{id: lookup-schema}, {id: apply-config}, {id: verify}], params as JSON Schema, body headings '## <step-id>' with '### gate' rubrics, and the body's stale 'akm show skill:inkwell' updated to the 0.9.1 grammar 'akm show skills/inkwell'). Step text and completion criteria are preserved verbatim in meaning. Verified: `akm index --full` now reports the workflow, `akm search \"\" --shape agent` lists ref 'workflows/configure-inkwell-service', and `akm show workflows/configure-inkwell-service` exits 0. fixtures/ is intentionally left untouched (owned by the legacy driver)."
+      }
+    ]
+  },
+  "unresolvable": []
+}

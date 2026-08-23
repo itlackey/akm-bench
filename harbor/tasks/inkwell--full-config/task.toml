@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/inkwell--full-config"
+version = "1.0.0"
+description = "Configure a complete inkwell service with scaling, healthcheck, and rate limits"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "inkwell/full-config"
+domain = "inkwell"
+slice = "eval"
+difficulty = "hard"
+stash = "inkwell"
+budget_tokens = 30000
+budget_wall_ms = 360000
+gold_ref = "skills/inkwell"
+gold_ref_legacy = "skill:inkwell"
+memory_ability = "multi_asset_composition"
+task_family = "inkwell/full-config"
+akm_keywords = "inkwell service scaling healthcheck limits rps burst"
+
+[verifier]
+timeout_sec = 1080.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "inkwell"

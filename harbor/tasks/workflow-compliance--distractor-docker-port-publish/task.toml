@@ -1,0 +1,38 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/workflow-compliance--distractor-docker-port-publish"
+version = "1.0.0"
+description = "Publish a port from a docker-compose web service"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "workflow-compliance/distractor-docker-port-publish"
+domain = "workflow-compliance"
+slice = "eval"
+difficulty = "medium"
+stash = "noisy"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "skills/docker"
+gold_ref_legacy = "skill:docker"
+memory_ability = "noisy_retrieval"
+task_family = "workflow-compliance/distractor"
+workflow_failure_category = "distractor-heavy"
+expected_workflows = ["akm-lookup-before-edit", "akm-correct-asset-use"]
+abstention_case = false
+akm_keywords = "docker compose port publish web service"
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "noisy"

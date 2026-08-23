@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/docker-homelab--compose-version-upgrade"
+version = "1.0.0"
+description = "Upgrade compose version 2 syntax to 3.8"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "docker-homelab/compose-version-upgrade"
+domain = "docker-homelab"
+slice = "train"
+difficulty = "medium"
+stash = "docker-homelab"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "skills/docker-homelab"
+gold_ref_legacy = "skill:docker-homelab"
+memory_ability = "procedural_lookup"
+task_family = "docker-homelab/compose-basics"
+akm_keywords = "docker compose version upgrade syntax"
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "docker-homelab"

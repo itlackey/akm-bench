@@ -1,0 +1,39 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/workflow-compliance--repeated-fail-opencode-provider-token-eval"
+version = "1.0.0"
+description = "Configure anthropic provider token and default model (eval variant)"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "workflow-compliance/repeated-fail-opencode-provider-token-eval"
+domain = "workflow-compliance"
+slice = "eval"
+difficulty = "hard"
+stash = "noisy"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "skills/opencode"
+gold_ref_legacy = "skill:opencode"
+memory_ability = "procedural_lookup"
+task_family = "workflow-compliance/repeated-failure"
+repeated_failure_group = "opencode-provider-config"
+workflow_failure_category = "repeated-failure-reflection-trigger"
+expected_workflows = ["akm-lookup-before-edit", "akm-correct-asset-use", "akm-negative-feedback-on-failure", "akm-reflect-after-repeated-failure"]
+abstention_case = false
+akm_keywords = "opencode config provider anthropic options apiKey env ANTHROPIC_API_KEY model"
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "noisy"

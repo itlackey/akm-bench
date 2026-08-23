@@ -1,0 +1,44 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/inkwell--workflow-configure-scaling"
+version = "1.0.0"
+description = "Configure rps-based autoscaling using the inkwell workflow"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+# NOTE: gold_ref was unresolvable in the first conversion pass -- the fixture
+# copy of workflows/configure-inkwell-service.md failed akm 0.9.1 workflow-asset
+# validation and was excluded from the index. The harbor/stashes/inkwell copy has
+# since been migrated to the 0.9.1 workflow schema, so the asset now indexes and
+# `akm show workflows/configure-inkwell-service` exits 0. See
+# harbor/stashes/gold-ref-map.json and harbor/stashes/README.md.
+[metadata]
+legacy_task_id = "inkwell/workflow-configure-scaling"
+domain = "inkwell"
+slice = "eval"
+difficulty = "medium"
+stash = "inkwell"
+budget_tokens = 30000
+budget_wall_ms = 360000
+gold_ref = "workflows/configure-inkwell-service"
+gold_ref_legacy = "workflow:configure-inkwell-service"
+memory_ability = "procedural_lookup"
+task_family = "inkwell/workflow"
+akm_keywords = "inkwell service configure workflow step autoscaling rps"
+workflow_failure_category = "workflow-skipped"
+expected_workflows = ["akm-workflow-followed"]
+abstention_case = false
+
+[verifier]
+timeout_sec = 1080.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "inkwell"

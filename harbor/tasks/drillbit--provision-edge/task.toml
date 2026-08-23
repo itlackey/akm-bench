@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/drillbit--provision-edge"
+version = "1.0.0"
+description = "Provision a drillbit edge node named sentinel-1 in az-west"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "drillbit/provision-edge"
+domain = "drillbit"
+slice = "eval"
+difficulty = "easy"
+stash = "drillbit"
+budget_tokens = 25000
+budget_wall_ms = 360000
+gold_ref = "skills/drillbit"
+gold_ref_legacy = "skill:drillbit"
+memory_ability = "procedural_lookup"
+task_family = "drillbit/provision"
+akm_keywords = "drillbit provision cluster tier region replicas"
+
+[verifier]
+timeout_sec = 1080.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "drillbit"

@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/az-cli--storage-account-create"
+version = "1.0.0"
+description = "Produce the az command to create a Standard_LRS storage account"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "az-cli/storage-account-create"
+domain = "az-cli"
+slice = "train"
+difficulty = "medium"
+stash = "az-cli"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "skills/az-cli"
+gold_ref_legacy = "skill:az-cli"
+memory_ability = "procedural_lookup"
+task_family = "az-cli/commands"
+akm_keywords = "az cli storage account create"
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "az-cli"

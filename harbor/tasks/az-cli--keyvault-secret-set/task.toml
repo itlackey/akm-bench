@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/az-cli--keyvault-secret-set"
+version = "1.0.0"
+description = "Produce the az command to set keyvault secret dbpass in myvault"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "az-cli/keyvault-secret-set"
+domain = "az-cli"
+slice = "train"
+difficulty = "easy"
+stash = "az-cli"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "skills/az-cli"
+gold_ref_legacy = "skill:az-cli"
+memory_ability = "procedural_lookup"
+task_family = "az-cli/commands"
+akm_keywords = "az cli keyvault secret set"
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "az-cli"
