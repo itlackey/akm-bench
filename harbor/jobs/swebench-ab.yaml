@@ -17,9 +17,12 @@
 #   1. every `model_name:` below (three arms, must match exactly)
 #   2. `environment.mounts[0].source` -- absolute host path for the
 #      akm-accumulating arm's shared bundle, PRE-POPULATED with a valid,
-#      seeded akm bundle before the first trial (AkmOpenCode with
-#      shared_bundle_path set only indexes a shared bundle, it never seeds
-#      one)
+#      seeded akm bundle before the first trial -- e.g. a copy of
+#      harbor/treatment-library/ (the hand-authored generic SWE skills
+#      bundle, decision D6 -- NOT harbor/seed-library/, the P0 smoke
+#      placeholder) run through `akm bundle create` + `akm index --full`
+#      (AkmOpenCode with shared_bundle_path set only indexes a shared
+#      bundle, it never seeds one)
 #   3. the `datasets:` block -- READ THE COST WARNING NEAR THE BOTTOM FIRST.
 #      swebench-verified is 500 tasks. Do not point this file at the full
 #      dataset without subsetting; see that section for exactly how.
@@ -154,6 +157,14 @@ agents:
 
     kwargs:
       version: "1.18.21"
+
+      # The cold-start library, decision D6 -- see tb2-ab.yaml's akm-static
+      # arm for the full rationale. Relative to the repo root, matching this
+      # file's own documented invocation (`cd akm-bench` then
+      # `PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/swebench-ab.yaml`) --
+      # AkmOpenCode resolves a relative seed_library_dir against the process
+      # CWD at install time, not against this YAML file's location.
+      seed_library_dir: harbor/treatment-library
       #
       # NOT set here, on purpose (same as tb2-ab.yaml):
       #   opencode_config -- AkmOpenCode force-merges plugin/tools/permission

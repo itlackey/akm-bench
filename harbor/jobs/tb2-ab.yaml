@@ -25,11 +25,14 @@
 #      different akm configurations)
 #   2. `environment.mounts[0].source` -- an absolute host path for the
 #      akm-accumulating arm's shared bundle
-#   3. pre-populate that host path with a valid, seeded akm bundle (e.g. a
-#      copy of harbor/seed-library/ run through `akm bundle create` +
-#      `akm index --full`) before the first trial -- AkmOpenCode with
-#      shared_bundle_path set only INDEXES a shared bundle, it never seeds
-#      one. An empty mount is not a null treatment; it is a broken one.
+#   3. pre-populate that host path with a valid, seeded akm bundle -- e.g. a
+#      copy of harbor/treatment-library/ (the hand-authored generic SWE
+#      skills bundle, decision D6 -- NOT harbor/seed-library/, which is the
+#      P0 smoke placeholder that proved the plumbing, not the benchmark
+#      content) run through `akm bundle create` + `akm index --full` --
+#      before the first trial. AkmOpenCode with shared_bundle_path set only
+#      INDEXES a shared bundle, it never seeds one. An empty mount is not a
+#      null treatment; it is a broken one.
 #   4. the `datasets:` block's task_names / n_tasks -- see the COST WARNING
 #      near the bottom before running against the full 89-task set
 #
@@ -209,6 +212,22 @@ agents:
       # own OPENCODE_VERSION constant when this is omitted; stated explicitly
       # so all three arms are visibly pinned together in one file.
       version: "1.18.21"
+
+      # The cold-start library, decision D6 of
+      # docs/plans/benchmark-harness-decisions.md: a hand-authored generic
+      # SWE skills bundle, replacing AkmOpenCode's own default
+      # (DEFAULT_SEED_LIBRARY_DIR, harbor/seed-library/ -- the ~15-asset P0
+      # smoke fixture that proved the plumbing, not benchmark content; see
+      # its own README). This bundle's quality caps the measurable effect of
+      # this whole A/B -- a weak library produces a null result that says
+      # nothing about akm. Relative to the repo root, matching this file's
+      # own documented invocation (`cd akm-bench` then
+      # `PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/tb2-ab.yaml`, per the
+      # header above) -- AkmOpenCode resolves a relative seed_library_dir
+      # against the process CWD at install time, not against this YAML
+      # file's location, so running from anywhere else silently resolves the
+      # wrong (or a nonexistent) directory.
+      seed_library_dir: harbor/treatment-library
       #
       # NOT set here, on purpose:
       #   opencode_config -- AkmOpenCode force-merges `plugin`, `tools` and

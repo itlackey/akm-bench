@@ -26,11 +26,19 @@
 # installed in that interpreter's environment -- `pip install harbor` or
 # `uv tool install harbor`, matching harbor/requirements.txt). Defaults to
 # `python3` on PATH. Deliberately does NOT set PYTHONPATH to this repo's
-# root: unlike harbor/akm_opencode.py and harbor/tests/, this script checks
-# the THIRD-PARTY harbor package itself, not this repo's `harbor/` shim
-# package (harbor/__init__.py) that shadows it -- so it must resolve
-# `import harbor` straight to the installed distribution, the same as any
-# consumer of harbor/requirements.txt would.
+# root -- but note precisely what that does and does not buy, verified
+# rather than assumed: this script feeds its program to python on STDIN, so
+# Python sets sys.path[0] to '' (the CWD), and this repo's own `harbor/`
+# shim package (harbor/__init__.py) is therefore importable regardless of
+# PYTHONPATH whenever this runs from the repo root -- `harbor.__file__` is
+# the repo shim here, not site-packages. What actually makes the checks
+# below exercise the THIRD-PARTY installed distribution is the shim's own
+# `extend_path` + attribute-forwarding (`harbor.__version__` reports the
+# real installed version through it, not a value the shim hardcodes). Not
+# setting PYTHONPATH keeps the repo root off the path for any SUBPROCESS
+# this script spawns; it is not what prevents the shim from loading in this
+# process. See .github/workflows/ci.yml's `harbor-agent` job for the same
+# note where it matters for CI, and docs/harbor-p0.md for more detail.
 #
 # Exit code: 0 if every check passes, 1 if any check fails or errors. Each
 # check prints PASS or a FAIL block naming what broke and what to look at

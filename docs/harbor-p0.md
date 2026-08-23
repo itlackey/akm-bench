@@ -637,22 +637,43 @@ Three failure signatures worth recognising:
   `AKM_PENDING_PROPOSAL_TIMEOUT` to 5s and `AKM_CURATE_TIMEOUT` to 15s to
   compensate. The treatment arm is inherently slower; do not read wall-clock as
   a quality signal.
-- **The seed library is a smoke fixture.** What the real benchmark library
-  should be is an open decision. See `harbor/seed-library/README.md`.
-- **Every claim about the akm CLI's own behaviour is source/doc-derived, not
-  executed.** `akm-cli` was never installed or run while writing any of this, so
-  the following are assumptions the first live run will test, not observations:
-  `akm bundle create` scaffolding ~12 `facts/conventions/*` templates (hence the
-  "~27 total entries" figure); `akm info --format json` reporting
-  `indexStats.byType` under the *singular* type keys
-  `knowledge/skill/command/agent/script/lesson` that `SEED_EXPECTED_BY_TYPE`
-  asserts against, rather than the plural directory names; `akm setup`
-  hard-failing on a non-TTY without `--yes`; `bundle create` leaving the default
-  pointer untouched without `--set-default`; `isTransientStashPath()` redirecting
-  config and cache for `/tmp`-resident bundles; a query-less `curate` exiting 2
-  with `MISSING_REQUIRED_ARGUMENT`; and `npm i -g akm-cli` weighing ~432MB. Each
-  of these is asserted by the install-time self-check, so a wrong assumption
-  fails **loudly at setup** rather than degrading a trial — but none is proven.
+- **The `harbor/seed-library/` fixture is a smoke fixture**, not the benchmark
+  library. The benchmark library is `harbor/treatment-library/` (D6), which
+  both A/B job configs now seed. See both READMEs.
+- **Most claims about the akm CLI's own behaviour have since been executed.**
+  This bullet originally read "every claim … is source/doc-derived, not
+  executed", because no `akm-cli` was available when it was written. A real
+  akm 0.9.1 has since been run hermetically (fresh
+  `AKM_BUNDLE_DIR`/`CONFIG`/`DATA`/`CACHE`/`STATE`, `AKM_FORCE_INIT_TMP_STASH=1`),
+  seeding through `_build_seed_bundle_command()`'s exact merge semantics
+  against both shipped libraries. Now **observed**, not assumed:
+  - `akm bundle create` scaffolds exactly 12 `facts/conventions/*` templates
+    (`byType.fact = 12`), so the seed-library total is 27 and the
+    treatment-library total 38 (as of the 2026-08-23 consolidation; 47
+    before it, on the pre-consolidation 35-asset draft) — both figures now
+    measured, not estimated.
+  - `akm info --format json` does report `indexStats.byType` under the
+    **singular** type keys the self-check asserts against
+    (`knowledge/skill/command/agent/script/lesson`). Note the asymmetry that
+    caught out an early verification pass: asset **refs** use the *plural*
+    directory name (`skills/systematic-debugging`,
+    `knowledge/build-failure-triage`, `lessons/…`) while `byType` keys are
+    singular. `knowledge` is both.
+  - `bundle create --set-default` and the `--dir` override behave as assumed;
+    `akm search "<prefix>/"` enumerates a subtree and its hits carry `ref`;
+    `akm feedback <ref> --positive` exits 0 for an indexed ref and exits 1
+    with `ASSET_NOT_FOUND` for an unindexed one; `akm curate` returns items
+    with no LLM configured.
+  - FTS is an implicit **AND** over every query token with no stopword
+    removal — measured, and the reason the treatment library carries
+    question-shaped `searchHints` (see its README).
+
+  Still assumed, not executed: `akm setup` hard-failing on a non-TTY without
+  `--yes`; `isTransientStashPath()` redirecting config and cache for
+  `/tmp`-resident bundles; a query-less `curate` exiting 2 with
+  `MISSING_REQUIRED_ARGUMENT`; and `npm i -g akm-cli` weighing ~432MB. Each is
+  asserted by the install-time self-check, so a wrong assumption fails
+  **loudly at setup** rather than degrading a trial.
 - **Where opencode writes its session log is an assumption about opencode, not a
   fact read out of Harbor.** Harbor's `OpenCode.run()` only exports
   `XDG_DATA_HOME=/logs/agent/opencode/xdg-data`; that opencode then writes
@@ -689,11 +710,42 @@ The plugin resolves its CLI in this order (`getResolvedAkmDetails()` →
 4. `$HOME/.local/bin/akm`
 5. the copy bundled beside the plugin (`<plugin>/node_modules/akm-cli`)
 
-Candidate 2 outranks the pin. That path is **npm's own independent resolution
-of the plugin's `"akm-cli": "^0.9.0"` dependency**, performed when opencode
-installs the plugin. The day `akm-cli@0.9.2` ships, npm will happily satisfy
-`^0.9.0` with it, and the measured run will exercise an unpinned CLI while
-`result.json` still reports the pinned version.
+Candidate 2 outranks the pin. Where it comes from was **wrong in an earlier
+draft of this document** — corrected here (2026-08-23) after reading opencode
+1.18.21's own source, not memory: it is **not** "npm's own independent
+resolution of the plugin's dependency, performed when opencode installs the
+plugin." Every npm install opencode 1.18.21 performs — the automatic one at
+session start (`plugin/shared.ts::resolvePluginTarget` → `Npm.add()`) and the
+manual `opencode plugin <mod> --global` CLI command (`cli/cmd/plug.ts` — the
+`--global` flag only changes where the plugin's *config-file entry* is
+patched, never where its npm dependencies land) — is rooted at
+`$HOME/.cache/opencode/packages/<sanitize(spec)>/`
+(`@opencode-ai/core` `packages/core/src/npm.ts`).
+
+**Correction — verified against the opencode 1.18.21 source clone.** An
+earlier revision of this section claimed that no live path ever installs into
+`~/.config/opencode` and that the directory-scoped `Npm.install()` export is
+dead code reachable only from opencode's own tests. That is wrong.
+`ConfigPaths.directories()` (`packages/opencode/src/config/paths.ts`) returns
+`Global.Path.config` as its **first** element, and
+`packages/opencode/src/config/config.ts:439` calls
+`npmSvc.install(dir, {add: [{name: "@opencode-ai/plugin", ...}]})` for every
+directory it returns (`config/tui.ts:238` does the same on the TUI path).
+That install is exactly what creates `~/.config/opencode/node_modules` — the
+directory self-check probe 6 already asserts must exist, and which
+`_build_warm_caches_command()`'s docstring has always described correctly.
+
+**What candidate 2 really is, restated correctly:** `~/.config/opencode` *is*
+an npm project root, but the only package opencode installs there is
+`@opencode-ai/plugin`, which has no `akm-cli` dependency — so
+`~/.config/opencode/node_modules/akm-cli` stays absent and candidate 2 stays
+unpopulated. The practical conclusion is unchanged (the overrides file is
+inert today; probes 7b/7c treat absence as healthy), but the *reason* is
+"nothing installs **akm-cli** there", not "nothing installs there". The
+distinction is load-bearing: the overrides manifest this agent writes into
+that directory **is** read, as the root manifest of a real Arborist reify
+rooted there — which is why it must be written before the warm boot rather
+than after, and why it is not merely decorative.
 
 Two more things make this worse than it sounds:
 
@@ -702,38 +754,101 @@ Two more things make this worse than it sounds:
   the resolution order above. `akm_search`, `akm_show` and `akm_curate` go
   through `runInProcess()`, which is a bare ES import
   (`import { akmSearch } from "akm-cli/dist/commands/read/search.js"`) resolved
-  by the module loader from the plugin's own location. Those two can be
-  different versions of akm-cli inside one session.
-- **Self-check #7 does not cover candidate 2.** It locates
-  `*/node_modules/akm-cli/package.json` under `$HOME/.cache/opencode` and
-  compares that to `akm --version`. It says nothing about
+  by the module loader from the plugin's own location — i.e. from
+  `$HOME/.cache/opencode/packages/<AKM_PLUGIN_SPEC>/node_modules/akm-cli`, the
+  SAME directory `Npm.add()` populates above, not `~/.config/opencode`. Those
+  two call paths can therefore run different versions of akm-cli inside one
+  session, and — since the in-process one is a bare module import, not a
+  spawned command — nothing on `~/.config/opencode`'s candidate list ever
+  reaches it at all.
+- **Self-check #7 does not cover candidate 2 or the in-process import root's
+  drift.** It locates `*/node_modules/akm-cli/package.json` under
+  `$HOME/.cache/opencode` and compares that to `akm --version`; it detects
+  skew but never corrects it, and says nothing about
   `~/.config/opencode/node_modules/.bin/akm`.
-- **Self-check #7b now does** (`akm_opencode.py`, probe `7b`). If
-  `~/.config/opencode/node_modules/.bin/akm` exists and its `--version` is not
-  `AKM_CLI_VERSION`, setup aborts with `akm-cli pin bypass: ...`. Absent is
-  fine — resolution then falls through to the pinned `akm` on PATH. This
-  converts the one silent-corruption path into a loud setup failure. It still
-  runs at install time, not at session start, and it does not cover the
-  in-process import path — see mitigation (1).
+- **Self-check #7b and #7c now cover candidate 2** (`akm_opencode.py`).
+  7b: if `~/.config/opencode/node_modules/.bin/akm` exists and its
+  `--version` is not `AKM_CLI_VERSION`, setup aborts with
+  `akm-cli pin bypass: ...`. 7c: same directory, checking
+  `node_modules/akm-cli/package.json`'s version directly rather than shelling
+  out to the `.bin` shim (catches a package present with no working bin
+  link). Absent is fine on both — nothing populates that directory today, so
+  absence is the expected case. Detection, not prevention, and — per the
+  correction above — a candidate that in practice is not what npm's plugin
+  install populates.
 
-Mitigations, in order of strength:
+### Mitigations — implemented, with caveats (2026-08-23)
 
-1. **npm `overrides`.** Write an `overrides` block pinning `akm-cli` to
-   `AKM_CLI_VERSION` into `~/.config/opencode/package.json` before the
-   cache-warm boot, so npm's own resolution of `^0.9.0` cannot float. This is
-   the only mitigation that also covers the in-process import path.
-2. **Extend the skew check** to probe every candidate in the resolution order.
-   *Implemented* as probe 7b for candidate 2, the one that outranks the PATH
-   pin. Detection, not prevention: it fails the trial rather than making the
-   right binary run, so (1) is still the stronger fix.
-3. **`AKM_LOCAL_BUILD_CLI=/usr/local/bin/akm`** in `AKM_ENV` wins outright over
+Both mitigations below are implemented in `AkmOpenCode.install()`, run as
+steps 7 and 9 (see `docs/harbor-p0.md`'s "What the agent actually does at
+install time" further down, and `harbor/akm_opencode.py`'s own docstrings on
+`_build_write_npm_overrides_command()` and
+`_build_align_hoisted_akm_cli_command()` for the complete verified/assumed
+split). Verification for both was done two ways: reading opencode 1.18.21's
+own source (not memory), and live `npm install` runs against the real,
+published `akm-opencode@0.9.202808220049` tarball from the npm registry — not
+simulated.
+
+1. **npm `overrides` in `~/.config/opencode/package.json` — implemented,
+   verified INERT against today's resolution, kept as insurance.** npm
+   `overrides` do constrain transitive dependency versions — verified with a
+   real install: a fresh `npm install akm-opencode@0.9.202808220049` run in a
+   directory pre-seeded with `{"overrides": {"akm-cli": "0.9.0"}}` installed
+   `akm-cli@0.9.0`, where the identical install with no overrides file
+   resolves `akm-cli@0.9.1` (the natural "latest satisfying `^0.9.0`"). But
+   they bind at the root of the directory the install actually happens in —
+   confirmed with a third run: the same overrides file written into an
+   unrelated directory has zero effect on an install elsewhere. Combined with
+   the corrected candidate-2 provenance above, this means the file is
+   **verified inert** against opencode 1.18.21's actual plugin-install root.
+   It is written anyway, before the cache-warm boot, as zero-cost insurance:
+   IF anything ever does install into `~/.config/opencode` (a human, a future
+   opencode version), this is what keeps that install pinned rather than
+   floating.
+2. **Force-realign the hoisted copy after the warm boot — implemented, and
+   this is the mitigation verified to actually close the hole.**
+   `_build_align_hoisted_akm_cli_command()` runs after the cache-warm boot
+   (which is what first creates
+   `$HOME/.cache/opencode/packages/<AKM_PLUGIN_SPEC>/node_modules/akm-cli` —
+   the directory the in-process `import()` resolves from, per the corrected
+   analysis above) and, if the version hoisted there disagrees with the pin,
+   runs `npm install --prefix <that tree> akm-cli@<pin> --ignore-scripts
+   --no-save` to force it back, then re-verifies. Verified empirically
+   against the real published tarball: with a naturally-resolved
+   `akm-cli@0.9.1` already hoisted, the realignment command surgically
+   swapped just that one package to a different requested version, left
+   `node_modules/akm-opencode` and the tree's `package.json` untouched, and
+   (being idempotent) is a nearly-free no-op on the common case where the
+   natural resolution already matches the pin. `--ignore-scripts` matches
+   opencode's own `Npm.add()` (`ignoreScripts: true`), so this introduces no
+   asymmetry beyond the version itself.
+3. **Extend the skew check to probe every candidate in the resolution
+   order.** *Implemented* as probes 7b and 7c for candidate 2. Detection, not
+   prevention — kept as defense-in-depth for the (currently unpopulated)
+   directory these two probes cover.
+4. **`AKM_LOCAL_BUILD_CLI=/usr/local/bin/akm`** in `AKM_ENV` wins outright over
    candidates 2–5 — but only for the exec path. The in-process tools ignore it,
-   so this is necessary-not-sufficient.
+   so on its own this is necessary-not-sufficient; (2) above is what covers
+   that path.
 
-With (2) in place the exec path fails loudly rather than silently drifting, but
-until (1) also lands treat the **in-process** tools' akm-cli as unverified
-for any run made after a newer 0.9.x ships, and re-warm the plugin cache whenever the
-global pin moves.
+**Caveats.** Mitigation (1) is real code, correctly implements npm overrides
+semantics, and does no harm — but per the verified analysis above it is not
+the reason the in-process path is safe; do not read its presence as proof of
+that on its own. Mitigation (2) is what makes the claim "the measured run
+cannot use an unpinned akm-cli on the in-process path" true today, and it is
+verified against a live install of the real package, not simulated — but,
+like every other install-time check in this file, it has never run inside an
+actual Harbor trial container (see "Not verified" above): the *directory
+layout* it depends on (`$HOME/.cache/opencode/packages/<spec>/node_modules`)
+is read from opencode's source, and confirmed only by installing the real
+package outside a container, not by observing a live `opencode` boot. If a
+future opencode version changes that cache layout, `_build_align_hoisted_akm_cli_command()`'s
+discovery `find` (the same glob probe 7 already trusts) will simply find
+nothing, and its "no hoisted akm-cli yet" branch will no-op silently while
+self-check probe 7's *existing*, harder failure ("no akm-cli hoisted beside
+the plugin") still catches the same layout change loudly at install time —
+so a layout change is not a silent-corruption risk, just an
+install-time failure to re-diagnose from probe 7's message.
 
 **As of 2026-08-22 the hole is latent, not active.** The npm registry was
 queried directly: `akm-cli` has exactly two stable `0.9.x` releases, `0.9.0` and
@@ -887,3 +1002,249 @@ PYTHONPATH="$(pwd)" pytest harbor/tests -q
 
 No Docker, no network, no credentials: container interaction goes through a
 recording fake and `install()` is asserted as a list of shell command strings.
+
+## D6 treatment library (`harbor/treatment-library/`)
+
+D6 (`docs/plans/benchmark-harness-decisions.md`) decided the akm treatment arm's
+cold-start library on terminal-bench 2.x and SWE-bench Verified would be a
+**hand-authored, generic software-engineering-practice bundle** — not derived
+from either benchmark's own repos, and not the P0 smoke fixture
+(`harbor/seed-library/`, which stays the default for `p0-smoke.yaml` and exists
+only to prove the plumbing). This section documents `harbor/treatment-library/`,
+that bundle, and how it was verified against a real `akm` binary. Provenance,
+the contamination policy, and the D6 "quality caps the effect" caveat are also
+recorded in `harbor/treatment-library/README.md`, which ships with the bundle.
+
+### Contamination policy
+
+Nothing benchmark-specific: no SWE-bench Verified repo names (`django`,
+`sympy`, `astropy`, `flask`, `requests`, `matplotlib`, ...), no terminal-bench
+task content or task-shaped scenarios, no fixture data that resembles either
+corpus. Every asset is generic engineering practice that would be reasonable
+advice in an arbitrary repository — the kind of thing that could plausibly
+transfer to *either* benchmark family, or to neither, without ever having read
+a task from one.
+
+### Coverage
+
+**Consolidated 2026-08-23** from an earlier 35-asset draft after an
+adversarial review found the same procedure independently authored two or
+three times (bisect as a skill + a knowledge doc + a command; incremental-
+change and codebase-orientation each as a skill + a near-identical
+knowledge doc; single-test-running and port-triage each as a knowledge doc
++ a command) — every such cluster co-ranked for every matching query,
+spending the agent's context on the same idea two or three times over. Each
+cluster is now ONE asset; the unique value of every twin was merged in
+rather than dropped. The `commands/` type was also retired entirely (see
+the library README's "Why no `commands/`" — that type gets no
+heading/TOC indexing in this harness and a Harbor trial agent never types
+a slash command, so it was strictly worse than `knowledge/` for every asset
+that used to live there). Four assets whose scenario doesn't fit a one-shot
+agent trial (multi-human git history rewrites, merge-conflict resolution —
+neither benchmark produces one) were cut outright. The freed budget went
+into four coverage gaps the same review found zero-hit against the old
+draft: concrete Python exception vocabulary, patch/diff mechanics (`git
+apply`, unified diffs — SWE-bench's own output format), non-interactive
+command hygiene (pagers, `apt` prompts, hanging commands), and verifying a
+fix against a task's own stated acceptance criteria rather than only
+self-written tests.
+
+26 hand-authored assets across the practice areas D6 specified, mixed
+across three akm asset types (`skill`, `knowledge`, `lesson`):
+
+| Practice area | Representative assets |
+|---|---|
+| Systematic debugging | `knowledge/reproduce-before-you-fix`, `knowledge/reading-stack-traces`, `knowledge/bisecting-code-and-commits`, `skills/systematic-debugging` |
+| Test workflows | `knowledge/running-a-single-test-fast`, `knowledge/diagnosing-flaky-tests`, `knowledge/grouping-failing-tests-by-root-cause`, `skills/test-first-fix-discipline` |
+| Git operations | `knowledge/git-log-and-blame-archaeology`, `knowledge/bisecting-code-and-commits` |
+| Build systems | `knowledge/build-failure-triage`, `knowledge/dependency-and-lockfile-errors` |
+| Linux CLI fluency | `knowledge/find-and-grep-recipes`, `knowledge/sed-awk-jq-xargs-recipes`, `knowledge/process-port-and-disk-triage`, `knowledge/non-interactive-command-hygiene` |
+| Environment issues | `knowledge/path-and-interpreter-resolution`, `knowledge/missing-headers-and-permissions`, `skills/environment-drift-triage` |
+| Incremental-change discipline | `knowledge/incremental-change-discipline`, `lessons/lesson-big-bang-refactor` |
+| Reading unfamiliar codebases | `knowledge/codebase-orientation`, `knowledge/tracing-symbol-usage-and-blast-radius` |
+| Patch mechanics / task completion | `knowledge/patch-and-diff-mechanics`, `knowledge/verifying-against-acceptance-criteria` |
+
+Two lessons don't map to a single practice area above because they're about
+the debugging *process* itself rather than a technical domain:
+`lessons/lesson-skip-instead-of-fix` and
+`lessons/lesson-guessed-without-reproducing`.
+
+### Asset shape and three indexing facts that drove authoring
+
+D6 already flagged that akm's FTS/embeddings index only frontmatter
+(`description`, `tags`) and headings, never body prose. Verifying that against
+`src/indexer/search/search-fields.ts` and `src/core/adapter/adapters/akm-metadata.ts`
+turned up three sharper, non-obvious facts every asset here was written against:
+
+1. **Heading (`toc`) indexing is exclusive to the `knowledge` type.** Only the
+   `knowledge-md` renderer runs a TOC-extraction contributor
+   (`akm-metadata.ts` — `case "knowledge-md"`); `skill-md`/`command-md`/`agent-md`
+   get **no** metadata contributor at all beyond frontmatter. An H2/H3 heading
+   inside a `SKILL.md` or a command template is real, useful prose for the agent
+   once the asset is opened via `akm show` — but it is **not** indexed and
+   contributes nothing to `akm search` recall. Every knowledge asset here
+   carries dense, term-bearing H2/H3 headings for exactly this reason; every
+   skill/command/lesson instead leans on frontmatter (`description`, `tags`,
+   `searchHints`) for retrievability, since that's the only indexed surface it
+   gets.
+2. **`keywords:` in frontmatter is not indexed at all — only `tags:` is.**
+   `applyCuratedFrontmatter` (`src/indexer/passes/metadata.ts`) reads
+   `fmData.tags`; there is no `keywords` alias. `harbor/seed-library/`'s assets
+   all use `keywords:` (copied verbatim from `akm-plugins/evals/fixtures/stash/`)
+   — every one of those tags is dead weight for search. This bundle uses
+   `tags:` everywhere, plus `searchHints:` (weight 2.0, folds into the `hints`
+   FTS column alongside `examples`/`usage`) to carry realistic paraphrases and
+   filler-word-bearing phrasings a searcher would actually type.
+3. **`$1`, `$2`, `$3`, or `$ARGUMENTS` anywhere in a `.md` file's body flips its
+   classification to `command`, even outside `commands/`.** The matcher
+   (`COMMAND_PLACEHOLDER_RE` in `src/indexer/walk/matchers.ts`) scans full file
+   content, not just frontmatter. This was caught empirically during
+   verification: `knowledge/sed-awk-jq-xargs-recipes.md`'s original awk
+   examples (`awk '{print $2}'`) misclassified it as `command` (byType showed
+   `command: 8, knowledge: 16` instead of the intended `7`/`17`), which silently
+   drops its heading indexing per fact 1. Fixed by rewriting the awk examples to
+   use `$4`/`$5`/`$6` and a `-v`-parameterized field reference instead of a
+   bare `$2`/`$3` for the one example that needed a specific real column
+   (`ps aux`'s PID/%CPU fields).
+
+Search's own matching is an unforgiving implicit AND with no stopword removal
+(`sanitizeFtsQuery` in `src/indexer/search/fts-query.ts` — every token in the
+query must appear *somewhere* in the entry's indexed row, connector words like
+"in"/"not"/"only" included, before an FTS5-prefix fallback is even tried). That
+is what makes `searchHints` — literal, realistic phrasings, connector words and
+all — the single highest-leverage field for skill/command/lesson assets, and is
+also what the search-verification pass below iterated against.
+
+### Counts (verified against a real `akm` binary)
+
+Hermetic bundle: fresh `AKM_BUNDLE_DIR`/`AKM_CONFIG_DIR`/`AKM_DATA_DIR`/
+`AKM_CACHE_DIR`/`AKM_STATE_DIR` under a scratch directory,
+`AKM_FORCE_INIT_TMP_STASH=1`, `bun src/cli.ts` from the `akm` repo (akm 0.9.1).
+Seeded with the **exact merge semantics `_build_seed_bundle_command()` uses**
+(`for d in <seed>/*/; do cp -a "$d" <bundle>/; done`, merging each type
+subdirectory into the already-scaffolded bundle — not `cp -r` into a
+pre-named destination, which double-nests) so this reproduces what
+`AkmOpenCode.install()` actually does in-container, not an approximation of it.
+
+```
+akm bundle create --dir <bundle> --set-default
+for d in harbor/treatment-library/*/; do cp -a "$d" <bundle>/; done
+akm index --full
+akm info
+```
+
+`akm index --full` → `totalEntries: 38`. `akm info` → `indexStats`:
+
+| type | count |
+|---|---|
+| `knowledge` | 20 |
+| `skill` | 3 |
+| `lesson` | 3 |
+| `fact` | 12 (akm's own `facts/conventions/*` scaffold, not this bundle) |
+| **total** | **38** |
+
+26 authored assets (20 + 3 + 3) + 12 scaffolded facts = 38, matching `akm
+bundle create`'s known ~12-fact scaffold baseline documented in
+`harbor/seed-library/README.md`. `derive_seed_expectations()` against the
+current tree agrees exactly: `{knowledge: 20, skill: 3, lesson: 3}`, no
+`command`/`agent`/`script` key present.
+
+### Search verification
+
+Re-run against the current, consolidated tree (2026-08-23), with three
+independent batteries, none drawn from these assets' own `searchHints`:
+
+1. **Prefix enumeration** (`akm search "knowledge/"` /
+   `"skills/"` / `"lessons/"`) returns exactly 20 / 3 / 3 hits — every
+   authored asset is indexed and reachable, matching the byType table.
+2. **Duplicate-cluster disambiguation** — the six topics that used to be
+   split across two or three co-ranked assets now each resolve to their
+   one surviving asset at rank 1 with no competing hit: `how do I find the
+   commit that broke the build` → `knowledge/bisecting-code-and-commits`;
+   `smallest change that could work` → `knowledge/incremental-change-discipline`;
+   `where do I start in an unfamiliar codebase` → `knowledge/codebase-orientation`;
+   `why is my build failing and what do I check first` → `knowledge/build-failure-triage`;
+   `how do I run only one test` → `knowledge/running-a-single-test-fast`;
+   `how can I tell which process is using port 8080` → `knowledge/process-port-and-disk-triage`.
+3. **Coverage-gap queries** (the four holes the pre-consolidation review
+   found zero-hit) each resolve to their purpose-built asset at rank 1:
+   `ModuleNotFoundError no module named` and `sys.path not picking up my
+   package` → `knowledge/path-and-interpreter-resolution`; `git apply patch
+   failed` and `how do I generate a unified diff` →
+   `knowledge/patch-and-diff-mechanics`; `git command opens a pager and
+   hangs` and `apt install prompts for confirmation and hangs` →
+   `knowledge/non-interactive-command-hygiene`; `how do I know when a task
+   is actually done` and `did I actually fix what the issue asked for` →
+   `knowledge/verifying-against-acceptance-criteria`.
+
+The retired-type conversions are also confirmed reachable at rank 1:
+`why are so many of my tests failing` → `knowledge/grouping-failing-tests-by-root-cause`;
+`find all usages of a function` → `knowledge/tracing-symbol-usage-and-blast-radius`.
+
+The pre-consolidation 35-asset draft's original 27-query/16-query/8-query
+battery methodology (iterating `searchHints`/`tags` against misses, not the
+underlying fact) is unchanged and is documented with its own before/after
+numbers in `harbor/treatment-library/README.md`'s "Natural-language
+recall" section — that measurement's *lesson* (write hints as whole
+questions) carries forward to the current tree; its raw counts describe
+the prior asset set and are marked historical there.
+
+### Usage
+
+Pass `seed_library_dir=harbor/treatment-library` as a job kwarg on the akm
+arms (`AkmOpenCode.__init__`'s `seed_library_dir` parameter) to seed this
+bundle instead of the default. `harbor/seed-library/` remains the default for
+`p0-smoke.yaml` and any other plumbing-only job — it is deliberately not this
+bundle (D6).
+
+### The install-time self-check is parameterized to the configured seed library
+
+*(Resolved. This section previously recorded the opposite as a known caveat.)*
+
+`AkmOpenCode._build_self_check_command()` used to assert the seeded index
+against the module-level `SEED_EXPECTED_BY_TYPE` — `knowledge>=4, skill>=3,
+command>=3, agent>=2, script>=2, lesson>=1` — and probe 5 ran
+`akm feedback knowledge/deployment-runbook ...` against that literal ref.
+Both described the **smoke** fixture regardless of which `seed_library_dir` a
+job passed. Since both A/B job configs now set
+`seed_library_dir: harbor/treatment-library`, and this bundle deliberately
+ships **no `agent` and no `script` assets**, that combination aborted 100% of
+akm-static-arm trials during `install()` — reproduced against a real akm
+0.9.1 index: probe 2 exits 1 with `byType.agent=0 want>=2`, and probe 5 exits
+1 with `ASSET_NOT_FOUND` for `knowledge/deployment-runbook`.
+
+Both couplings are gone:
+
+- **Per-type floors are derived, not hardcoded.**
+  `derive_seed_expectations(seed_dir)` counts assets per type directory in
+  whichever library the instance was configured with, and `install()` passes
+  the result through `AKM_SEED_EXPECTED_BY_TYPE`. It reproduces
+  `SEED_EXPECTED_BY_TYPE` exactly for `harbor/seed-library/` (that equality is
+  pinned by `test_derivation_reproduces_the_smoke_constant`) and yields
+  `{knowledge: 20, skill: 3, lesson: 3}` for this bundle as it stands today
+  (post the 2026-08-23 consolidation; `{knowledge: 17, skill: 7, command:
+  7, lesson: 4}` at the time this section was first written) — identical
+  either way to the `byType` a real `akm index --full` reports for it.
+  `install()` also now refuses a seed library with no recognisable asset type
+  directories at all, rather than seeding a scaffold-only bundle.
+- **Probe 5 no longer names a fixture asset.** It sends `akm feedback` to
+  `hits[0].ref` from probe 3's own `knowledge/` enumeration of the live
+  bundle, so the ref exists by construction for any seed library — including a
+  pre-populated shared bundle on the accumulating arm. Probe 4's curate query
+  was likewise generalised off the smoke fixture's deployment wording.
+
+Verified end to end against a real akm 0.9.1 CLI, seeding through
+`_build_seed_bundle_command()`'s exact merge semantics: probes 2–5 pass for
+both `harbor/treatment-library/` (38 entries as of the 2026-08-23
+consolidation; 47 at the time this section was first written) and
+`harbor/seed-library/` (27 entries).
+
+### The D6 caveat, restated
+
+This bundle's quality **caps the measurable treatment effect**. A weak or
+narrow library produces a null result that says nothing about akm itself — the
+search-verification pass above is evidence the bundle is *retrievable*, not
+evidence it is *sufficient*. See `harbor/treatment-library/README.md` and
+`docs/plans/benchmark-harness-decisions.md` (D6) for the full reasoning,
+including why per-domain `akm import` of real benchmark-repo docs and
+learned-from-train-split content were both explicitly rejected as contaminating.

@@ -285,13 +285,22 @@ PLUGIN_FAILED_MARKER = "AKM CLI resolution failed"
 # Seed expectations
 # ---------------------------------------------------------------------------
 
-#: Per-type index entry counts the seeded bundle must reach. Mirrors the asset
-#: table in ``seed-library/README.md``; update both together.
+#: Per-type index entry counts the DEFAULT (smoke) seed library must reach.
+#: Mirrors the asset table in ``seed-library/README.md``; update both together.
 #:
 #: These are the load-bearing assertion. ``akm bundle create`` scaffolds ~12
 #: ``facts/conventions/*`` templates on its own, so a scaffold-only bundle
 #: already indexes to ~12 entries and "entryCount > 0" proves nothing. Only
 #: these six types come from the seed.
+#:
+#: This constant describes ``harbor/seed-library/`` ONLY. It is NOT what the
+#: self-check asserts: that comes from :func:`derive_seed_expectations` applied
+#: to whatever ``seed_library_dir`` the job actually configured, so a job that
+#: points the static arm at a differently-shaped library (e.g. the D6
+#: ``harbor/treatment-library/``, which ships no ``agent`` and no ``script``
+#: assets at all) is checked against ITS OWN shape instead of this one.
+#: ``test_derivation_reproduces_the_smoke_constant`` pins the two together for
+#: the default library.
 SEED_EXPECTED_BY_TYPE: dict[str, int] = {
     "knowledge": 4,
     "skill": 3,
@@ -306,6 +315,86 @@ SEED_EXPECTED_BY_TYPE: dict[str, int] = {
 #: ``akm bundle create``'s scaffold ever changes, whereas 15 still cleanly
 #: rejects a scaffold-only (~12) bundle.
 SEED_MIN_ENTRIES = sum(SEED_EXPECTED_BY_TYPE.values())
+
+#: Bundle type-directory name -> akm asset type. akm's bundle layout uses a
+#: plural directory per singular asset type (``skills/`` -> ``skill``), except
+#: ``knowledge/``, which is already singular. Verified against a real akm 0.9.1
+#: index of both shipped libraries: the ``byType`` keys it reports are exactly
+#: the values on the right, and asset refs are ``<directory>/<name>``.
+SEED_TYPE_DIRS: dict[str, str] = {
+    "skills": "skill",
+    "commands": "command",
+    "agents": "agent",
+    "knowledge": "knowledge",
+    "scripts": "script",
+    "lessons": "lesson",
+    "workflows": "workflow",
+    "instructions": "instruction",
+    "tasks": "task",
+    "memories": "memory",
+}
+
+
+def derive_seed_expectations(seed_dir: Path) -> dict[str, int]:
+    """Per-type index-entry floors for the seed library at ``seed_dir``.
+
+    The self-check's strongest probe asserts that every asset type the seed
+    library ships actually landed in the index. Hardcoding one library's
+    per-type counts makes that probe a fixture assertion rather than a health
+    check: it fails every trial of any job that seeds a DIFFERENT library, for
+    a reason that has nothing to do with whether the arm works. That is not
+    hypothetical -- both A/B job configs point the static arm at
+    ``harbor/treatment-library/`` (decision D6), which ships no ``agent`` and
+    no ``script`` assets, so the old hardcoded ``agent>=2`` / ``script>=2``
+    aborted 100% of static-arm trials at install time.
+
+    Counting rule, deliberately conservative (these are floors -- undercounting
+    only weakens the probe, overcounting FALSE-FAILS a healthy trial):
+
+    * A type directory containing subdirectories is counted by subdirectory
+      (``skills/<name>/SKILL.md`` -- one entry per skill directory).
+    * Otherwise it is counted by file, skipping ``README.md``. A root
+      README never reaches the bundle because ``_build_seed_bundle_command``
+      copies only type subdirectories (and a scaffolded bundle would not
+      index a root README anyway -- measured; an UNscaffolded directory
+      would, which is why the copy step, not akm, is the real guarantee).
+      ``test_seed_library_readme_is_not_a_bundle_asset`` pins this.
+    * Directories that are not a known akm type are ignored entirely.
+
+    Verified against a real akm 0.9.1 ``index --full`` of both shipped
+    libraries, seeded through the exact merge semantics
+    ``_build_seed_bundle_command()`` uses in-container: this returns
+    ``{knowledge: 4, skill: 3, command: 3, agent: 2, script: 2, lesson: 1}``
+    for ``harbor/seed-library/`` (identical to :data:`SEED_EXPECTED_BY_TYPE`,
+    and to akm's own reported ``byType``) and ``{knowledge: 20, skill: 3,
+    lesson: 3}`` for ``harbor/treatment-library/`` (identical to the
+    ``byType`` akm reports for it: 38 entries total, 26 authored + 12
+    scaffolded facts; the post-review consolidation pass reshaped the
+    library, and ``test_derivation_matches_the_treatment_library_index_shape``
+    keeps this claim honest against the shipped tree).
+    """
+    expectations: dict[str, int] = {}
+    for child in sorted(seed_dir.iterdir()):
+        if not child.is_dir():
+            continue
+        asset_type = SEED_TYPE_DIRS.get(child.name)
+        if asset_type is None:
+            continue
+        entries = [e for e in child.iterdir() if not e.name.startswith(".")]
+        subdirs = [e for e in entries if e.is_dir()]
+        if subdirs:
+            count = len(subdirs)
+        else:
+            count = len(
+                [
+                    e
+                    for e in entries
+                    if e.is_file() and e.name.casefold() != "readme.md"
+                ]
+            )
+        if count:
+            expectations[asset_type] = count
+    return expectations
 
 
 class AkmPluginNotLoadedError(RuntimeError):
@@ -975,6 +1064,21 @@ class AkmOpenCode(OpenCode):
                 environment,
                 command=f"chown -R {owner} {shlex.quote(AKM_SEED_DIR)}",
             )
+            # Same answer-key invariant as the stash root (see 5b): the seed
+            # library is uploaded verbatim into the TREATMENT arm only, and
+            # its root-level files are benchmark meta-commentary -- the
+            # treatment library's README literally lists the SWE-bench repo
+            # names its contamination policy forbids. The seed step copies
+            # only type SUBDIRECTORIES into the bundle, so purging root-level
+            # non-directories loses nothing the bundle uses while closing the
+            # browse-the-filesystem side channel.
+            await self.exec_as_root(
+                environment,
+                command=(
+                    f"find {shlex.quote(AKM_SEED_DIR)} "
+                    "-mindepth 1 -maxdepth 1 ! -type d -exec rm -f {} +"
+                ),
+            )
 
             # 5b. Upload the stash root, once, if configured. Selection among
             #     its subdirectories happens container-side, in
@@ -1043,7 +1147,20 @@ class AkmOpenCode(OpenCode):
                 env=self._install_env,
             )
 
-        # 7. Pre-warm both opencode plugin caches while egress is still open.
+        # 7. Write an npm `overrides` pin for akm-cli into
+        #    ~/.config/opencode/package.json, BEFORE opencode ever resolves
+        #    the plugin (the warm boot, next step). Verified inert against
+        #    opencode 1.18.21's actual plugin-install root -- kept anyway as
+        #    zero-cost insurance against the plugin's exec-path candidate 2.
+        #    See _build_write_npm_overrides_command()'s docstring for the
+        #    full verified/assumed split.
+        await self.exec_as_agent(
+            environment,
+            command=self._build_write_npm_overrides_command(),
+            env=self._install_env,
+        )
+
+        # 8. Pre-warm both opencode plugin caches while egress is still open.
         #    opencode installs npm plugins at SESSION START, i.e. during
         #    agent.run(), where the task's network allowlist applies. The boot
         #    uses the REAL run-phase config and the REAL model name, so a config
@@ -1055,10 +1172,34 @@ class AkmOpenCode(OpenCode):
             env=self._install_env,
         )
 
-        # 8. Fail the trial loudly rather than shipping a half-alive arm. On
+        # 9. Force the akm-cli copy this warm boot just hoisted beside the
+        #    plugin back onto the pin. THIS is the step that actually closes
+        #    the in-process-import pin-bypass hole (akm_search/show/curate) --
+        #    see _build_align_hoisted_akm_cli_command()'s docstring for why
+        #    step 7's overrides file cannot.
+        await self.exec_as_agent(
+            environment,
+            command=self._build_align_hoisted_akm_cli_command(),
+            env=self._install_env,
+        )
+
+        # 10. Fail the trial loudly rather than shipping a half-alive arm. On
         #    the accumulating arm, probes 3-5 (search/curate/feedback -- see
         #    _build_self_check_command) read AND WRITE the shared bundle, so
         #    this exec is flock-wrapped for the same reason step 6' is.
+        expectations = (
+            derive_seed_expectations(self._seed_library_dir)
+            if self._shared_bundle_path is None
+            else {}
+        )
+        if self._shared_bundle_path is None and not expectations:
+            raise RuntimeError(
+                f"akm seed library at {self._seed_library_dir} contains no "
+                "recognisable asset type directories "
+                f"({', '.join(sorted(SEED_TYPE_DIRS))}). Seeding it would "
+                "produce a scaffold-only bundle, and the arm would measure "
+                "akm with nothing to retrieve."
+            )
         self_check_command = self._build_self_check_command()
         if self._shared_bundle_path:
             self_check_command = self._wrap_shared_lock(self_check_command)
@@ -1067,8 +1208,13 @@ class AkmOpenCode(OpenCode):
             command=self_check_command,
             env={
                 **self._install_env,
-                "AKM_SEED_EXPECTED_BY_TYPE": json.dumps(SEED_EXPECTED_BY_TYPE),
-                "AKM_SEED_MIN_ENTRIES": str(SEED_MIN_ENTRIES),
+                # Derived from the seed library THIS instance was configured
+                # with, not from the smoke fixture's constant -- see
+                # derive_seed_expectations(). The accumulating arm never reads
+                # these (it gets the lighter, content-agnostic probe 2), so a
+                # missing seed dir on that arm must not raise here.
+                "AKM_SEED_EXPECTED_BY_TYPE": json.dumps(expectations),
+                "AKM_SEED_MIN_ENTRIES": str(sum(expectations.values())),
                 "AKM_CLI_VERSION_PREFIX": AKM_CLI_VERSION_PREFIX,
             },
         )
@@ -1527,6 +1673,218 @@ class AkmOpenCode(OpenCode):
             "-- warmup >/dev/null 2>&1 || true"
         )
 
+    def _build_write_npm_overrides_command(self) -> str:
+        """Write an npm ``overrides`` pin for akm-cli into
+        ``~/.config/opencode/package.json``, before opencode ever resolves
+        the plugin.
+
+        **npm overrides semantics -- VERIFIED, empirically.** ``overrides``
+        constrains transitive dependency versions for any ``npm install``
+        whose PROJECT ROOT is the directory holding that ``package.json``.
+        Confirmed with a real, live install against the published
+        akm-opencode tarball: a fresh
+        ``npm install akm-opencode@0.9.202808220049`` run in a directory
+        pre-seeded with ``{"overrides": {"akm-cli": "0.9.0"}}`` installed
+        ``akm-cli@0.9.0`` into that directory's ``node_modules`` -- where the
+        identical install with no overrides file resolves
+        ``akm-cli@0.9.1`` (the natural "latest satisfying the plugin's
+        `^0.9.0`"). A THIRD run confirmed the isolation this method's
+        placement depends on: the same overrides file written into an
+        UNRELATED directory has zero effect on an install that happens in a
+        different directory -- it too resolves ``akm-cli@0.9.1``, exactly
+        like the no-overrides control.
+
+        **Where opencode 1.18.21 actually installs plugins -- VERIFIED,
+        against its own source, not memory.** Every npm install opencode
+        performs -- the automatic one at session start that resolves this
+        agent's forced ``plugin: ["akm-opencode@<pin>"]`` entry
+        (``@opencode-ai/core`` ``packages/opencode/src/plugin/shared.ts``
+        ``resolvePluginTarget()`` -> ``Npm.add()``), AND the manual
+        ``opencode plugin <mod> --global`` CLI command (``cli/cmd/plug.ts``
+        ``createPlugTask()`` -> the same ``installPlugin()`` ->
+        ``resolvePluginTarget()`` -> ``Npm.add()``) -- is rooted at
+        ``$HOME/.cache/opencode/packages/<sanitize(spec)>/``
+        (``@opencode-ai/core`` ``packages/core/src/npm.ts``: ``directory =
+        path.join(global.cache, "packages", sanitize(pkg))``; ``sanitize()``
+        is a no-op on non-Windows). ``--global`` on ``opencode plugin`` only
+        changes where the plugin's CONFIG-FILE entry is patched
+        (``opencode.json``), never where its npm dependencies land.
+
+        **``~/.config/opencode`` IS an npm project root -- VERIFIED, and the
+        opposite of what an earlier revision of this docstring asserted.**
+        ``ConfigPaths.directories()``
+        (``packages/opencode/src/config/paths.ts``) returns
+        ``Global.Path.config`` as its FIRST element, and
+        ``packages/opencode/src/config/config.ts:439`` calls
+        ``npmSvc.install(dir, {add: [{name: "@opencode-ai/plugin", ...}]})``
+        for every directory it returns (``config/tui.ts:238`` does the same
+        on the TUI path). That directory-scoped ``Npm.install()`` reifies
+        with Arborist rooted at ``dir``, so it reads ``dir/package.json`` --
+        ``overrides`` field included -- as the project manifest. This is what
+        creates ``~/.config/opencode/node_modules``, whose existence
+        self-check probe 6 already asserts and which
+        ``_build_warm_caches_command()``'s docstring correctly describes.
+
+        **Conclusion -- still INERT today, but for a narrower reason than
+        "nothing installs there".** The only package opencode installs into
+        that root is ``@opencode-ai/plugin``, which does not depend on
+        ``akm-cli`` -- so an ``akm-cli`` override has nothing to bind to, and
+        ``~/.config/opencode/node_modules/akm-cli`` stays absent (the case
+        probes 7b and 7c treat as healthy). Neither CLI-resolution candidate
+        that matters for opencode 1.18.21 +
+        akm-opencode@<AKM_PLUGIN_VERSION> is reached by it: the "bundled"
+        candidate the in-process ``akm_search``/``akm_show``/``akm_curate``
+        tools import from is protected instead by
+        ``_build_align_hoisted_akm_cli_command()``, and the "path" candidate
+        our own ``/usr/local/bin/akm`` symlink satisfies.
+
+        **Writing it is safe -- VERIFIED against that installer's own logic.**
+        ``Npm.install()`` reifies only when ``node_modules`` is absent, or
+        when a manifest-declared dep is missing from ``package-lock.json``;
+        in both paths ``add`` still carries ``@opencode-ai/plugin``, and
+        Arborist runs with ``save: true``, so it writes that dependency back
+        into the ``package.json`` written here rather than being pruned away
+        by its empty ``dependencies``. Running BEFORE the warm boot is what
+        keeps this an initial manifest rather than a clobber of one opencode
+        has already populated -- an ordering
+        ``test_overrides_are_written_before_the_warm_boot`` pins.
+
+        **Why write it anyway -- ASSUMED, not verified, forward-looking
+        insurance.** The shipped plugin's own CLI-resolution order
+        (``getPathAkmCandidates()``, read out of the real
+        akm-opencode@<AKM_PLUGIN_VERSION> tarball's ``index.ts``) checks
+        ``${XDG_CONFIG_HOME:-~/.config}/opencode/node_modules/.bin/akm``
+        BEFORE the bare ``akm`` on PATH -- i.e. before our pin. Nothing in
+        opencode 1.18.21 or in this agent's own install() populates that
+        directory today (self-check probe 7c below will find it absent and
+        pass), but the plugin author clearly built resolution logic
+        anticipating SOME mechanism populating it (a user's own
+        ``npm install --prefix ~/.config/opencode akm-cli``, or a future
+        opencode version that does root a plugin-adjacent install there).
+        Pre-seeding the override is zero-cost and harmless either way: IF
+        that directory is ever populated by anything that respects npm
+        `overrides` semantics, this is what keeps the version pinned rather
+        than floating to whatever ``^0.9.0`` naturally resolves to at that
+        moment. Self-check probes 7b and 7c both already fail the trial
+        loudly if that directory exists and disagrees with the pin; this
+        turns "exists and disagrees" from a detected failure into a
+        structurally unreachable one, for any installer that honors
+        overrides.
+
+        Idempotent and side-effect-free: this only writes a file, creates no
+        ``node_modules``, and runs no install of its own.
+        """
+        payload = json.dumps(
+            {
+                "name": "akm-bench-opencode-config-overrides",
+                "private": True,
+                "dependencies": {},
+                "overrides": {"akm-cli": AKM_CLI_VERSION},
+            }
+        )
+        return (
+            "set -euo pipefail; "
+            "install -d -m 0755 ~/.config/opencode && "
+            f"echo {shlex.quote(payload)} > ~/.config/opencode/package.json"
+        )
+
+    def _build_align_hoisted_akm_cli_command(self) -> str:
+        """Force the akm-cli copy hoisted beside the plugin onto the pin.
+
+        **This is the fix that actually closes the in-process-import hole.**
+        Verified, out of the real akm-opencode@<AKM_PLUGIN_VERSION> tarball's
+        ``index.ts``: ``akm_search``/``akm_show``/``akm_curate`` resolve
+        akm-cli through ``runInProcess()``'s bare
+        ``import("akm-cli/dist/commands/...")`` specifier. Node/Bun module
+        resolution for a bare specifier walks UP from the importing module's
+        own location through ITS ``node_modules`` chain -- landing on
+        exactly what ``getBundledAkmCommand()`` also targets:
+        ``<pluginPackageDir>/node_modules/akm-cli``, where
+        ``pluginPackageDir`` sits under
+        ``$HOME/.cache/opencode/packages/<AKM_PLUGIN_SPEC>/`` -- the tree
+        opencode's own ``Npm.add()`` creates the first time the plugin is
+        resolved (this agent's warm boot, the install step immediately
+        before this one). No ``overrides`` field written anywhere else, and
+        no PATH pin, reaches that ``import()`` -- see
+        ``_build_write_npm_overrides_command()``'s docstring for the
+        verification that rules those out.
+
+        **Verified empirically that realigning it is safe and surgical.**
+        Against a real, previously-installed akm-opencode@<pin> tree (fetched
+        from the live npm registry) with its natural ``akm-cli@0.9.1``
+        already hoisted: running ``npm install --prefix <that tree>
+        akm-cli@<other-version> --ignore-scripts --no-save`` flipped
+        ``node_modules/akm-cli``'s version to the requested one, left
+        ``node_modules/akm-opencode`` itself untouched, and (``--no-save``)
+        left the tree's ``package.json`` byte-identical -- a targeted
+        in-place version swap of exactly the one package, not a
+        re-resolution of the whole tree.
+
+        ``--ignore-scripts`` matches how opencode's own ``Npm.add()``
+        installs the plugin (``new Arborist({..., ignoreScripts: true})`` in
+        ``packages/core/src/npm.ts``), so this does not newly run a
+        postinstall (e.g. a native ``better-sqlite3`` build) that opencode's
+        own install of the SAME package would not itself have run --
+        no asymmetry beyond the version pin.
+
+        Runs AFTER the warm boot -- nothing exists here before opencode's
+        first plugin resolution -- and BEFORE the self-check. Only actually
+        reinstalls when the hoisted version disagrees with the pin; the
+        common case, where npm's own ``^0.9.0`` resolution already landed on
+        the pin, costs one ``find`` and one ``node -p`` and nothing else.
+        Absent is left to self-check probe 7, which already fails the trial
+        with a more specific message ("no akm-cli hoisted beside the
+        plugin") than anything duplicated here.
+
+        **Enumerates every match, not just the first.** An earlier revision
+        used ``find ... -print -quit`` (first match wins) on the theory that
+        exactly one ``.../node_modules/akm-cli`` tree exists under
+        ``$HOME/.cache/opencode`` for this agent's single forced plugin. That
+        is true for the resolution root this method verified against (see
+        above), but ``find``'s traversal order is otherwise unspecified, and
+        nothing rules out a second, unrelated hoisted copy (a stale cache
+        entry from a prior plugin version, a nested
+        ``node_modules/<pkg>/node_modules/akm-cli``) coexisting on disk. A
+        ``-quit`` on an arbitrary one of those would realign whichever one
+        ``find`` happened to visit first and leave any other unpinned and
+        unchecked -- silently reintroducing the exact drift this method
+        exists to close. Realigning every match found is strictly safer than
+        that and only costs one extra ``node -p`` per additional copy, which
+        is never more than a handful.
+        """
+        pin = shlex.quote(AKM_CLI_VERSION)
+        return (
+            "set -euo pipefail; "
+            "[ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; "
+            'AKM_HOISTED_PKGS="$(find "$HOME/.cache/opencode" -path '
+            "'*/node_modules/akm-cli/package.json' "
+            '2>/dev/null || true)"; '
+            'if [ -z "$AKM_HOISTED_PKGS" ]; then '
+            'echo "akm-bootstrap: no hoisted akm-cli yet to realign; the '
+            'self-check will fail the trial if this is still true after '
+            'it"; exit 0; fi; '
+            'echo "$AKM_HOISTED_PKGS" | while IFS= read -r AKM_HOISTED_PKG; do '
+            '[ -n "$AKM_HOISTED_PKG" ] || continue; '
+            'AKM_HOISTED_VER="$(node -p "require(process.argv[1]).version" '
+            '"$AKM_HOISTED_PKG")"; '
+            f'if [ "$AKM_HOISTED_VER" = {pin} ]; then '
+            f'echo "akm-bootstrap: hoisted akm-cli at $AKM_HOISTED_PKG '
+            f'already at the pin ({AKM_CLI_VERSION})"; continue; fi; '
+            'AKM_HOISTED_ROOT="${AKM_HOISTED_PKG%/node_modules/akm-cli/package.json}"; '
+            f'echo "akm-bootstrap: hoisted akm-cli at $AKM_HOISTED_PKG is '
+            f'$AKM_HOISTED_VER, pin is {AKM_CLI_VERSION} -- realigning '
+            f'$AKM_HOISTED_ROOT"; '
+            f'npm install --prefix "$AKM_HOISTED_ROOT" akm-cli@{pin} '
+            "--ignore-scripts --no-audit --no-fund --no-save; "
+            'AKM_REALIGNED_VER="$(node -p '
+            '"require(process.argv[1]).version" "$AKM_HOISTED_PKG")"; '
+            f'[ "$AKM_REALIGNED_VER" = {pin} ] || {{ echo '
+            f'"AKM-BOOTSTRAP FATAL: realignment of hoisted akm-cli at '
+            f'$AKM_HOISTED_PKG to {AKM_CLI_VERSION} did not take (still '
+            f'$AKM_REALIGNED_VER)" 1>&2; exit 1; }}; '
+            "done"
+        )
+
     def _build_self_check_command(self) -> str:
         """Assert the bootstrap actually took. Any failure aborts the trial.
 
@@ -1535,8 +1893,11 @@ class AkmOpenCode(OpenCode):
 
         Probe 2 (the seed-count assertions, ``info_js`` below) runs its FULL
         per-type form only for the static per-trial-seeded arm.
-        ``AKM_SEED_EXPECTED_BY_TYPE`` / ``AKM_SEED_MIN_ENTRIES`` describe the
-        seed-library fixture that arm writes; the accumulating arm
+        ``AKM_SEED_EXPECTED_BY_TYPE`` / ``AKM_SEED_MIN_ENTRIES`` are DERIVED
+        by ``derive_seed_expectations()`` from the seed library this instance
+        was actually configured with (not from the smoke fixture's constant),
+        so a job that seeds ``harbor/treatment-library/`` is checked against
+        that library's shape; the accumulating arm
         (``shared_bundle_path`` set) never writes it -- it only indexes a
         bundle the job's own setup is responsible for pre-populating (see
         the class docstring) -- so asserting those per-type counts would
@@ -1553,14 +1914,15 @@ class AkmOpenCode(OpenCode):
         wrong cause (an empty knowledge/ enumeration, not "the mount is
         empty or misconfigured"). Every OTHER probe -- akm on PATH (1, 1b),
         the read/rank/mutate paths (3, 4, 5), the plugin cache (6),
-        CLI-version skew (7), the pin-bypass hole (7b), and the run-phase
+        CLI-version skew (7), the pin-bypass hole (7b, 7c), and the run-phase
         log line (8) -- still gates this arm exactly as it gates the static
-        one, and inherits the same coupling to the seed library's specific
-        content (a ``knowledge/`` prefix with >=4 entries; a
-        ``knowledge/deployment-runbook`` ref) that the static arm has --
-        the shared bundle must contain equivalent content, which is exactly
-        why every job config that uses this arm suggests pre-populating the
-        mount from ``harbor/seed-library/``.
+        one. The only content coupling left anywhere in this method is probe
+        3's ``knowledge/`` prefix enumeration returning >=4 entries; probe 5
+        now mutates whatever ref THAT enumeration returned first, so it no
+        longer names a fixture asset and works against any pre-populated
+        shared bundle. Both A/B job configs accordingly suggest
+        pre-populating the mount from ``harbor/treatment-library/`` (decision
+        D6), not from the smoke fixture.
         """
         info_js = (
             "const fs=require(\"fs\");"
@@ -1618,12 +1980,41 @@ class AkmOpenCode(OpenCode):
             ".items||[];"
             "if(!it.length)throw new Error(\"curate returned 0 items\");"
         )
+        # Probe 5 mutates a ref that must actually EXIST in the seeded bundle.
+        # Taking it from probe 3's own enumeration (hits[0].ref, verified
+        # present in `akm search --format json -q` output) instead of naming a
+        # fixture asset keeps this probe working for ANY seed library -- the
+        # hardcoded `knowledge/deployment-runbook` exists only in the smoke
+        # fixture, so it failed with ASSET_NOT_FOUND (exit 1) against the D6
+        # treatment library both job configs actually seed.
+        feedback_ref_js = (
+            "const fs=require(\"fs\");"
+            "const h=JSON.parse(fs.readFileSync(\"/tmp/akm-search.json\",\"utf8\"))"
+            ".hits||[];"
+            "const r=(h[0]||{}).ref;"
+            "if(!r)throw new Error(\"no ref in the knowledge/ enumeration\");"
+            "process.stdout.write(r);"
+        )
+        # Checks EVERY hoisted akm-cli copy found under $HOME/.cache/opencode,
+        # not just one -- `find` traversal order is unspecified, and a second,
+        # unrelated hoisted copy (a stale cache entry, a nested
+        # node_modules/<pkg>/node_modules/akm-cli) coexisting on disk must not
+        # be able to pass this probe unchecked just because it wasn't the one
+        # an arbitrary first-match picked. AKM_HOISTED_PKGS is newline-
+        # separated paths from `find` (no -print -quit -- see
+        # _build_align_hoisted_akm_cli_command()'s docstring for the same
+        # reasoning applied there).
         skew_js = (
-            "const hoisted=require(process.env.AKM_HOISTED_PKG).version;"
+            "const paths=(process.env.AKM_HOISTED_PKGS||\"\").split(\"\\n\")"
+            ".map(s=>s.trim()).filter(Boolean);"
             "const global_=process.env.AKM_GLOBAL_VERSION;"
-            "if(hoisted!==global_)throw new Error(\"akm-cli skew: in-process=\"+"
-            "hoisted+\" global=\"+global_);"
-            "console.log(\"akm-cli versions agree: \"+hoisted);"
+            "for(const p of paths){"
+            "const hoisted=require(p).version;"
+            "if(hoisted!==global_)throw new Error(\"akm-cli skew: in-process(\"+"
+            "p+\")=\"+hoisted+\" global=\"+global_);"
+            "}"
+            "console.log(\"akm-cli versions agree: \"+global_+\" (\"+paths.length+"
+            "\" hoisted copy\"+(paths.length===1?\"\":\"ies\")+\")\");"
         )
         # 2) config, bundle and index agree, and the seed landed. The
         #    accumulating arm gets the lighter `info_js_accumulating` form
@@ -1665,15 +2056,24 @@ class AkmOpenCode(OpenCode):
             f"akm search {shlex.quote('knowledge/')} --format json -q "
             '> /tmp/akm-search.json || fail "akm search failed"; '
             f"node -e '{search_js}' || fail \"akm search prefix enumeration failed\"; "
-            # 4) ranking path, with no LLM configured.
+            # 4) ranking path, with no LLM configured. The query is deliberately
+            #    generic: it must return >=1 item against ANY seed library, and
+            #    the old `roll back a bad production deploy` phrasing was
+            #    written for the smoke fixture's deployment-runbook asset.
             "akm curate "
-            f"{shlex.quote('how do I roll back a bad production deploy')} "
+            f"{shlex.quote('how do I debug a failing test')} "
             "--limit 3 --format json -q > /tmp/akm-curate.json || "
             'fail "akm curate failed"; '
             f"node -e '{curate_js}' || fail \"akm curate returned nothing\"; "
-            # 5) mutating CLI path — what akm_feedback / akm_remember shell out to.
-            f"akm feedback {shlex.quote('knowledge/deployment-runbook')} "
-            '--positive -q >/dev/null || fail "akm feedback failed"; '
+            # 5) mutating CLI path — what akm_feedback / akm_remember shell out
+            #    to. The ref comes from probe 3's enumeration of THIS bundle, so
+            #    it exists by construction whatever the seed library is.
+            "AKM_FEEDBACK_REF=\"$(node -e '"
+            + feedback_ref_js
+            + "')\" || fail \"could not pick a ref to send feedback on\"; "
+            'akm feedback "$AKM_FEEDBACK_REF" '
+            '--positive -q >/dev/null || fail "akm feedback failed on '
+            '$AKM_FEEDBACK_REF"; '
             # 6) plugin materialised in opencode's cache. Never hardcode the
             #    layout; it is version-dependent.
             # `|| true` so a missing cache dir surfaces as the friendly
@@ -1687,12 +2087,12 @@ class AkmOpenCode(OpenCode):
             # 7) version skew between the two call paths: the akm-cli hoisted
             #    beside the plugin drives the in-process akm_search/show/curate,
             #    the global pin drives feedback/remember/hints.
-            'AKM_HOISTED_PKG="$(find "$HOME/.cache/opencode" -path '
-            "'*/node_modules/akm-cli/package.json' -print -quit "
+            'AKM_HOISTED_PKGS="$(find "$HOME/.cache/opencode" -path '
+            "'*/node_modules/akm-cli/package.json' "
             '2>/dev/null || true)"; '
-            '[ -n "$AKM_HOISTED_PKG" ] || fail "no akm-cli hoisted beside the '
+            '[ -n "$AKM_HOISTED_PKGS" ] || fail "no akm-cli hoisted beside the '
             'plugin; the in-process tools will fail to import"; '
-            "export AKM_HOISTED_PKG; "
+            "export AKM_HOISTED_PKGS; "
             f"node -e '{skew_js}' || fail \"akm-cli version skew\"; "
             # 7b) the pin-bypass hole. The plugin's CLI resolution walks
             #     ~/.config/opencode/node_modules/.bin/akm BEFORE bare `akm` on
@@ -1714,6 +2114,39 @@ class AkmOpenCode(OpenCode):
             f'the plugin resolves $CFG_AKM (${{CFG_VER:-unknown}}) before the '
             f'pinned PATH akm ({AKM_CLI_VERSION}); pin the transitive dep with '
             'an npm overrides entry in ~/.config/opencode/package.json"; '
+            'fi; '
+            # 7c) same directory as 7b, but reads the PACKAGE version directly
+            #     instead of shelling out to node_modules/.bin/akm --version --
+            #     catches a package present with no working bin shim (e.g.
+            #     installed with --no-bin-links, or dropped in by hand) that
+            #     7b's `-x "$CFG_AKM"` guard would silently step over. Historical
+            #     note, not a claim about today's resolution: this directory is
+            #     the plugin's EXEC-path candidate 2
+            #     (getPathAkmCandidates()), the same one 7b covers -- it is NOT
+            #     the root the in-process akm_search/show/curate tools import
+            #     from. That one is
+            #     $HOME/.cache/opencode/packages/.../node_modules/akm-cli,
+            #     forced onto the pin by install()'s own
+            #     _build_align_hoisted_akm_cli_command() step, immediately
+            #     before this self-check runs -- see that method's docstring
+            #     for the verified/assumed split behind this comment. Absent is
+            #     fine here too, for the same reason 7b treats it as fine.
+            #     Note the precise claim: opencode 1.18.21 DOES npm-install
+            #     into ~/.config/opencode (ConfigPaths.directories() lists it
+            #     first; config.ts:439 installs into every entry -- that is
+            #     what probe 6's node_modules assertion relies on), but the
+            #     only package it puts there is @opencode-ai/plugin, which has
+            #     no akm-cli dependency. So this akm-cli path specifically
+            #     stays absent, and absence is the expected case, not evidence
+            #     of anything wrong.
+            'CFG_AKM_PKG="$HOME/.config/opencode/node_modules/akm-cli/'
+            'package.json"; '
+            'if [ -f "$CFG_AKM_PKG" ]; then '
+            'CFG_PKG_VER="$(node -p "require(process.argv[1]).version" '
+            '"$CFG_AKM_PKG" 2>/dev/null || true)"; '
+            f'[ "$CFG_PKG_VER" = "{AKM_CLI_VERSION}" ] || fail "akm-cli pin '
+            f'bypass (package.json): $CFG_AKM_PKG reports '
+            f'${{CFG_PKG_VER:-unknown}}, pin is {AKM_CLI_VERSION}"; '
             'fi; '
             # 8) strongest check: the plugin loaded and resolved akm in a real
             #    session, booted from the REAL run-phase config (step 7), so a

@@ -17,7 +17,10 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import os
+import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -56,6 +59,7 @@ from harbor.akm_opencode import (  # noqa: E402
     SHARED_PERMISSIONS,
     AkmOpenCode,
     AkmPluginNotLoadedError,
+    derive_seed_expectations,
 )
 
 #: The complete `permission` key set opencode 1.18.21 declares, transcribed
@@ -717,6 +721,440 @@ def test_warm_boot_refuses_a_model_name_opencode_would_reject(tmp_path: Path):
     agent = make_agent(tmp_path, model_name="claude-sonnet-4-5")
     with pytest.raises(RuntimeError, match="provider/model"):
         agent._build_warm_caches_command()
+
+
+# --------------------------------------------------------------------------
+# npm-overrides pin fix (closes the in-process akm-cli hole)
+#
+# Two independent mechanisms, tested separately below:
+#   * _build_write_npm_overrides_command() -- writes an npm `overrides` pin
+#     into ~/.config/opencode/package.json before the warm boot. VERIFIED
+#     (see that method's docstring) inert against opencode 1.18.21's actual
+#     plugin-install root; kept as harmless forward-looking insurance for the
+#     plugin's exec-path candidate 2.
+#   * _build_align_hoisted_akm_cli_command() -- the mechanism VERIFIED to
+#     actually close the hole: force-realigns the akm-cli copy hoisted
+#     beside the plugin (the root the in-process akm_search/show/curate
+#     tools import from) after the warm boot creates it.
+# --------------------------------------------------------------------------
+
+
+def test_npm_overrides_file_pins_akm_cli_to_the_version_constant(agent: AkmOpenCode):
+    command = agent._build_write_npm_overrides_command()
+    assert "~/.config/opencode/package.json" in command
+    assert "install -d -m 0755 ~/.config/opencode" in command
+    # The payload must be valid JSON carrying the exact pin, not a range.
+    match = re.search(r"echo (.*) > ~/\.config/opencode/package\.json", command)
+    assert match is not None
+    payload = json.loads(shlex.split(match.group(1))[0])
+    assert payload["overrides"] == {"akm-cli": AKM_CLI_VERSION}
+    assert payload["dependencies"] == {}
+
+
+def test_npm_overrides_command_actually_writes_a_valid_overrides_file(
+    tmp_path: Path,
+):
+    """Not just textual: run the real command through real bash and confirm
+    the file that lands on disk is parseable JSON carrying the pin -- the
+    same shape a real `npm install` reads its root manifest's `overrides`
+    from.
+    """
+    agent = make_agent(tmp_path)
+    fake_home = tmp_path / "fake-home"
+    fake_home.mkdir()
+    result = run_shell(
+        agent._build_write_npm_overrides_command(),
+        extra_env={"HOME": str(fake_home)},
+    )
+    assert result.returncode == 0, result.stderr
+
+    written = fake_home / ".config" / "opencode" / "package.json"
+    assert written.is_file()
+    payload = json.loads(written.read_text())
+    assert payload["overrides"] == {"akm-cli": AKM_CLI_VERSION}
+
+
+def test_align_hoisted_akm_cli_command_targets_the_pin(agent: AkmOpenCode):
+    command = agent._build_align_hoisted_akm_cli_command()
+    # Same discovery glob as self-check probe 7 -- the location this method
+    # exists to protect is the one probe 7 already trusts.
+    assert "*/node_modules/akm-cli/package.json" in command
+    assert "npm install --prefix" in command
+    assert f"akm-cli@{AKM_CLI_VERSION}" in command
+    # Matches Npm.add()'s own ignoreScripts:true (packages/core/src/npm.ts),
+    # so this does not newly run a postinstall opencode's own install
+    # would not itself have run.
+    assert "--ignore-scripts" in command
+    # Never rewrites the plugin's own package.json/lock bookkeeping.
+    assert "--no-save" in command
+    assert "AKM-BOOTSTRAP FATAL" in command
+    assert "did not take" in command
+
+
+def test_install_writes_overrides_before_warm_boot_and_aligns_after(installed):
+    """Ordering is load-bearing: the overrides file must exist before
+    opencode's first plugin resolution (the warm boot), and the hoisted
+    copy cannot be realigned until AFTER that resolution has created it.
+    """
+    _, env = installed
+    commands = env.commands
+    overrides_index = next(
+        i for i, c in enumerate(commands) if "~/.config/opencode/package.json" in c
+    )
+    warm_index = next(i for i, c in enumerate(commands) if "warmup" in c)
+    align_index = next(
+        i
+        for i, c in enumerate(commands)
+        if "node_modules/akm-cli/package.json" in c and "npm install --prefix" in c
+    )
+    self_check_index = len(commands) - 1
+
+    assert overrides_index < warm_index < align_index < self_check_index
+    assert "AKM-BOOTSTRAP FATAL" in commands[self_check_index]
+
+
+def test_align_hoisted_akm_cli_runs_for_the_accumulating_arm_too(tmp_path: Path):
+    """The pin-bypass hole is about opencode's own plugin cache, not the akm
+    bundle -- both arms share the same exposure, so both must get the fix,
+    and (since it never touches the shared bundle mount) neither needs the
+    accumulating arm's flock wrapping.
+    """
+    agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle")
+    env = FakeEnvironment()
+    asyncio.run(agent.install(env))
+    align_command = next(
+        c
+        for c in env.commands
+        if "node_modules/akm-cli/package.json" in c and "npm install --prefix" in c
+    )
+    assert "flock " not in align_command
+
+
+def test_align_hoisted_akm_cli_skips_reinstall_when_already_pinned(tmp_path: Path):
+    """Real bash + real node, no network: prove the fast path is genuinely
+    a no-op when the hoisted copy already matches the pin. A poisoned `npm`
+    stub sits ahead of the real PATH on purpose -- if the "already pinned"
+    fast exit did not fire, the script would invoke it and this test would
+    catch that instead of silently passing.
+    """
+    agent = make_agent(tmp_path)
+    fake_home = tmp_path / "fake-home"
+    pkg_dir = (
+        fake_home
+        / ".cache"
+        / "opencode"
+        / "packages"
+        / "akm-opencode@pin"
+        / "node_modules"
+        / "akm-cli"
+    )
+    pkg_dir.mkdir(parents=True)
+    pkg_json = pkg_dir / "package.json"
+    pkg_json.write_text(json.dumps({"name": "akm-cli", "version": AKM_CLI_VERSION}))
+
+    poison_bin = tmp_path / "poison-bin"
+    poison_bin.mkdir()
+    poison_marker = tmp_path / "npm-was-called"
+    poison_npm = poison_bin / "npm"
+    poison_npm.write_text(
+        f"#!/bin/sh\ntouch {shlex.quote(str(poison_marker))}\nexit 1\n"
+    )
+    poison_npm.chmod(0o755)
+
+    real_path = os.environ.get("PATH", "")
+    result = run_shell(
+        agent._build_align_hoisted_akm_cli_command(),
+        extra_env={
+            "HOME": str(fake_home),
+            "PATH": f"{poison_bin}{os.pathsep}{real_path}",
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert "already at the pin" in result.stdout
+    assert not poison_marker.exists(), "the fast path invoked npm anyway"
+    # Untouched: still exactly what was written above.
+    assert json.loads(pkg_json.read_text())["version"] == AKM_CLI_VERSION
+
+
+def test_align_hoisted_akm_cli_exits_cleanly_when_nothing_is_hoisted_yet(
+    tmp_path: Path,
+):
+    agent = make_agent(tmp_path)
+    fake_home = tmp_path / "fake-home"
+    fake_home.mkdir()
+    result = run_shell(
+        agent._build_align_hoisted_akm_cli_command(),
+        extra_env={"HOME": str(fake_home)},
+    )
+    assert result.returncode == 0, result.stderr
+    assert "no hoisted akm-cli yet" in result.stdout
+
+
+def test_align_hoisted_akm_cli_realigns_a_drifted_copy(tmp_path: Path):
+    """Real bash + a FAKE npm stub (no network): simulate the exact threat
+    this method exists for -- the plugin's own `^0.9.0` range naturally
+    resolving to something newer than our pin -- and prove the on-disk
+    package.json is rewritten to the pin.
+    """
+    agent = make_agent(tmp_path)
+    fake_home = tmp_path / "fake-home"
+    pkg_dir = (
+        fake_home
+        / ".cache"
+        / "opencode"
+        / "packages"
+        / "akm-opencode@pin"
+        / "node_modules"
+        / "akm-cli"
+    )
+    pkg_dir.mkdir(parents=True)
+    pkg_json = pkg_dir / "package.json"
+    pkg_json.write_text(json.dumps({"name": "akm-cli", "version": "9.9.9-drifted"}))
+
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_npm = fake_bin / "npm"
+    marker = tmp_path / "npm-was-called"
+    # A stub that behaves like `npm install --prefix <dir> akm-cli@<pin> ...`:
+    # rewrite the SAME package.json to the requested version. Proves the
+    # command's shell plumbing (argument shape, --prefix resolution from
+    # AKM_HOISTED_PKG) is correct without touching the real registry.
+    fake_npm.write_text(
+        "#!/bin/sh\n"
+        f'touch {shlex.quote(str(marker))}\n'
+        'while [ "$#" -gt 0 ]; do\n'
+        '  case "$1" in\n'
+        '    --prefix) PREFIX="$2"; shift 2 ;;\n'
+        '    akm-cli@*) PINSPEC="$1"; shift ;;\n'
+        "    *) shift ;;\n"
+        "  esac\n"
+        "done\n"
+        'PIN="${PINSPEC#akm-cli@}"\n'
+        'node -e \'const fs=require("fs");const p=process.argv[1];const v=process.argv[2];'
+        'const j=JSON.parse(fs.readFileSync(p));j.version=v;'
+        'fs.writeFileSync(p,JSON.stringify(j));\' '
+        '"$PREFIX/node_modules/akm-cli/package.json" "$PIN"\n'
+    )
+    fake_npm.chmod(0o755)
+
+    real_path = os.environ.get("PATH", "")
+    result = run_shell(
+        agent._build_align_hoisted_akm_cli_command(),
+        extra_env={"HOME": str(fake_home), "PATH": f"{fake_bin}{os.pathsep}{real_path}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert marker.is_file(), "the realignment branch never invoked npm"
+    assert json.loads(pkg_json.read_text())["version"] == AKM_CLI_VERSION
+
+
+def test_align_hoisted_akm_cli_fails_loudly_if_realignment_does_not_take(
+    tmp_path: Path,
+):
+    """`npm install` can exit 0 without producing the expected content (a
+    stub that misbehaves, a real npm hitting an edge case). The post-check
+    must catch that rather than reporting success on faith.
+    """
+    agent = make_agent(tmp_path)
+    fake_home = tmp_path / "fake-home"
+    pkg_dir = (
+        fake_home
+        / ".cache"
+        / "opencode"
+        / "packages"
+        / "akm-opencode@pin"
+        / "node_modules"
+        / "akm-cli"
+    )
+    pkg_dir.mkdir(parents=True)
+    pkg_json = pkg_dir / "package.json"
+    pkg_json.write_text(json.dumps({"name": "akm-cli", "version": "9.9.9-drifted"}))
+
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_npm = fake_bin / "npm"
+    # Exits 0 but does nothing -- the version stays drifted.
+    fake_npm.write_text("#!/bin/sh\nexit 0\n")
+    fake_npm.chmod(0o755)
+
+    real_path = os.environ.get("PATH", "")
+    result = run_shell(
+        agent._build_align_hoisted_akm_cli_command(),
+        extra_env={"HOME": str(fake_home), "PATH": f"{fake_bin}{os.pathsep}{real_path}"},
+    )
+    assert result.returncode != 0
+    assert "AKM-BOOTSTRAP FATAL" in result.stderr
+    assert "did not take" in result.stderr
+
+
+def test_align_hoisted_akm_cli_realigns_every_hoisted_copy_found(tmp_path: Path):
+    """`find ... -print -quit` (first match) would realign an ARBITRARY one
+    of several hoisted akm-cli copies and leave any other unpinned and
+    unchecked -- silently reintroducing the drift this method exists to
+    close. Two independent hoisted trees, both drifted: both must end up at
+    the pin, proving the command enumerates every match rather than stopping
+    at the first.
+    """
+    agent = make_agent(tmp_path)
+    fake_home = tmp_path / "fake-home"
+
+    def make_hoisted(name: str, version: str) -> Path:
+        pkg_dir = (
+            fake_home
+            / ".cache"
+            / "opencode"
+            / "packages"
+            / name
+            / "node_modules"
+            / "akm-cli"
+        )
+        pkg_dir.mkdir(parents=True)
+        pkg_json = pkg_dir / "package.json"
+        pkg_json.write_text(json.dumps({"name": "akm-cli", "version": version}))
+        return pkg_json
+
+    # One already at the pin, one drifted -- and in an order `find` is likely
+    # to visit the drifted one second, which is exactly the case a
+    # first-match `-quit` would get wrong.
+    pinned_pkg = make_hoisted("akm-opencode@pin-a", AKM_CLI_VERSION)
+    drifted_pkg = make_hoisted("akm-opencode@pin-b", "9.9.9-drifted")
+
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_npm = fake_bin / "npm"
+    marker = tmp_path / "npm-was-called"
+    fake_npm.write_text(
+        "#!/bin/sh\n"
+        f'touch {shlex.quote(str(marker))}\n'
+        'while [ "$#" -gt 0 ]; do\n'
+        '  case "$1" in\n'
+        '    --prefix) PREFIX="$2"; shift 2 ;;\n'
+        '    akm-cli@*) PINSPEC="$1"; shift ;;\n'
+        "    *) shift ;;\n"
+        "  esac\n"
+        "done\n"
+        'PIN="${PINSPEC#akm-cli@}"\n'
+        'node -e \'const fs=require("fs");const p=process.argv[1];const v=process.argv[2];'
+        'const j=JSON.parse(fs.readFileSync(p));j.version=v;'
+        'fs.writeFileSync(p,JSON.stringify(j));\' '
+        '"$PREFIX/node_modules/akm-cli/package.json" "$PIN"\n'
+    )
+    fake_npm.chmod(0o755)
+
+    real_path = os.environ.get("PATH", "")
+    result = run_shell(
+        agent._build_align_hoisted_akm_cli_command(),
+        extra_env={"HOME": str(fake_home), "PATH": f"{fake_bin}{os.pathsep}{real_path}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert marker.is_file(), "npm was never invoked for the drifted copy"
+    # The already-pinned copy was left alone (no spurious reinstall)...
+    assert json.loads(pinned_pkg.read_text())["version"] == AKM_CLI_VERSION
+    # ...and the drifted copy -- found second, which a `-quit` first-match
+    # would have missed entirely -- was realigned to the pin too.
+    assert json.loads(drifted_pkg.read_text())["version"] == AKM_CLI_VERSION
+    assert result.stdout.count("realigning") == 1
+
+
+def test_self_check_probes_the_config_dir_akm_cli_package_json(tmp_path: Path):
+    """Probe 7c: complements 7b (which shells out to the .bin shim) by
+    reading node_modules/akm-cli/package.json directly, catching a package
+    present with no working bin shim. Same directory as 7b -- the plugin's
+    exec-path candidate 2 -- not the in-process-import root (that one is
+    covered by _build_align_hoisted_akm_cli_command(), run one install step
+    earlier).
+    """
+    command = make_agent(tmp_path)._build_self_check_command()
+    assert "$HOME/.config/opencode/node_modules/akm-cli/package.json" in command
+    assert "pin bypass (package.json)" in command
+    assert f'[ "$CFG_PKG_VER" = "{AKM_CLI_VERSION}" ] || fail' in command
+    # Absent must fall through, not abort: the guard is -f, not a hard
+    # existence assertion.
+    assert 'if [ -f "$CFG_AKM_PKG" ]; then' in command
+
+
+def _probe_7c_fragment(agent: AkmOpenCode) -> str:
+    """Slice just probe 7c's shell out of the full self-check command.
+
+    The full command needs a real akm/node/seed bundle to reach probe 7c at
+    all; this extracts only that probe's own fragment (bounded by its
+    distinctive start and its closing `fi;`) so it can be run standalone
+    against a fabricated ``$HOME/.config/opencode`` with a plain `fail()`
+    preamble -- real bash, real node, no container.
+    """
+    command = agent._build_self_check_command()
+    start = command.index('CFG_AKM_PKG="$HOME/.config/opencode')
+    end = command.index("fi; ", start) + len("fi; ")
+    fragment = command[start:end]
+    assert fragment.startswith('CFG_AKM_PKG="$HOME/.config/opencode')
+    assert fragment.rstrip().endswith("fi;")
+    return fragment
+
+
+def test_self_check_probe_7c_passes_through_when_the_config_dir_is_absent(
+    tmp_path: Path,
+):
+    """Real bash + real node: nothing lives at
+    $HOME/.config/opencode/node_modules/akm-cli today (see the module's own
+    docstring on where opencode 1.18.21 actually installs plugins), and
+    absence must fall through to a healthy exit, not abort setup.
+    """
+    agent = make_agent(tmp_path)
+    fake_home = tmp_path / "fake-home"
+    fake_home.mkdir()
+    script = (
+        'set -euo pipefail; fail(){ echo "AKM-BOOTSTRAP FATAL: $*" >&2; exit 1; }; '
+        + _probe_7c_fragment(agent)
+        + ' echo "probe 7c: passed"'
+    )
+    result = run_shell(script, extra_env={"HOME": str(fake_home)})
+    assert result.returncode == 0, result.stderr
+    assert "probe 7c: passed" in result.stdout
+
+
+def test_self_check_probe_7c_passes_when_the_config_dir_copy_matches_the_pin(
+    tmp_path: Path,
+):
+    agent = make_agent(tmp_path)
+    fake_home = tmp_path / "fake-home"
+    pkg_dir = fake_home / ".config" / "opencode" / "node_modules" / "akm-cli"
+    pkg_dir.mkdir(parents=True)
+    (pkg_dir / "package.json").write_text(
+        json.dumps({"name": "akm-cli", "version": AKM_CLI_VERSION})
+    )
+    script = (
+        'set -euo pipefail; fail(){ echo "AKM-BOOTSTRAP FATAL: $*" >&2; exit 1; }; '
+        + _probe_7c_fragment(agent)
+        + ' echo "probe 7c: passed"'
+    )
+    result = run_shell(script, extra_env={"HOME": str(fake_home)})
+    assert result.returncode == 0, result.stderr
+    assert "probe 7c: passed" in result.stdout
+
+
+def test_self_check_probe_7c_aborts_on_a_version_mismatch(tmp_path: Path):
+    """The branch the string-only assertions above cannot prove by
+    themselves: a present-but-wrong-version package.json in
+    ~/.config/opencode/node_modules/akm-cli must actually abort setup, not
+    just contain the right substrings in the source.
+    """
+    agent = make_agent(tmp_path)
+    fake_home = tmp_path / "fake-home"
+    pkg_dir = fake_home / ".config" / "opencode" / "node_modules" / "akm-cli"
+    pkg_dir.mkdir(parents=True)
+    (pkg_dir / "package.json").write_text(
+        json.dumps({"name": "akm-cli", "version": "9.9.9-bypass"})
+    )
+    script = (
+        'set -euo pipefail; fail(){ echo "AKM-BOOTSTRAP FATAL: $*" >&2; exit 1; }; '
+        + _probe_7c_fragment(agent)
+        + ' echo "probe 7c: passed"'
+    )
+    result = run_shell(script, extra_env={"HOME": str(fake_home)})
+    assert result.returncode != 0
+    assert "probe 7c: passed" not in result.stdout
+    assert "AKM-BOOTSTRAP FATAL" in result.stderr
+    assert "pin bypass (package.json)" in result.stderr
+    assert "9.9.9-bypass" in result.stderr
 
 
 def test_install_runs_the_self_check_last(installed):
@@ -1806,11 +2244,16 @@ def test_install_purges_non_directories_from_uploaded_stash_root() -> None:
     answer-key channel. install() must scrub non-directories from the uploaded
     root, leaving stash content untouched."""
     source = inspect.getsource(akm_opencode)
-    assert '-mindepth 1 -maxdepth 1 ! -type d -exec rm -f {} +' in source
-    # The purge must target the uploaded root, not the seed dir.
-    purge_idx = source.index("-mindepth 1 -maxdepth 1 ! -type d")
-    window = source[purge_idx - 600 : purge_idx]
-    assert "AKM_STASH_ROOT_DIR" in window
+    # BOTH uploaded roots carry the purge: the stash root AND the seed
+    # library root (the treatment library's README lists the SWE-bench repo
+    # names its contamination policy forbids, and only the treatment arm
+    # receives the upload).
+    purge = "-mindepth 1 -maxdepth 1 ! -type d -exec rm -f {} +"
+    assert source.count(purge) == 2
+    first = source.index(purge)
+    second = source.index(purge, first + 1)
+    assert "AKM_SEED_DIR" in source[first - 900 : first]
+    assert "AKM_STASH_ROOT_DIR" in source[second - 900 : second]
 
 
 def test_repo_stash_root_contains_only_directories() -> None:
@@ -1822,3 +2265,296 @@ def test_repo_stash_root_contains_only_directories() -> None:
         pytest.skip("harbor/stashes not present in this checkout")
     stray = [p.name for p in stash_root.iterdir() if not p.is_dir()]
     assert stray == [], f"non-directory entries at stash root would leak into treatment containers: {stray}"
+
+
+# --------------------------------------------------------------------------
+# Seed expectations follow the CONFIGURED seed library, not the smoke fixture
+# --------------------------------------------------------------------------
+
+TREATMENT_LIBRARY_DIR = REPO_ROOT / "harbor" / "treatment-library"
+
+#: What a real akm 0.9.1 `index --full` reports for harbor/treatment-library/
+#: when it is seeded through _build_seed_bundle_command()'s exact merge
+#: semantics. The library was consolidated (duplicate skill/knowledge/command
+#: coverage of the same topic merged into one asset each, the `commands/`
+#: type retired in favor of `knowledge/` -- see its README's "Why no
+#: commands/" section) and extended with net-new coverage; re-verify this
+#: constant with a real hermetic akm index (`derive_seed_expectations()`
+#: against the checked-out directory IS that verification, run by the test
+#: below) whenever the library's asset set changes.
+TREATMENT_EXPECTED_BY_TYPE = {
+    "knowledge": 20,
+    "skill": 3,
+    "lesson": 3,
+}
+
+
+def test_derivation_reproduces_the_smoke_constant():
+    """derive_seed_expectations() must agree with the hand-maintained
+    SEED_EXPECTED_BY_TYPE for the library that constant documents. This is
+    what makes the derivation trustworthy for OTHER libraries."""
+    assert derive_seed_expectations(SEED_LIBRARY_DIR) == SEED_EXPECTED_BY_TYPE
+
+
+def test_derivation_matches_the_treatment_library_index_shape():
+    """The D6 library ships no agent, script, or command assets -- retired
+    `commands/` in favor of `knowledge/`, which alone gets heading/TOC
+    indexing (see the library README). Pinned against the byType a real akm
+    0.9.1 index reports for it."""
+    if not TREATMENT_LIBRARY_DIR.is_dir():
+        pytest.fail(
+            "harbor/treatment-library is missing. Both A/B job yamls hard-depend on it "
+            "(seed_library_dir: harbor/treatment-library); without it every akm-static-arm "
+            "trial aborts at install time. A skip here would let CI go green on exactly "
+            "that omission, so this fails instead."
+        )
+    assert derive_seed_expectations(TREATMENT_LIBRARY_DIR) == TREATMENT_EXPECTED_BY_TYPE
+    derived = derive_seed_expectations(TREATMENT_LIBRARY_DIR)
+    assert "agent" not in derived and "script" not in derived and "command" not in derived
+
+
+def test_derivation_skips_readmes_and_unknown_directories(tmp_path: Path):
+    lib = tmp_path / "lib"
+    (lib / "knowledge").mkdir(parents=True)
+    (lib / "knowledge" / "README.md").write_text("not an asset")
+    (lib / "knowledge" / "a.md").write_text("---\nname: a\n---\n")
+    (lib / "skills" / "s").mkdir(parents=True)
+    (lib / "skills" / "s" / "SKILL.md").write_text("---\nname: s\n---\n")
+    (lib / "notatype").mkdir()
+    (lib / "notatype" / "x.md").write_text("x")
+    (lib / "README.md").write_text("library readme")
+    assert derive_seed_expectations(lib) == {"knowledge": 1, "skill": 1}
+
+
+def test_self_check_expectations_follow_the_configured_seed_library(tmp_path: Path):
+    """Regression: both A/B job configs seed harbor/treatment-library/, which
+    has no agent/script assets. Asserting the smoke fixture's per-type counts
+    against it failed probe 2 on every static-arm trial."""
+    if not TREATMENT_LIBRARY_DIR.is_dir():
+        pytest.fail(
+            "harbor/treatment-library is missing. Both A/B job yamls hard-depend on it "
+            "(seed_library_dir: harbor/treatment-library); without it every akm-static-arm "
+            "trial aborts at install time. A skip here would let CI go green on exactly "
+            "that omission, so this fails instead."
+        )
+    agent = make_agent(tmp_path, seed_library_dir=TREATMENT_LIBRARY_DIR)
+    env = FakeEnvironment()
+    asyncio.run(agent.install(env))
+    self_check = next(
+        e for e in env.execs if "AKM_SEED_EXPECTED_BY_TYPE" in e["env"]
+    )
+    sent = json.loads(self_check["env"]["AKM_SEED_EXPECTED_BY_TYPE"])
+    assert sent == TREATMENT_EXPECTED_BY_TYPE
+    assert self_check["env"]["AKM_SEED_MIN_ENTRIES"] == str(sum(sent.values()))
+
+
+def test_self_check_expectations_still_match_the_default_library(installed):
+    _, env = installed
+    self_check = next(
+        e for e in env.execs if "AKM_SEED_EXPECTED_BY_TYPE" in e["env"]
+    )
+    assert json.loads(self_check["env"]["AKM_SEED_EXPECTED_BY_TYPE"]) == (
+        SEED_EXPECTED_BY_TYPE
+    )
+
+
+def test_self_check_does_not_name_a_fixture_asset(tmp_path: Path):
+    """Probe 5 mutates a ref taken from probe 3's own enumeration of the live
+    bundle. Naming knowledge/deployment-runbook (smoke-fixture only) made it
+    exit 1 with ASSET_NOT_FOUND against any other seed library."""
+    agent = make_agent(tmp_path, seed_library_dir=TREATMENT_LIBRARY_DIR)
+    self_check = agent._build_self_check_command()
+    assert "deployment-runbook" not in self_check
+    assert 'akm feedback "$AKM_FEEDBACK_REF"' in self_check
+    # The ref is read from probe 3's output, so probe 3 must come first.
+    assert self_check.index("/tmp/akm-search.json") < self_check.index(
+        "AKM_FEEDBACK_REF"
+    )
+
+
+def test_install_rejects_a_seed_library_with_no_asset_directories(tmp_path: Path):
+    lib = tmp_path / "empty-lib"
+    (lib / "notatype").mkdir(parents=True)
+    agent = make_agent(tmp_path, seed_library_dir=lib)
+    with pytest.raises(RuntimeError, match="no recognisable asset type"):
+        asyncio.run(agent.install(FakeEnvironment()))
+
+
+def test_overrides_are_written_before_the_warm_boot(installed):
+    """The overrides manifest only shapes opencode's config-dir npm install if
+    it is on disk before that install runs (the warm boot)."""
+    _, env = installed
+    commands = env.commands
+    overrides = next(
+        i
+        for i, c in enumerate(commands)
+        if ".config/opencode/package.json" in c and "overrides" in c and "echo" in c
+    )
+    warm = next(i for i, c in enumerate(commands) if "warmup" in c)
+    realign = next(i for i, c in enumerate(commands) if "AKM_HOISTED_ROOT" in c)
+    # The realign step also carries an AKM-BOOTSTRAP FATAL message, so match
+    # the self-check on its `fail()` helper definition instead.
+    self_check = next(
+        i for i, c in enumerate(commands) if 'fail(){ echo "AKM-BOOTSTRAP FATAL' in c
+    )
+    assert overrides < warm < realign < self_check
+
+
+def test_overrides_manifest_is_valid_json_pinning_the_akm_cli_version(agent):
+    command = agent._build_write_npm_overrides_command()
+    payload = re.search(r"echo '(\{.*\})'", command).group(1)
+    assert json.loads(payload)["overrides"] == {"akm-cli": AKM_CLI_VERSION}
+
+
+# --------------------------------------------------------------------------
+# The three-arm A/B job configs (tb2-ab.yaml, swebench-ab.yaml)
+#
+# Everything above this section that starts with `test_job_config_` reads
+# JOB_CONFIG_PATH == harbor/jobs/p0-smoke.yaml ONLY. Neither of the two
+# three-arm configs this repo actually ships for the real benchmarks was
+# ever parsed by a test, so a desync between the control and static-treatment
+# permission blocks in EITHER of them -- the exact confound the p0-smoke
+# tests above exist to catch -- could land with CI green. This section
+# closes that gap without duplicating every p0-smoke assertion: it covers
+# the ones that generalize across a 3-arm config (permission-block parity,
+# no akm surface on control, shared model/hosts) and, most importantly,
+# would have caught the seed-library/self-check floor mismatch fixed above
+# (derive_seed_expectations) before it ever landed in these two files.
+# --------------------------------------------------------------------------
+
+AB_JOB_CONFIG_PATHS = {
+    "tb2-ab": REPO_ROOT / "harbor" / "jobs" / "tb2-ab.yaml",
+    "swebench-ab": REPO_ROOT / "harbor" / "jobs" / "swebench-ab.yaml",
+}
+
+
+@pytest.fixture(params=sorted(AB_JOB_CONFIG_PATHS), scope="module")
+def ab_job_name(request) -> str:
+    return request.param
+
+
+@pytest.fixture(scope="module")
+def ab_job_config(ab_job_name: str) -> dict:
+    return yaml.safe_load(AB_JOB_CONFIG_PATHS[ab_job_name].read_text())
+
+
+@pytest.fixture(scope="module")
+def ab_three_arms(ab_job_config: dict) -> tuple[dict, dict, dict]:
+    """(control, akm-static, akm-accumulating), identified the same way
+    AkmOpenCode.arm_name() distinguishes them at runtime: by whether
+    `shared_bundle_path` is present in kwargs, not by list position."""
+    agents = ab_job_config["agents"]
+    control = next(a for a in agents if a.get("name") == "opencode")
+    treatments = [a for a in agents if a.get("import_path") == "harbor.akm_opencode:AkmOpenCode"]
+    assert len(treatments) == 2, "expected exactly two akm arms (static + accumulating)"
+    static = next(a for a in treatments if "shared_bundle_path" not in a.get("kwargs", {}))
+    accumulating = next(a for a in treatments if "shared_bundle_path" in a.get("kwargs", {}))
+    return control, static, accumulating
+
+
+def test_ab_job_config_runs_three_distinct_arms(ab_three_arms):
+    control, static, accumulating = ab_three_arms
+    assert control["name"] == "opencode"
+    assert static["import_path"] == "harbor.akm_opencode:AkmOpenCode"
+    assert accumulating["import_path"] == "harbor.akm_opencode:AkmOpenCode"
+    assert "shared_bundle_path" in accumulating["kwargs"]
+    assert "shared_bundle_path" not in static["kwargs"]
+
+
+def test_ab_job_config_pins_the_same_opencode_across_all_three_arms(ab_three_arms):
+    for arm in ab_three_arms:
+        assert arm["kwargs"]["version"] == OPENCODE_VERSION
+
+
+def test_ab_job_config_control_arm_gets_the_shared_permission_block(ab_three_arms):
+    """Same central hygiene rule as p0-smoke's test of the same name, applied
+    to the config that actually ships for the real benchmarks."""
+    control, _static, _accumulating = ab_three_arms
+    assert control["kwargs"]["opencode_config"]["permission"] == SHARED_PERMISSIONS
+
+
+def test_ab_job_config_control_arm_permission_block_only_uses_declared_keys(ab_three_arms):
+    control, _static, _accumulating = ab_three_arms
+    permission = control["kwargs"]["opencode_config"]["permission"]
+    assert set(permission) == OPENCODE_DECLARED_PERMISSION_KEYS
+
+
+def test_ab_job_config_control_arm_has_no_akm_surface(ab_three_arms):
+    control, _static, _accumulating = ab_three_arms
+    control_config = control["kwargs"]["opencode_config"]
+    assert "plugin" not in control_config
+    assert "tools" not in control_config
+    for akm_tool in AKM_TOOLS:
+        assert akm_tool not in control_config["permission"]
+
+
+def test_ab_job_config_control_arm_mirrors_the_treatment_defaults(ab_three_arms):
+    control, _static, _accumulating = ab_three_arms
+    control_config = control["kwargs"]["opencode_config"]
+    for key, value in AkmOpenCode._DEFAULT_CONFIG.items():
+        assert control_config[key] == value
+
+
+def test_ab_job_config_control_arm_disables_opencode_autoupdate_via_env_too(ab_three_arms):
+    control, _static, _accumulating = ab_three_arms
+    assert control.get("env", {}).get("OPENCODE_DISABLE_AUTOUPDATE") == "true"
+
+
+def test_ab_job_config_all_three_arms_share_model_name_and_hosts(ab_three_arms):
+    control, static, accumulating = ab_three_arms
+    assert control["model_name"] == static["model_name"] == accumulating["model_name"]
+    assert (
+        control["extra_allowed_hosts"]
+        == static["extra_allowed_hosts"]
+        == accumulating["extra_allowed_hosts"]
+    )
+
+
+def test_ab_job_config_npm_registry_is_allowed_for_both_akm_arms(ab_three_arms):
+    _control, static, accumulating = ab_three_arms
+    assert "registry.npmjs.org" in static["extra_allowed_hosts"]
+    assert "registry.npmjs.org" in accumulating["extra_allowed_hosts"]
+
+
+def test_ab_job_config_environment_deletes_containers_between_trials(ab_job_config: dict):
+    assert ab_job_config["environment"]["delete"] is True
+
+
+def test_ab_job_config_static_arm_seed_library_dir_satisfies_the_self_check_floor(
+    ab_three_arms,
+):
+    """The regression this test exists to catch: a job config whose
+    `seed_library_dir` kwarg points at a library the install-time self-check
+    would reject (derive_seed_expectations() returning {} or a shape the
+    seeded bundle cannot actually satisfy) aborts EVERY akm-static trial at
+    install time -- silently collapsing the three-arm design to two arms
+    while burning the paid container build first. Both shipped configs point
+    the static arm at harbor/treatment-library/ (decision D6); this asserts
+    that whatever they point it at resolves to a real directory with a
+    non-empty per-type floor, so a future edit that repoints
+    `seed_library_dir` at something self_check can't satisfy fails an
+    ordinary `pytest` run instead of every trial of a live job.
+    """
+    _control, static, _accumulating = ab_three_arms
+    configured = static["kwargs"]["seed_library_dir"]
+    seed_dir = (REPO_ROOT / configured).resolve()
+    assert seed_dir.is_dir(), f"seed_library_dir {configured!r} does not resolve to a directory"
+    expectations = derive_seed_expectations(seed_dir)
+    assert expectations, (
+        f"derive_seed_expectations({configured!r}) returned {{}} -- this seed "
+        "library has no recognisable asset type directories, so every "
+        "akm-static trial would abort at install time (see AkmOpenCode.install()'s "
+        "'contains no recognisable asset type directories' guard)."
+    )
+    # Every type the library ships must have at least one asset -- a zero
+    # floor for a type that exists on disk would silently under-check it.
+    assert all(count > 0 for count in expectations.values())
+
+
+def test_ab_job_config_static_arm_uses_the_d6_treatment_library(ab_three_arms):
+    """Pins the specific choice (not just "some valid library") so a silent
+    revert to the smoke fixture -- which would still pass the floor check
+    above, since harbor/seed-library/ is also a real, non-empty library --
+    is still caught."""
+    _control, static, _accumulating = ab_three_arms
+    assert static["kwargs"]["seed_library_dir"] == "harbor/treatment-library"
