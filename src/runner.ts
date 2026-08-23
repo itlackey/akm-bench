@@ -674,14 +674,17 @@ async function runOneIsolated(args: {
     const failureMode =
       args.arm === "akm" ? classifyFailureMode(args.task, { ...result, trajectory, assetsLoaded }) : null;
     if (args.arm === "akm") {
-      const trace = normalizeRunToTrace({ ...result, trajectory, assetsLoaded }, {
-        workspaceWrites,
-        warnings: args.warnings,
-        harness: {
-          agentStartedTs: result.startedAt,
-          agentFinishedTs: result.finishedAt,
+      const trace = normalizeRunToTrace(
+        { ...result, trajectory, assetsLoaded },
+        {
+          workspaceWrites,
+          warnings: args.warnings,
+          harness: {
+            agentStartedTs: result.startedAt,
+            agentFinishedTs: result.finishedAt,
+          },
         },
-      });
+      );
       const hasFirstWrite = trace.events.some((e) => e.type === "first_workspace_write");
       if (!hasFirstWrite) {
         const fallback = detectLikelyWorkspaceWrite(result, workspace);
@@ -703,10 +706,7 @@ function snapshotWorkspaceFiles(root: string): Map<string, { mtimeMs: number; si
   return out;
 }
 
-function detectWorkspaceWrites(
-  before: Map<string, { mtimeMs: number; size: number }>,
-  root: string,
-): string[] {
+function detectWorkspaceWrites(before: Map<string, { mtimeMs: number; size: number }>, root: string): string[] {
   const writes: string[] = [];
   const after = new Map<string, { mtimeMs: number; size: number }>();
   walkWorkspace(root, root, after, true, writes, before);

@@ -908,6 +908,8 @@ function readPersistedRuns(envelope: Record<string, unknown>): import("./driver"
       },
       assets_loaded: Array.isArray(row.assets_loaded) ? (row.assets_loaded as string[]) : [],
       failure_mode: typeof row.failure_mode === "string" ? row.failure_mode : null,
+      termination_cause: typeof row.termination_cause === "string" ? row.termination_cause : null,
+      first_error_line: typeof row.first_error_line === "string" ? row.first_error_line : null,
     };
     out.push(rehydrateRunFromSerialized(normalised));
   }

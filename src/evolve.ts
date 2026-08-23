@@ -33,13 +33,13 @@ import fs from "node:fs";
 import { resolveAkmCommand } from "./akm-command";
 import { registerCleanup } from "./cleanup";
 import type { TaskMetadata, TaskSlice } from "./corpus";
+import { writeOpencodeJson } from "./environment";
 import {
   computeLessonMetrics,
   computePostTaskLessonLineage,
   type LessonMetrics,
   type PostTaskLessonLineage,
 } from "./evolve-metrics";
-import { writeOpencodeJson } from "./environment";
 import { type LoadedFixtureStash, loadFixtureStash } from "./fixture-stash";
 import {
   computeFeedbackIntegrity,
@@ -278,9 +278,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   const evalTasks = options.tasks.filter((t) => effectiveSlice(t) === "eval");
 
   const uniqueTrainGoldRefs = new Set(
-    trainTasks
-      .map((t) => t.goldRef)
-      .filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0),
+    trainTasks.map((t) => t.goldRef).filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0),
   );
   if (uniqueTrainGoldRefs.size < 2) {
     warnings.push(
@@ -557,74 +555,69 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       // `slice:train`. Distill excludes `slice:eval` tags so eval feedback
       // never leaks into the LLM input while preserving train feedback.
       for (const ref of refsToEvolve) {
-      const counts = phase1FeedbackByRef.get(ref) ?? { positive: 0, negative: 0 };
-      const fixtureName = refToFixture.get(ref) ?? "default";
-      const phase2StashDir = evolveDirByFixture.get(fixtureName);
-      const evolveEnv: Record<string, string> = {
-        ...envForRef(ref),
-        XDG_CONFIG_HOME: phase2XdgConfigHome(`phase2-${fixtureName}`, phase2StashDir),
-      };
+        const counts = phase1FeedbackByRef.get(ref) ?? { positive: 0, negative: 0 };
+        const fixtureName = refToFixture.get(ref) ?? "default";
+        const phase2StashDir = evolveDirByFixture.get(fixtureName);
+        const evolveEnv: Record<string, string> = {
+          ...envForRef(ref),
+          XDG_CONFIG_HOME: phase2XdgConfigHome(`phase2-${fixtureName}`, phase2StashDir),
+        };
 
-      const distillArgs = [
-        "distill",
-        ref,
-        "--exclude-tags",
-        "slice:eval",
-      ];
-      const distillResult = await invokeAkm("phase2", distillArgs, phase1Cwd, evolveEnv);
-      if (distillResult.exitCode !== 0) {
-        warnings.push(`phase2: akm distill ${ref} failed: ${distillResult.stderr.trim()}`);
-      }
-      if (phase2SkipReflectOnAllNegative && isAllNegativeThresholdRef(counts, negativeThreshold.absoluteCount)) {
-        warnings.push(
-          `phase2.reflect_skipped_all_negative: akm reflect ${ref} skipped (positive=0 negative=${counts.negative} threshold=${negativeThreshold.absoluteCount})`,
-        );
-        continue;
-      }
-      const reflectArgs = [
-        "reflect",
-        ref,
-        "--task",
-        PHASE2_REFLECT_CONSTRAINED_TASK,
-        "--timeout-ms",
-        String(phase2ReflectTimeoutMs),
-      ];
-      const reflectResult = await invokeAkm("phase2", reflectArgs, phase1Cwd, evolveEnv);
-      if (reflectResult.exitCode !== 0) {
-        const reflectFailure = summariseAkmFailure(reflectResult);
-        if (isLikelyTimeoutFailure(reflectFailure)) {
-          if (phase2ReflectRetryTimeoutMs >= PHASE2_REFLECT_RETRY_DISABLE_THRESHOLD_MS) {
-            warnings.push(
-              `phase2.reflect_retry_skipped: akm reflect ${ref} timed out and retry is disabled for retry timeout >= ${PHASE2_REFLECT_RETRY_DISABLE_THRESHOLD_MS}ms`,
-            );
-            warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${reflectFailure}`);
-            continue;
-          }
+        const distillArgs = ["distill", ref, "--exclude-tags", "slice:eval"];
+        const distillResult = await invokeAkm("phase2", distillArgs, phase1Cwd, evolveEnv);
+        if (distillResult.exitCode !== 0) {
+          warnings.push(`phase2: akm distill ${ref} failed: ${distillResult.stderr.trim()}`);
+        }
+        if (phase2SkipReflectOnAllNegative && isAllNegativeThresholdRef(counts, negativeThreshold.absoluteCount)) {
           warnings.push(
-            `phase2.reflect_retry_timeout: akm reflect ${ref} timed out; retrying once with narrower task and timeout ${phase2ReflectRetryTimeoutMs}ms`,
+            `phase2.reflect_skipped_all_negative: akm reflect ${ref} skipped (positive=0 negative=${counts.negative} threshold=${negativeThreshold.absoluteCount})`,
           );
-          const retryReflectResult = await invokeAkm(
-            "phase2",
-            [
-              "reflect",
-              ref,
-              "--task",
-              PHASE2_REFLECT_RETRY_TASK,
-              "--timeout-ms",
-              String(phase2ReflectRetryTimeoutMs),
-            ],
-            phase1Cwd,
-            evolveEnv,
-          );
-          if (retryReflectResult.exitCode !== 0) {
-            warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${summariseAkmFailure(retryReflectResult)}`);
-          }
           continue;
         }
-        // `reflect` requires `agent.default` to be configured — a missing
-        // config is non-fatal for the bench; we record and continue.
-        warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${reflectFailure}`);
-      }
+        const reflectArgs = [
+          "reflect",
+          ref,
+          "--task",
+          PHASE2_REFLECT_CONSTRAINED_TASK,
+          "--timeout-ms",
+          String(phase2ReflectTimeoutMs),
+        ];
+        const reflectResult = await invokeAkm("phase2", reflectArgs, phase1Cwd, evolveEnv);
+        if (reflectResult.exitCode !== 0) {
+          const reflectFailure = summariseAkmFailure(reflectResult);
+          if (isLikelyTimeoutFailure(reflectFailure)) {
+            if (phase2ReflectRetryTimeoutMs >= PHASE2_REFLECT_RETRY_DISABLE_THRESHOLD_MS) {
+              warnings.push(
+                `phase2.reflect_retry_skipped: akm reflect ${ref} timed out and retry is disabled for retry timeout >= ${PHASE2_REFLECT_RETRY_DISABLE_THRESHOLD_MS}ms`,
+              );
+              warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${reflectFailure}`);
+              continue;
+            }
+            warnings.push(
+              `phase2.reflect_retry_timeout: akm reflect ${ref} timed out; retrying once with narrower task and timeout ${phase2ReflectRetryTimeoutMs}ms`,
+            );
+            const retryReflectResult = await invokeAkm(
+              "phase2",
+              [
+                "reflect",
+                ref,
+                "--task",
+                PHASE2_REFLECT_RETRY_TASK,
+                "--timeout-ms",
+                String(phase2ReflectRetryTimeoutMs),
+              ],
+              phase1Cwd,
+              evolveEnv,
+            );
+            if (retryReflectResult.exitCode !== 0) {
+              warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${summariseAkmFailure(retryReflectResult)}`);
+            }
+            continue;
+          }
+          // `reflect` requires `agent.default` to be configured — a missing
+          // config is non-fatal for the bench; we record and continue.
+          warnings.push(`phase2: akm reflect ${ref} skipped/failed: ${reflectFailure}`);
+        }
       }
 
       // Walk the proposal queue per fixture (each evolveStash has its own
@@ -633,161 +626,167 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       // this is one pass.
       const proposalFixtures = materialiseStash ? [...evolveDirByFixture.keys()] : [undefined];
       for (const fixtureName of proposalFixtures) {
-      let acceptedCountForFixture = 0;
-      const proposalEnv: Record<string, string> = { ...(process.env as Record<string, string>) };
-      if (materialiseStash && fixtureName) {
-        const dir = evolveDirByFixture.get(fixtureName);
-        if (dir) proposalEnv.AKM_STASH_DIR = dir;
-        const cacheDir = evolveCacheDirByFixture.get(fixtureName);
-        if (cacheDir) proposalEnv.XDG_CACHE_HOME = cacheDir;
-        proposalEnv.XDG_CONFIG_HOME = phase2XdgConfigHome(`phase2-${fixtureName}`, dir);
-      } else if (!materialiseStash) {
-        delete proposalEnv.AKM_STASH_DIR;
-        proposalEnv.XDG_CONFIG_HOME = phase2XdgConfigHome("phase2-default");
-      }
-      const fixtureLabel = fixtureName ?? "default";
-      const listResult = await invokeAkm("phase2", ["proposal", "list", "--json"], phase1Cwd, proposalEnv);
-      if (listResult.exitCode !== 0) {
-        const stderr = listResult.stderr.trim() || "<empty stderr>";
-        warnings.push(
-          `phase2: akm proposal list --json failed for fixture "${fixtureLabel}" (exit ${listResult.exitCode}); skipping this fixture's proposal queue. stderr: ${stderr}`,
-        );
-        continue;
-      }
-      const processedProposalIds = new Set<string>();
-      const queue = parseProposalList(listResult.stdout);
-      while (queue.length > 0) {
-        const p = queue.shift();
-        if (!p || processedProposalIds.has(p.id)) continue;
-        processedProposalIds.add(p.id);
-        const showResult = await invokeAkm("phase2", ["proposal", "show", p.id, "--json"], phase1Cwd, proposalEnv);
-        if (showResult.exitCode !== 0) {
-          const stderr = showResult.stderr.trim() || "<empty stderr>";
-          const showFailureReason = `proposal show failed (exit ${showResult.exitCode}): ${stderr}`;
-          const rejectResult = await invokeAkm(
-            "phase2",
-            ["proposal", "reject", p.id, "--reason", showFailureReason],
-            phase1Cwd,
-            proposalEnv,
+        let acceptedCountForFixture = 0;
+        const proposalEnv: Record<string, string> = { ...(process.env as Record<string, string>) };
+        if (materialiseStash && fixtureName) {
+          const dir = evolveDirByFixture.get(fixtureName);
+          if (dir) proposalEnv.AKM_STASH_DIR = dir;
+          const cacheDir = evolveCacheDirByFixture.get(fixtureName);
+          if (cacheDir) proposalEnv.XDG_CACHE_HOME = cacheDir;
+          proposalEnv.XDG_CONFIG_HOME = phase2XdgConfigHome(`phase2-${fixtureName}`, dir);
+        } else if (!materialiseStash) {
+          delete proposalEnv.AKM_STASH_DIR;
+          proposalEnv.XDG_CONFIG_HOME = phase2XdgConfigHome("phase2-default");
+        }
+        const fixtureLabel = fixtureName ?? "default";
+        const listResult = await invokeAkm("phase2", ["proposal", "list", "--json"], phase1Cwd, proposalEnv);
+        if (listResult.exitCode !== 0) {
+          const stderr = listResult.stderr.trim() || "<empty stderr>";
+          warnings.push(
+            `phase2: akm proposal list --json failed for fixture "${fixtureLabel}" (exit ${listResult.exitCode}); skipping this fixture's proposal queue. stderr: ${stderr}`,
           );
-          warnings.push(`phase2: proposal ${p.id} rejected due to show command failure: ${showFailureReason}`);
-          proposalLog.push({
-            proposalId: p.id,
-            assetRef: p.assetRef,
-            kind: p.kind,
-            lintPass: false,
-            decision: "reject",
-            rejectReason: showFailureReason,
-          });
-          if (rejectResult.exitCode !== 0) {
-            warnings.push(`phase2: akm proposal reject ${p.id} failed after show failure: ${rejectResult.stderr.trim()}`);
-          }
           continue;
         }
-
-        const showInfo = parseProposalShow(showResult.stdout);
-        if (showInfo.status === "lint_pass") {
-          const acceptResult = await invokeAkm("phase2", ["proposal", "accept", p.id], phase1Cwd, proposalEnv);
-          if (acceptResult.exitCode === 0) acceptedCountForFixture += 1;
-          proposalLog.push({
-            proposalId: p.id,
-            assetRef: p.assetRef,
-            kind: p.kind,
-            lintPass: true,
-            decision: acceptResult.exitCode === 0 ? "accept" : "reject",
-            ...(acceptResult.exitCode === 0 ? {} : { rejectReason: `accept failed: ${acceptResult.stderr.trim()}` }),
-          });
-        } else {
-          const reason =
-            showInfo.status === "lint_fail"
-              ? showInfo.message ?? "lint failed"
-              : showInfo.status === "show_error"
-                ? showInfo.message ?? "proposal show error"
-                : showInfo.message ?? "proposal show parse error";
-          const rejectReason =
-            showInfo.status === "lint_fail"
-              ? `lint failed: ${reason}`
-              : showInfo.status === "show_error"
-                ? `proposal show failed: ${reason}`
-                : `proposal show parse error: ${reason}`;
-
-          if (showInfo.status === "lint_fail" && !repairedRefs.has(p.assetRef)) {
-            repairedRefs.add(p.assetRef);
-            const repairReflectResult = await invokeAkm(
+        const processedProposalIds = new Set<string>();
+        const queue = parseProposalList(listResult.stdout);
+        while (queue.length > 0) {
+          const p = queue.shift();
+          if (!p || processedProposalIds.has(p.id)) continue;
+          processedProposalIds.add(p.id);
+          const showResult = await invokeAkm("phase2", ["proposal", "show", p.id, "--json"], phase1Cwd, proposalEnv);
+          if (showResult.exitCode !== 0) {
+            const stderr = showResult.stderr.trim() || "<empty stderr>";
+            const showFailureReason = `proposal show failed (exit ${showResult.exitCode}): ${stderr}`;
+            const rejectResult = await invokeAkm(
               "phase2",
-              [
-                "reflect",
-                p.assetRef,
-                "--task",
-                PHASE2_REFLECT_LINT_REPAIR_TASK,
-                "--timeout-ms",
-                String(phase2ReflectTimeoutMs),
-              ],
+              ["proposal", "reject", p.id, "--reason", showFailureReason],
               phase1Cwd,
               proposalEnv,
             );
-            if (repairReflectResult.exitCode !== 0) {
-              warnings.push(`phase2: lint-repair reflect ${p.assetRef} failed: ${summariseAkmFailure(repairReflectResult)}`);
-            }
-
-            const refreshedListResult = await invokeAkm(
-              "phase2",
-              ["proposal", "list", "--json"],
-              phase1Cwd,
-              proposalEnv,
-            );
-            if (refreshedListResult.exitCode !== 0) {
-              const stderr = refreshedListResult.stderr.trim() || "<empty stderr>";
+            warnings.push(`phase2: proposal ${p.id} rejected due to show command failure: ${showFailureReason}`);
+            proposalLog.push({
+              proposalId: p.id,
+              assetRef: p.assetRef,
+              kind: p.kind,
+              lintPass: false,
+              decision: "reject",
+              rejectReason: showFailureReason,
+            });
+            if (rejectResult.exitCode !== 0) {
               warnings.push(
-                `phase2: akm proposal list --json refresh failed for fixture "${fixtureLabel}" after lint repair on ${p.assetRef} (exit ${refreshedListResult.exitCode}); stderr: ${stderr}`,
+                `phase2: akm proposal reject ${p.id} failed after show failure: ${rejectResult.stderr.trim()}`,
               );
-            } else {
-              const refreshed = parseProposalList(refreshedListResult.stdout);
-              for (const candidate of refreshed) {
-                if (candidate.assetRef !== p.assetRef) continue;
-                if (processedProposalIds.has(candidate.id)) continue;
-                queue.push(candidate);
+            }
+            continue;
+          }
+
+          const showInfo = parseProposalShow(showResult.stdout);
+          if (showInfo.status === "lint_pass") {
+            const acceptResult = await invokeAkm("phase2", ["proposal", "accept", p.id], phase1Cwd, proposalEnv);
+            if (acceptResult.exitCode === 0) acceptedCountForFixture += 1;
+            proposalLog.push({
+              proposalId: p.id,
+              assetRef: p.assetRef,
+              kind: p.kind,
+              lintPass: true,
+              decision: acceptResult.exitCode === 0 ? "accept" : "reject",
+              ...(acceptResult.exitCode === 0 ? {} : { rejectReason: `accept failed: ${acceptResult.stderr.trim()}` }),
+            });
+          } else {
+            const reason =
+              showInfo.status === "lint_fail"
+                ? (showInfo.message ?? "lint failed")
+                : showInfo.status === "show_error"
+                  ? (showInfo.message ?? "proposal show error")
+                  : (showInfo.message ?? "proposal show parse error");
+            const rejectReason =
+              showInfo.status === "lint_fail"
+                ? `lint failed: ${reason}`
+                : showInfo.status === "show_error"
+                  ? `proposal show failed: ${reason}`
+                  : `proposal show parse error: ${reason}`;
+
+            if (showInfo.status === "lint_fail" && !repairedRefs.has(p.assetRef)) {
+              repairedRefs.add(p.assetRef);
+              const repairReflectResult = await invokeAkm(
+                "phase2",
+                [
+                  "reflect",
+                  p.assetRef,
+                  "--task",
+                  PHASE2_REFLECT_LINT_REPAIR_TASK,
+                  "--timeout-ms",
+                  String(phase2ReflectTimeoutMs),
+                ],
+                phase1Cwd,
+                proposalEnv,
+              );
+              if (repairReflectResult.exitCode !== 0) {
+                warnings.push(
+                  `phase2: lint-repair reflect ${p.assetRef} failed: ${summariseAkmFailure(repairReflectResult)}`,
+                );
+              }
+
+              const refreshedListResult = await invokeAkm(
+                "phase2",
+                ["proposal", "list", "--json"],
+                phase1Cwd,
+                proposalEnv,
+              );
+              if (refreshedListResult.exitCode !== 0) {
+                const stderr = refreshedListResult.stderr.trim() || "<empty stderr>";
+                warnings.push(
+                  `phase2: akm proposal list --json refresh failed for fixture "${fixtureLabel}" after lint repair on ${p.assetRef} (exit ${refreshedListResult.exitCode}); stderr: ${stderr}`,
+                );
+              } else {
+                const refreshed = parseProposalList(refreshedListResult.stdout);
+                for (const candidate of refreshed) {
+                  if (candidate.assetRef !== p.assetRef) continue;
+                  if (processedProposalIds.has(candidate.id)) continue;
+                  queue.push(candidate);
+                }
               }
             }
-          }
 
-          const rejectResult = await invokeAkm(
-            "phase2",
-            ["proposal", "reject", p.id, "--reason", rejectReason],
-            phase1Cwd,
-            proposalEnv,
-          );
-          if (showInfo.status === "show_error" || showInfo.status === "parse_error") {
-            warnings.push(
-              `phase2: proposal ${p.id} rejected due to ${showInfo.status === "show_error" ? "show error" : "show parse error"}: ${reason}`,
+            const rejectResult = await invokeAkm(
+              "phase2",
+              ["proposal", "reject", p.id, "--reason", rejectReason],
+              phase1Cwd,
+              proposalEnv,
             );
-          }
-          proposalLog.push({
-            proposalId: p.id,
-            assetRef: p.assetRef,
-            kind: p.kind,
-            lintPass: false,
-            decision: "reject",
-            rejectReason,
-          });
-          if (rejectResult.exitCode !== 0) {
-            warnings.push(`phase2: akm proposal reject ${p.id} failed: ${rejectResult.stderr.trim()}`);
+            if (showInfo.status === "show_error" || showInfo.status === "parse_error") {
+              warnings.push(
+                `phase2: proposal ${p.id} rejected due to ${showInfo.status === "show_error" ? "show error" : "show parse error"}: ${reason}`,
+              );
+            }
+            proposalLog.push({
+              proposalId: p.id,
+              assetRef: p.assetRef,
+              kind: p.kind,
+              lintPass: false,
+              decision: "reject",
+              rejectReason,
+            });
+            if (rejectResult.exitCode !== 0) {
+              warnings.push(`phase2: akm proposal reject ${p.id} failed: ${rejectResult.stderr.trim()}`);
+            }
           }
         }
-      }
 
-      // Rebuild the index so accepted lessons surface in Phase 3.
-      // Only needed when at least one proposal was accepted — if all were
-      // rejected (or none generated) the index is unchanged.
-      if (acceptedCountForFixture > 0) {
-        process.stderr.write(`[evolve] rebuilding index after ${acceptedCountForFixture} accepted proposal(s) for ${fixtureLabel}\n`);
-        const indexResult = await invokeAkm("phase2", ["index"], phase1Cwd, proposalEnv);
-        if (indexResult.exitCode !== 0) {
-          warnings.push(`phase2: akm index rebuild failed: ${indexResult.stderr.trim()}`);
+        // Rebuild the index so accepted lessons surface in Phase 3.
+        // Only needed when at least one proposal was accepted — if all were
+        // rejected (or none generated) the index is unchanged.
+        if (acceptedCountForFixture > 0) {
+          process.stderr.write(
+            `[evolve] rebuilding index after ${acceptedCountForFixture} accepted proposal(s) for ${fixtureLabel}\n`,
+          );
+          const indexResult = await invokeAkm("phase2", ["index"], phase1Cwd, proposalEnv);
+          if (indexResult.exitCode !== 0) {
+            warnings.push(`phase2: akm index rebuild failed: ${indexResult.stderr.trim()}`);
+          }
+        } else {
+          process.stderr.write(`[evolve] skipping index rebuild — 0 accepted proposals\n`);
         }
-      } else {
-        process.stderr.write(`[evolve] skipping index rebuild — 0 accepted proposals\n`);
-      }
       }
     } else {
       warnings.push("phase2: disabled by config (phase2Enabled=false); skipping distill/reflect/proposal/index");
@@ -1234,7 +1233,10 @@ function compactOneLine(value: string, maxLen: number): string {
 }
 
 function sanitizePathComponent(value: string): string {
-  const cleaned = value.replace(/[^A-Za-z0-9._-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const cleaned = value
+    .replace(/[^A-Za-z0-9._-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
   return cleaned.length > 0 ? cleaned : "default";
 }
 

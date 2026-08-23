@@ -192,7 +192,10 @@ describe("runOne", () => {
   });
 
   test("harness_error: verifier exit 127 is tagged as verifier_runtime_missing", async () => {
-    const { spawn } = scriptedSpawn({ exitCode: 0, stdout: "ok" }, { exitCode: 127, stdout: "pytest: command not found" });
+    const { spawn } = scriptedSpawn(
+      { exitCode: 0, stdout: "ok" },
+      { exitCode: 127, stdout: "pytest: command not found" },
+    );
     const result = await runOne({ ...baseOptions, workspace, spawn, verifier: "pytest" });
     expect(result.outcome).toBe("harness_error");
     expect(result.terminationCause).toBe("verifier_runtime_missing");

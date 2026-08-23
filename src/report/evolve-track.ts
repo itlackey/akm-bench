@@ -556,9 +556,7 @@ function buildEvolveMarkdown(input: EvolveReportInput): string {
   lines.push(`| improvement_slope | ${signedFixed(input.longitudinal.improvementSlope, 2)} |`);
   lines.push(`| interpretation | ${input.longitudinal.interpretation} |`);
   lines.push(`| directional_improvement | ${input.longitudinal.directionalImprovement ? "yes" : "no"} |`);
-  lines.push(
-    `| exceeds_significance_threshold | ${input.longitudinal.exceedsSignificanceThreshold ? "yes" : "no"} |`,
-  );
+  lines.push(`| exceeds_significance_threshold | ${input.longitudinal.exceedsSignificanceThreshold ? "yes" : "no"} |`);
   lines.push(`| matches_or_beats_synthetic | ${input.longitudinal.matchesOrBeatsSynthetic ? "yes" : "no"} |`);
   lines.push(`| pre_pass_rate_stdev | ${input.longitudinal.prePassRateStdev.toFixed(2)} |`);
   lines.push(`| post_pass_rate_stdev | ${input.longitudinal.postPassRateStdev.toFixed(2)} |`);

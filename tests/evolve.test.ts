@@ -106,7 +106,8 @@ function buildFakeAkmCli(opts: {
       const queue =
         opts.proposalQueueSequence?.[proposalListCallCount] ??
         opts.proposalQueueSequence?.[opts.proposalQueueSequence.length - 1] ??
-        opts.proposalQueue ?? [];
+        opts.proposalQueue ??
+        [];
       proposalListCallCount += 1;
       return {
         exitCode: 0,
@@ -415,7 +416,9 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
       materialiseStash: false,
     });
 
-    expect(observed.calls.some((c) => c[0] === "proposal" && c[1] === "accept" && c[2] === "p-validation-ok")).toBe(true);
+    expect(observed.calls.some((c) => c[0] === "proposal" && c[1] === "accept" && c[2] === "p-validation-ok")).toBe(
+      true,
+    );
     expect(report.proposalLog.find((e) => e.proposalId === "p-validation-ok")?.decision).toBe("accept");
   });
 
@@ -432,9 +435,7 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
           proposal: { id: "p-validation-bad", ref: "skill:loser" },
           validation: {
             ok: false,
-            findings: [
-              { severity: "error", path: "skills/docker/SKILL.md", line: 2, message: "missing description" },
-            ],
+            findings: [{ severity: "error", path: "skills/docker/SKILL.md", line: 2, message: "missing description" }],
           },
         }),
       },
@@ -573,7 +574,9 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     const lintEntry = report.proposalLog.find((e) => e.proposalId === "p-lint-rich");
     expect(lintEntry?.decision).toBe("reject");
     expect(lintEntry?.rejectReason).toContain("lint failed: proposal lint checks failed");
-    expect(lintEntry?.rejectReason).toContain("issue_1=[error] yaml-schema @assets/lesson.yaml:12:3 missing required field: summary");
+    expect(lintEntry?.rejectReason).toContain(
+      "issue_1=[error] yaml-schema @assets/lesson.yaml:12:3 missing required field: summary",
+    );
     expect(lintEntry?.rejectReason).toContain("issue_2=frontmatter tags must be lowercase");
 
     const rendered = renderEvolveReport({
@@ -612,7 +615,7 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     const akmCli = buildFakeAkmCli({
       proposalQueue: [{ id: "p-bad-json", targetRef: "skill:loser", kind: "revision" }],
       showStdoutByProposal: {
-        "p-bad-json": "{\n  \"ok\": true,\n  \"lint\": [this is invalid json]\n}",
+        "p-bad-json": '{\n  "ok": true,\n  "lint": [this is invalid json]\n}',
       },
     });
 
@@ -628,9 +631,9 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     const entry = report.proposalLog.find((e) => e.proposalId === "p-bad-json");
     expect(entry?.decision).toBe("reject");
     expect(entry?.rejectReason).toContain("proposal show parse error");
-    expect(entry?.rejectReason).toContain("raw={ \"ok\": true, \"lint\": [this is invalid json] }");
+    expect(entry?.rejectReason).toContain('raw={ "ok": true, "lint": [this is invalid json] }');
     expect(report.warnings.some((w) => w.includes("rejected due to show parse error"))).toBe(true);
-    expect(report.warnings.some((w) => w.includes("raw={ \"ok\": true, \"lint\": [this is invalid json] }"))).toBe(true);
+    expect(report.warnings.some((w) => w.includes('raw={ "ok": true, "lint": [this is invalid json] }'))).toBe(true);
   });
 
   test("proposal list non-zero exit adds warning and continues safely", async () => {
@@ -698,7 +701,9 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
       (c) => c[0] === "reflect" && c[1] === "skill:loser" && c[3] === EXPECTED_REFLECT_LINT_REPAIR_TASK,
     );
     expect(reflectRepairCalls.length).toBe(1);
-    const repairedAccept = observed.calls.find((c) => c[0] === "proposal" && c[1] === "accept" && c[2] === "p-repaired");
+    const repairedAccept = observed.calls.find(
+      (c) => c[0] === "proposal" && c[1] === "accept" && c[2] === "p-repaired",
+    );
     expect(repairedAccept).toBeDefined();
     expect(report.proposalLog.find((e) => e.proposalId === "p-initial")?.decision).toBe("reject");
     expect(report.proposalLog.find((e) => e.proposalId === "p-repaired")?.decision).toBe("accept");

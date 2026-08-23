@@ -195,8 +195,7 @@ function extractGoldRanksFromEvents(runResult: RunResult, goldRef: string): Gold
       meta && typeof meta === "object" && typeof (meta as Record<string, unknown>).query === "string"
         ? ((meta as Record<string, unknown>).query as string)
         : "";
-    const resultRefsRaw =
-      meta && typeof meta === "object" ? (meta as Record<string, unknown>).resultRefs : undefined;
+    const resultRefsRaw = meta && typeof meta === "object" ? (meta as Record<string, unknown>).resultRefs : undefined;
     const results = Array.isArray(resultRefsRaw)
       ? resultRefsRaw.filter((item): item is string => typeof item === "string").slice(0, TOP_K)
       : [];

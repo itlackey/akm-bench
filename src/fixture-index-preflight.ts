@@ -1,5 +1,5 @@
-import { fixtureContentHash } from "./fixture-stash";
 import { ensureFixtureIndexCacheEntry } from "./fixture-index-cache";
+import { fixtureContentHash } from "./fixture-stash";
 
 export interface FixtureRefLike {
   stash: string;

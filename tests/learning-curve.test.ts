@@ -321,7 +321,12 @@ describe("renderEvolveReport — learning block (#265)", () => {
     expect(parsed.phase_timings?.phase2.elapsed_ms).toBe(15000);
     expect(parsed.phase_timings?.phase3.arms.post_elapsed_ms).toBe(7000);
     expect(parsed.phase_timings?.total_elapsed_ms).toBe(40000);
-    expect(parsed.phase_timings?.akm_commands.map((row) => ({ command: row.command, watchdog_exceeded: row.watchdog_exceeded }))).toEqual([
+    expect(
+      parsed.phase_timings?.akm_commands.map((row) => ({
+        command: row.command,
+        watchdog_exceeded: row.watchdog_exceeded,
+      })),
+    ).toEqual([
       { command: "feedback", watchdog_exceeded: false },
       { command: "reflect", watchdog_exceeded: true },
     ]);

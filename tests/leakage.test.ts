@@ -164,17 +164,29 @@ describe("cross-task eval/train verifier leakage check", () => {
     // field-access patterns by design, just with different expected values.
     // Also skip workflow-compliance variants (e.g. repeated-fail-storage-lifecycle-a/b/eval)
     // which share structural assertions by design.
-    const isVariantPair = (trainId: string, evalId: string) => {
-      const trainBase = trainId.replace(/-train$/, "").replace(/-[a-z]+$/, "");
-      const evalBase = evalId.replace(/-eval$/, "").replace(/-[a-z]+$/, "");
-      return trainBase === evalBase || evalId.startsWith(`${trainBase}-`);
+    // A declared `repeated_failure_group` is the authoritative signal: its
+    // members (the train tasks whose repeated failure triggers reflection and
+    // the eval task measuring the transfer) share verifier structure BY
+    // DESIGN, and the id-string heuristic below cannot recognise every
+    // naming shape they use (e.g. `...-disable-provider` vs
+    // `...-provider-token-eval`). Only same-group pairs are exempt —
+    // cross-group repeated-failure tasks are still checked against each
+    // other, which is exactly the accidental-leakage case this test exists
+    // to catch.
+    const sameRepeatedFailureGroup = (a: TaskMetadata, b: TaskMetadata) =>
+      a.repeatedFailureGroup !== undefined && a.repeatedFailureGroup === b.repeatedFailureGroup;
+    const isVariantPair = (trainTask: TaskMetadata, evalTask: TaskMetadata) => {
+      if (sameRepeatedFailureGroup(trainTask, evalTask)) return true;
+      const trainBase = trainTask.id.replace(/-train$/, "").replace(/-[a-z]+$/, "");
+      const evalBase = evalTask.id.replace(/-eval$/, "").replace(/-[a-z]+$/, "");
+      return trainBase === evalBase || evalTask.id.startsWith(`${trainBase}-`);
     };
     for (const trainTask of trainTasks) {
       const trainFragments = crossTaskFragments(trainTask);
       if (trainFragments.length === 0) continue;
 
       for (const evalTask of evalTasks) {
-        if (isVariantPair(trainTask.id, evalTask.id)) continue;
+        if (isVariantPair(trainTask, evalTask)) continue;
         const evalVerifierText = readVerifierFiles(evalTask);
         test(`stash:${stashName} — train:${trainTask.id} fragments not in eval:${evalTask.id} verifier`, () => {
           const leaked = trainFragments.filter((frag) => evalVerifierText.includes(frag));
@@ -191,7 +203,7 @@ describe("cross-task eval/train verifier leakage check", () => {
       if (evalFragments.length === 0) continue;
 
       for (const trainTask of trainTasks) {
-        if (isVariantPair(trainTask.id, evalTask.id)) continue;
+        if (isVariantPair(trainTask, evalTask)) continue;
         const trainVerifierText = readVerifierFiles(trainTask);
         test(`stash:${stashName} — eval:${evalTask.id} fragments not in train:${trainTask.id} verifier`, () => {
           const leaked = evalFragments.filter((frag) => trainVerifierText.includes(frag));
