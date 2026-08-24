@@ -11,16 +11,16 @@
 set -uo pipefail
 
 # --- documented form for THIS task -------------------------------------
-FILE=commands.txt
+FILE=runbook.txt
 # leading command words, in order:
-WORDS=(drillbit backup)
+WORDS=(drillbit provision)
 # positional arguments after the command words, in order:
 POSITIONAL=()
 # documented flags and their required values (order between them may vary):
-declare -A FLAGS=([--cluster]=logs-archive [--retention]=30d [--snapshots]=14)
+declare -A FLAGS=([--cluster]=relay-3 [--tier]=edge [--region]=az-west [--replicas]=2)
 # extended-regexes that must NOT appear anywhere in FILE (stale/invalid forms
 # the task requires to be removed):
-FORBIDDEN=()
+FORBIDDEN=('--type' 'us-west-2')
 # -----------------------------------------------------------------------
 
 if [[ ! -f "$FILE" ]]; then echo "$FILE missing"; exit 1; fi

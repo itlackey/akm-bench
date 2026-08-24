@@ -2,7 +2,7 @@
   {
     "name": "akm-tasks-train",
     "version": "1.0",
-    "description": "akm-bench legacy corpus, train slice (27 tasks: az-cli, docker-homelab, drillbit, inkwell, opencode, workflow-compliance, plus the reference fixture task).",
+    "description": "akm-bench legacy corpus, train slice (29 tasks: az-cli, docker-homelab, drillbit, inkwell, opencode, workflow-compliance, plus the reference fixture task).",
     "tasks": [
       {
         "name": "reference--example-task",
@@ -65,12 +65,20 @@
         "path": "harbor/tasks/drillbit--scale-replicas-train"
       },
       {
+        "name": "drillbit--fix-runbook-train",
+        "path": "harbor/tasks/drillbit--fix-runbook-train"
+      },
+      {
         "name": "inkwell--add-healthcheck-train",
         "path": "harbor/tasks/inkwell--add-healthcheck-train"
       },
       {
         "name": "inkwell--new-service-train",
         "path": "harbor/tasks/inkwell--new-service-train"
+      },
+      {
+        "name": "inkwell--new-service-scaled-train",
+        "path": "harbor/tasks/inkwell--new-service-scaled-train"
       },
       {
         "name": "opencode--opencode-config-model",

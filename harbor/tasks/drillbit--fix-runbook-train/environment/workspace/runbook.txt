@@ -1,0 +1,11 @@
+# relay expansion runbook — step 3 of 5
+#
+# Step 1 and 2 (capacity approval, change ticket) are already done.
+# Step 3 provisions the new relay node. The command below is carried over
+# from the previous CLI generation and is rejected by the installed
+# drillbit; correct it before running this runbook.
+
+drillbit provision --cluster relay-3 --type edge --region us-west-2 --replicas 2
+
+# Step 4: re-run the fleet inventory report.
+# Step 5: hand the runbook back to the on-call rotation.

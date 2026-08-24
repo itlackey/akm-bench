@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/inkwell--new-service-scaled-train"
+version = "1.0.0"
+description = "Create an inkwell service definition from scratch with scaling and rate limits"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+domain = "inkwell"
+slice = "train"
+difficulty = "medium"
+stash = "inkwell"
+budget_tokens = 25000
+budget_wall_ms = 360000
+gold_ref = "skills/inkwell"
+gold_ref_legacy = "skill:inkwell"
+memory_ability = "multi_asset_composition"
+task_family = "inkwell/service"
+akm_keywords = "inkwell service yaml scaling limits rps burst"
+notes = "Authored (not converted from the legacy corpus) for issue #6: a create-shaped inkwell task carrying the full scaling+limits surface, so that task SHAPE is no longer perfectly correlated with tool FAMILY. instruction.md states the requirements in prose only; every field name (metric/target/rps/burst) and the inkwell/v2 envelope come from harbor/stashes/inkwell."
+
+[verifier]
+timeout_sec = 1080.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "inkwell"
