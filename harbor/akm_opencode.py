@@ -335,6 +335,13 @@ SEED_TYPE_DIRS: dict[str, str] = {
 }
 
 
+#: Inverse of :data:`SEED_TYPE_DIRS`. Asset refs are ``<directory>/<name>``, so
+#: the self-check's prefix-enumeration probe needs the DIRECTORY for a type it
+#: picked by count (``skill`` -> ``skills/``). Built from the forward map so the
+#: two can never drift.
+SEED_DIR_FOR_TYPE: dict[str, str] = {v: k for k, v in SEED_TYPE_DIRS.items()}
+
+
 def derive_seed_expectations(seed_dir: Path) -> dict[str, int]:
     """Per-type index-entry floors for the seed library at ``seed_dir``.
 
@@ -1192,6 +1199,18 @@ class AkmOpenCode(OpenCode):
             if self._shared_bundle_path is None
             else {}
         )
+        # One entry per uploaded stash. The container picks among these with
+        # the SAME AKM_TASK_STASH it seeded from, so probe 2 always checks the
+        # library that actually landed.
+        stash_expectations = (
+            {
+                child.name: derive_seed_expectations(child)
+                for child in sorted(self._stash_root.iterdir())
+                if child.is_dir() and not child.name.startswith(".")
+            }
+            if self._shared_bundle_path is None and self._stash_root is not None
+            else {}
+        )
         if self._shared_bundle_path is None and not expectations:
             raise RuntimeError(
                 f"akm seed library at {self._seed_library_dir} contains no "
@@ -1214,7 +1233,15 @@ class AkmOpenCode(OpenCode):
                 # these (it gets the lighter, content-agnostic probe 2), so a
                 # missing seed dir on that arm must not raise here.
                 "AKM_SEED_EXPECTED_BY_TYPE": json.dumps(expectations),
-                "AKM_SEED_MIN_ENTRIES": str(sum(expectations.values())),
+                # Per-stash expectations, because WHICH library gets seeded is
+                # decided container-side from the task's AKM_TASK_STASH (see
+                # _build_stash_select_command), not by seed_library_dir. Sending
+                # only the library's shape made the probe assert the wrong
+                # source for every converted task that names a stash, aborting
+                # 100% of those treatment trials at install with a byType
+                # mismatch that had nothing to do with the arm's health.
+                "AKM_SEED_EXPECTED_BY_STASH": json.dumps(stash_expectations),
+                "AKM_SEED_TYPE_DIRS": json.dumps(SEED_DIR_FOR_TYPE),
                 "AKM_CLI_VERSION_PREFIX": AKM_CLI_VERSION_PREFIX,
             },
         )
@@ -1924,6 +1951,46 @@ class AkmOpenCode(OpenCode):
         pre-populating the mount from ``harbor/treatment-library/`` (decision
         D6), not from the smoke fixture.
         """
+        # Resolve WHICH seed source this trial actually got, using the same
+        # AKM_TASK_STASH the seed step used, and write its expected shape to
+        # /tmp/akm-seed-want.json for the probes below. Deriving this
+        # host-side from seed_library_dir was wrong: a converted task that
+        # names a stash is seeded from that stash, whose shape is unrelated to
+        # the library. Prints the DIRECTORY the enumeration probe should use,
+        # captured by command substitution -- a bare lowercase name, so it
+        # needs no quoting games on the shell side.
+        select_js = (
+            "const fs=require(\"fs\");"
+            "const stash=(process.env.AKM_TASK_STASH||\"\").trim();"
+            "const dflt=JSON.parse(process.env.AKM_SEED_EXPECTED_BY_TYPE||\"{}\");"
+            "const byStash=JSON.parse("
+            "process.env.AKM_SEED_EXPECTED_BY_STASH||\"{}\");"
+            "let want=dflt;"
+            "if(stash){"
+            "if(!Object.prototype.hasOwnProperty.call(byStash,stash))"
+            "throw new Error(\"no seed expectations were recorded for "
+            "AKM_TASK_STASH=\"+stash+\"; the uploaded stash root has no such "
+            "directory\");"
+            "want=byStash[stash];}"
+            "const types=Object.keys(want);"
+            "if(!types.length)throw new Error(\"the selected seed source ships "
+            "no recognisable asset type directories\");"
+            "types.sort((a,b)=>(want[b]-want[a])||a.localeCompare(b));"
+            "const probeType=types[0];"
+            "const dirs=JSON.parse(process.env.AKM_SEED_TYPE_DIRS||\"{}\");"
+            "const probeDir=dirs[probeType];"
+            "if(!probeDir)throw new Error(\"no bundle directory known for asset "
+            "type \"+probeType);"
+            "const min=types.reduce((a,k)=>a+want[k],0);"
+            # probeMin is capped at 4 on purpose: the enumeration probe should
+            # be as strong as the content allows and never stronger. The old
+            # hardcoded >=4 aborted every trial of a stash with fewer than
+            # four knowledge assets -- drillbit and inkwell ship none at all.
+            "const probeMin=Math.min(want[probeType],4);"
+            "fs.writeFileSync(\"/tmp/akm-seed-want.json\",JSON.stringify("
+            "{byType:want,minEntries:min,probeDir:probeDir,probeMin:probeMin}));"
+            "process.stdout.write(probeDir);"
+        )
         info_js = (
             "const fs=require(\"fs\");"
             "const i=JSON.parse(fs.readFileSync(\"/tmp/akm-info.json\",\"utf8\"));"
@@ -1932,12 +1999,14 @@ class AkmOpenCode(OpenCode):
             "\" want=\"+want);"
             "if(!i.defaultBundle)throw new Error(\"no defaultBundle configured\");"
             "const stats=i.indexStats||{};"
-            "const min=Number(process.env.AKM_SEED_MIN_ENTRIES);"
+            "const seed=JSON.parse(fs.readFileSync("
+            "\"/tmp/akm-seed-want.json\",\"utf8\"));"
+            "const min=seed.minEntries;"
             "const n=stats.entryCount;"
             "if(!(n>=min))throw new Error(\"indexStats.entryCount=\"+n+\" (<\"+min+"
             "\"; ~12 means only the scaffold indexed and the seed did not land)\");"
             "const byType=stats.byType||{};"
-            "const wantByType=JSON.parse(process.env.AKM_SEED_EXPECTED_BY_TYPE);"
+            "const wantByType=seed.byType;"
             "for(const k of Object.keys(wantByType)){"
             "if((byType[k]||0)<wantByType[k])throw new Error(\"byType.\"+k+\"=\"+"
             "(byType[k]||0)+\" want>=\"+wantByType[k]);}"
@@ -1961,7 +2030,7 @@ class AkmOpenCode(OpenCode):
             "if(!(n>0))throw new Error(\"indexStats.entryCount=\"+n+\" (want >0); "
             "the shared bundle must be pre-populated and indexed before the "
             "first trial runs -- see the accumulating-arm operational "
-            "requirements in AkmOpenCode's class docstring\");"
+            "requirements in the AkmOpenCode class docstring\");"
             "console.log(\"akm info OK (accumulating): entries=\"+n+\" bundle=\"+"
             "i.bundleDir);"
         )
@@ -1971,8 +2040,38 @@ class AkmOpenCode(OpenCode):
             "const fs=require(\"fs\");"
             "const h=JSON.parse(fs.readFileSync(\"/tmp/akm-search.json\",\"utf8\"))"
             ".hits||[];"
+            "const seed=JSON.parse(fs.readFileSync("
+            "\"/tmp/akm-seed-want.json\",\"utf8\"));"
+            "if(h.length<seed.probeMin)throw new Error(seed.probeDir+\"/ "
+            "enumeration returned \"+h.length+\" hits, want >=\"+seed.probeMin);"
+        )
+        # The accumulating arm never runs the selection preamble (it seeds
+        # nothing, so there is no /tmp/akm-seed-want.json to read) and keeps
+        # the arm-agnostic fixed floor it always had.
+        search_js_accumulating = (
+            "const fs=require(\"fs\");"
+            "const h=JSON.parse(fs.readFileSync(\"/tmp/akm-search.json\",\"utf8\"))"
+            ".hits||[];"
             "if(h.length<4)throw new Error(\"knowledge/ enumeration returned \"+"
             "h.length+\" hits, want >=4\");"
+        )
+        # The ranking probe's query is DERIVED from the bundle that actually
+        # landed, for the same reason probe 3's directory is: a fixed English
+        # phrase is a content assumption. `how do I debug a failing test`
+        # returns 0 items against the docker-homelab and drillbit stashes
+        # (measured with real akm 0.9.1), which would abort every trial of
+        # those tasks for a reason unrelated to the arm's health. akm's FTS is
+        # conjunctive AND over name/description/tags/headings, so the enumerated
+        # asset's own name is the one query guaranteed to have a match.
+        curate_query_js = (
+            "const fs=require(\"fs\");"
+            "const h=JSON.parse(fs.readFileSync(\"/tmp/akm-search.json\",\"utf8\"))"
+            ".hits||[];"
+            "const r=(h[0]||{}).ref;"
+            "if(!r)throw new Error(\"no ref in the seed enumeration\");"
+            "const name=r.split(\"/\").pop().replace(/[-_]+/g,\" \").trim();"
+            "if(!name)throw new Error(\"could not derive a curate query from \"+r);"
+            "process.stdout.write(name);"
         )
         curate_js = (
             "const fs=require(\"fs\");"
@@ -2020,6 +2119,28 @@ class AkmOpenCode(OpenCode):
         #    accumulating arm gets the lighter `info_js_accumulating` form
         #    instead -- see the docstring above.
         active_info_js = info_js if self._shared_bundle_path is None else info_js_accumulating
+        if self._shared_bundle_path is None:
+            # 2′) resolve the seed shape THIS trial was actually given, using
+            #     the same AKM_TASK_STASH the seed step selected with.
+            seed_shape_probe = (
+                "AKM_SEED_PROBE_DIR=\"$(node -e '" + select_js + "')\" || "
+                'fail "could not resolve the expected seed shape (see '
+                'AKM_TASK_STASH and the uploaded stash root)"; '
+            )
+            enumeration_probe = (
+                'akm search "$AKM_SEED_PROBE_DIR/" --format json -q '
+                '> /tmp/akm-search.json || fail "akm search failed"; '
+                f"node -e '{search_js}' || "
+                'fail "akm search prefix enumeration failed"; '
+            )
+        else:
+            seed_shape_probe = ""
+            enumeration_probe = (
+                f"akm search {shlex.quote('knowledge/')} --format json -q "
+                '> /tmp/akm-search.json || fail "akm search failed"; '
+                f"node -e '{search_js_accumulating}' || "
+                'fail "akm search prefix enumeration failed"; '
+            )
         seed_count_probe = (
             "akm info --format json -q > /tmp/akm-info.json || "
             'fail "akm info failed"; '
@@ -2051,17 +2172,21 @@ class AkmOpenCode(OpenCode):
             '"$AKM_CLI_VERSION_PREFIX"*) ;; '
             '*) fail "akm --version=$AKM_GLOBAL_VERSION does not satisfy '
             '${AKM_CLI_VERSION_PREFIX}x" ;; esac; '
-            + seed_count_probe +
-            # 3) read path.
-            f"akm search {shlex.quote('knowledge/')} --format json -q "
-            '> /tmp/akm-search.json || fail "akm search failed"; '
-            f"node -e '{search_js}' || fail \"akm search prefix enumeration failed\"; "
-            # 4) ranking path, with no LLM configured. The query is deliberately
-            #    generic: it must return >=1 item against ANY seed library, and
-            #    the old `roll back a bad production deploy` phrasing was
-            #    written for the smoke fixture's deployment-runbook asset.
-            "akm curate "
-            f"{shlex.quote('how do I debug a failing test')} "
+            + seed_shape_probe
+            + seed_count_probe
+            # 3) read path. Which directory, and how many hits are required,
+            #    follow the seed source this trial actually got.
+            + enumeration_probe
+            # 4) ranking path, with no LLM configured. The query is DERIVED
+            #    from probe 3's first hit (see curate_query_js), so it matches
+            #    something in whatever bundle this trial actually got. A fixed
+            #    English phrase cannot: the previous `how do I debug a failing
+            #    test` returns 0 items against the docker-homelab and drillbit
+            #    stashes, and the one before it was written for the smoke
+            #    fixture's deployment-runbook asset.
+            + "AKM_CURATE_QUERY=\"$(node -e '" + curate_query_js + "')\" || "
+            'fail "could not derive a curate query from the seed enumeration"; '
+            'akm curate "$AKM_CURATE_QUERY" '
             "--limit 3 --format json -q > /tmp/akm-curate.json || "
             'fail "akm curate failed"; '
             f"node -e '{curate_js}' || fail \"akm curate returned nothing\"; "

@@ -10,6 +10,18 @@
 # (qwen3.6-35b-a3b, devstral-small-2) return HTTP 500 on the treatment arm only
 # -- an arm-asymmetric hard failure. Verified accepting: qwen3-30b-a3b-2507,
 # qwen3-coder-30b, gpt-oss-20b.
+# P0b: same two arms as p0-smoke.yaml, but on an akm-RELEVANT corpus task.
+#
+# Why this file exists: on harbor's `hello-world` the plugin loads, runs its
+# hooks, and then deliberately declines to curate -- its events ledger records
+# `prompt_recall / skip-low-signal` -- so the model is never offered stash
+# context and never calls an akm_* tool. That is the plugin's own activation
+# heuristic working as designed, not a plumbing failure, but it means
+# hello-world cannot answer P0's actual question. This job asks it on a task
+# whose instruction is substantive and akm-shaped.
+#
+#   PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/p0-corpus.yaml
+#
 # P0 smoke: opencode WITH the akm-opencode plugin vs. stock opencode.
 #
 # Runs BOTH arms over ONE task in a single job, so the A/B is one invocation and
@@ -31,7 +43,7 @@
 # deprecated `orchestrator:` block replaced by the top-level keys that superseded
 # it (harbor still accepts `orchestrator:` but emits a DeprecationWarning).
 
-job_name: akm-p0-smoke
+job_name: akm-p0-corpus
 
 # Where trial directories are written, relative to the working directory.
 # Results land in <jobs_dir>/<job_name>/<trial>/ -- trial dirs are DIRECT
@@ -196,8 +208,13 @@ agents:
       #   akm_plugin_spec / akm_cli_spec -- pinned by AKM_PLUGIN_SPEC and
       #     AKM_CLI_SPEC in harbor/akm_opencode.py. Override only to test a
       #     different plugin build.
-      #   seed_library_dir -- defaults to harbor/seed-library next to the
-      #     module.
+      #   akm_plugin_spec / akm_cli_spec -- see p0-smoke.yaml.
+      #
+      # The D6 treatment library, not the smoke fixture: this task is an
+      # akm-relevant corpus task, so the arm must carry the library the corpus
+      # was authored against. Relative to the process working directory, same
+      # as tb2-ab.yaml / swebench-ab.yaml.
+      seed_library_dir: harbor/treatment-library
 
     # Required. opencode installs npm plugins at SESSION START, i.e. during
     # agent.run(), where the task's agent-phase network policy applies. If the
@@ -249,6 +266,6 @@ agents:
 # next step, and picking one is an open decision (see harbor/seed-library/
 # README.md).
 datasets:
-  - path: /home/founder3/code/github/harbor-src/examples/tasks
+  - path: harbor/tasks
     task_names:
-      - hello-world
+      - opencode--select-correct-skill

@@ -22,6 +22,7 @@ import os
 import re
 import shlex
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,7 @@ from harbor.akm_opencode import (  # noqa: E402
     PLUGIN_RESOLVED_MARKER,
     RUN_LOG_RELDIR,
     RUN_XDG_DATA_HOME,
+    SEED_DIR_FOR_TYPE,
     SEED_EXPECTED_BY_TYPE,
     SHARED_PERMISSIONS,
     AkmOpenCode,
@@ -105,15 +107,19 @@ def run_shell(
     inherited (for bash/node itself); no other ambient env leaks in, so a
     stray AKM_TASK_STASH in the invoking shell can never contaminate a test.
     """
-    env = {"PATH": os.environ.get("PATH", "")}
-    env.update(extra_env or {})
-    return subprocess.run(
-        ["bash", "-c", script],
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
+    with tempfile.TemporaryDirectory() as isolated_home:
+        # HOME must be SET (the fragments source ~/.nvm/nvm.sh, and nvm itself
+        # dereferences $HOME under `set -u`), but must never be the developer's
+        # real home -- that would let a machine-local ~/.nvm decide the result.
+        env = {"PATH": os.environ.get("PATH", ""), "HOME": isolated_home}
+        env.update(extra_env or {})
+        return subprocess.run(
+            ["bash", "-c", script],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
 
 
 # --------------------------------------------------------------------------
@@ -1171,7 +1177,7 @@ def test_install_runs_the_self_check_last(installed):
     ):
         assert probe in self_check
     # FTS does not stem, so the read-path probe must be prefix enumeration.
-    assert "akm search knowledge/" in self_check
+    assert 'akm search "$AKM_SEED_PROBE_DIR/"' in self_check
     assert "akm search deploy" not in self_check
 
 
@@ -1194,10 +1200,13 @@ def test_self_check_proves_akm_works_without_nvm_or_a_path_pin(installed):
 def test_self_check_receives_the_seed_expectations(installed):
     _, env = installed
     self_check_env = env.execs[-1]["env"]
-    assert self_check_env["AKM_SEED_MIN_ENTRIES"] == str(
-        sum(SEED_EXPECTED_BY_TYPE.values())
-    )
     assert "knowledge" in self_check_env["AKM_SEED_EXPECTED_BY_TYPE"]
+    # Per-stash shapes travel too: WHICH library gets seeded is decided
+    # container-side from AKM_TASK_STASH, so the library's shape alone cannot
+    # describe what a stash-using task actually indexes.
+    assert "AKM_SEED_EXPECTED_BY_STASH" in self_check_env
+    assert "AKM_SEED_TYPE_DIRS" in self_check_env
+    assert json.loads(self_check_env["AKM_SEED_TYPE_DIRS"])["skill"] == "skills"
     assert self_check_env["AKM_EVENT_SOURCE"] == "audit"
 
 
@@ -1521,8 +1530,8 @@ def test_shared_bundle_path_self_check_skips_the_per_type_seed_count_probe(tmp_p
     agent = make_agent(tmp_path, shared_bundle_path="/mnt/shared/bundle")
     self_check = agent._build_self_check_command()
 
-    assert "AKM_SEED_MIN_ENTRIES" not in self_check
     assert "AKM_SEED_EXPECTED_BY_TYPE" not in self_check
+    assert "AKM_SEED_PROBE_DIR" not in self_check
     assert "defaultBundle" not in self_check
     # The lighter probe IS present:
     assert "akm info assertions failed" in self_check
@@ -1557,8 +1566,8 @@ def test_default_arm_self_check_still_includes_the_seed_count_probe(
     # Pins the other side of the branch: nothing about adding the
     # accumulating arm may weaken the static arm's self-check.
     self_check = agent._build_self_check_command()
-    assert "AKM_SEED_MIN_ENTRIES" in self_check
     assert "AKM_SEED_EXPECTED_BY_TYPE" in self_check
+    assert "AKM_SEED_PROBE_DIR" in self_check
     assert "akm info assertions failed" in self_check
 
 
@@ -2345,7 +2354,6 @@ def test_self_check_expectations_follow_the_configured_seed_library(tmp_path: Pa
     )
     sent = json.loads(self_check["env"]["AKM_SEED_EXPECTED_BY_TYPE"])
     assert sent == TREATMENT_EXPECTED_BY_TYPE
-    assert self_check["env"]["AKM_SEED_MIN_ENTRIES"] == str(sum(sent.values()))
 
 
 def test_self_check_expectations_still_match_the_default_library(installed):
@@ -2558,3 +2566,161 @@ def test_ab_job_config_static_arm_uses_the_d6_treatment_library(ab_three_arms):
     is still caught."""
     _control, static, _accumulating = ab_three_arms
     assert static["kwargs"]["seed_library_dir"] == "harbor/treatment-library"
+
+
+# --------------------------------------------------------------------------
+# Which seed source the probes describe (per-task stash vs. seed library)
+# --------------------------------------------------------------------------
+
+STASH_ROOT_DIR = REPO_ROOT / "harbor" / "stashes"
+
+#: Where the selection step writes the resolved seed shape, container-side.
+SEED_WANT_PATH = Path("/tmp/akm-seed-want.json")
+
+
+def _select_js(agent: AkmOpenCode) -> str:
+    """The seed-shape selection fragment, lifted out of the rendered command.
+
+    Extracting it (rather than re-deriving the shape in Python) is the point:
+    these tests must exercise the JS that actually ships in the container.
+    """
+    match = re.search(
+        "AKM_SEED_PROBE_DIR=\"[$][(]node -e '(.*?)'[)]\"",
+        agent._build_self_check_command(),
+        re.S,
+    )
+    assert match, "the self-check no longer contains a seed-shape selection step"
+    return match.group(1)
+
+
+def _run_select(agent: AkmOpenCode, stash: str | None) -> subprocess.CompletedProcess:
+    """Run the selection JS under a real node, with the env install() sends."""
+    library = derive_seed_expectations(agent._seed_library_dir)
+    by_stash = {
+        child.name: derive_seed_expectations(child)
+        for child in sorted(STASH_ROOT_DIR.iterdir())
+        if child.is_dir()
+    }
+    env = {
+        "PATH": os.environ.get("PATH", ""),
+        "AKM_SEED_EXPECTED_BY_TYPE": json.dumps(library),
+        "AKM_SEED_EXPECTED_BY_STASH": json.dumps(by_stash),
+        "AKM_SEED_TYPE_DIRS": json.dumps(SEED_DIR_FOR_TYPE),
+    }
+    if stash is not None:
+        env["AKM_TASK_STASH"] = stash
+    with tempfile.TemporaryDirectory() as tmp:
+        env["TMPDIR"] = tmp
+        return subprocess.run(
+            ["node", "-e", _select_js(agent)],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+
+def test_install_sends_expectations_for_every_uploaded_stash(tmp_path: Path):
+    """The regression that blocked the whole converted corpus.
+
+    Expectations used to be derived host-side from ``seed_library_dir`` only,
+    while the bundle is seeded container-side from the task's
+    ``AKM_TASK_STASH``. Every converted task that names a stash therefore had
+    probe 2 assert the LIBRARY's byType against the STASH's index and abort:
+    the first live corpus trial died on ``byType.knowledge=16 want>=20`` --
+    16 being multi-domain's real shape, 20 the treatment library's.
+    """
+    agent = make_agent(
+        tmp_path,
+        seed_library_dir=TREATMENT_LIBRARY_DIR,
+        stash_root=STASH_ROOT_DIR,
+    )
+    env = FakeEnvironment()
+    asyncio.run(agent.install(env))
+    self_check = next(e for e in env.execs if "AKM_SEED_EXPECTED_BY_STASH" in e["env"])
+    sent = json.loads(self_check["env"]["AKM_SEED_EXPECTED_BY_STASH"])
+
+    shipped = {p.name for p in STASH_ROOT_DIR.iterdir() if p.is_dir()}
+    assert set(sent) == shipped
+    for name in shipped:
+        assert sent[name] == derive_seed_expectations(STASH_ROOT_DIR / name)
+
+
+def test_seed_shape_selection_follows_the_task_stash(tmp_path: Path):
+    """Real node, real shipped stashes: the container-side selection resolves
+    the stash the task named, not the configured library."""
+    agent = make_agent(tmp_path, seed_library_dir=TREATMENT_LIBRARY_DIR)
+
+    result = _run_select(agent, "multi-domain")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "knowledge"
+
+    library = _run_select(agent, None)
+    assert library.returncode == 0, library.stderr
+    assert library.stdout == "knowledge"
+
+
+def test_seed_shape_selection_handles_a_stash_with_no_knowledge_assets(
+    tmp_path: Path,
+):
+    """The hardcoded ``knowledge/`` enumeration was a second content
+    assumption: drillbit and inkwell ship no knowledge assets at all, so a
+    fixed ``knowledge/ >= 4`` floor aborted those trials too. The probe now
+    enumerates the type the seed source actually leads with, at a floor that
+    the content can meet."""
+    agent = make_agent(tmp_path, seed_library_dir=TREATMENT_LIBRARY_DIR)
+
+    result = _run_select(agent, "drillbit")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "skills"
+    # The floor must follow the content. drillbit ships exactly one asset, so
+    # anything above 1 fails a perfectly healthy trial; the cap keeps the
+    # richer sources at the original strength.
+    assert json.loads(SEED_WANT_PATH.read_text())["probeMin"] == 1
+
+    rich = _run_select(agent, "multi-domain")
+    assert rich.returncode == 0, rich.stderr
+    assert json.loads(SEED_WANT_PATH.read_text())["probeMin"] == 4
+
+
+def test_seed_shape_selection_rejects_an_unrecorded_stash(tmp_path: Path):
+    """A stash the upload does not contain must fail loudly here, matching the
+    seed step's own contract -- never fall back to the library, which would
+    check the wrong source."""
+    agent = make_agent(tmp_path, seed_library_dir=TREATMENT_LIBRARY_DIR)
+
+    result = _run_select(agent, "no-such-stash")
+    assert result.returncode != 0
+    assert "no seed expectations were recorded" in result.stderr
+
+
+def test_curate_probe_query_is_derived_from_the_seeded_bundle(tmp_path: Path):
+    """Probe 4's query must come from probe 3's first hit. The fixed phrase it
+    replaced (`how do I debug a failing test`) returns 0 items against the
+    docker-homelab and drillbit stashes -- measured with real akm 0.9.1 --
+    which would abort those trials on content, not health."""
+    self_check = make_agent(tmp_path)._build_self_check_command()
+    assert "how do I debug a failing test" not in self_check
+    assert 'akm curate "$AKM_CURATE_QUERY"' in self_check
+    assert "could not derive a curate query" in self_check
+
+
+@pytest.mark.parametrize("shared_bundle_path", [None, "/mnt/shared/bundle"])
+def test_self_check_is_valid_bash_on_both_arms(
+    tmp_path: Path, shared_bundle_path: str | None
+):
+    """`bash -n` on the rendered command, for BOTH arms.
+
+    Not a formality: the accumulating arm's probe 2 carried a literal
+    apostrophe (`AkmOpenCode's class docstring`) inside a single-quoted
+    `node -e '...'`, which closes the quote and makes the whole script a
+    syntax error -- so every accumulating-arm trial would have died at setup.
+    Textual probe assertions cannot see that; only a parser can.
+    """
+    agent = make_agent(tmp_path, shared_bundle_path=shared_bundle_path)
+    script = tmp_path / "self-check.sh"
+    script.write_text(agent._build_self_check_command())
+    result = subprocess.run(
+        ["bash", "-n", str(script)], capture_output=True, text=True, timeout=30
+    )
+    assert result.returncode == 0, result.stderr
