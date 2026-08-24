@@ -54,10 +54,11 @@ n_concurrent_trials: 1
 # Show trial progress. Set true for CI.
 quiet: false
 
-# No timeout scaling. Both phase budgets are set per agent instead
-# (override_setup_timeout_sec and override_timeout_sec below), identically on
-# both arms, so neither the long treatment setup nor a scaling factor can move
-# the AGENT phase budget on one arm only.
+# No timeout scaling. The AGENT phase budget comes from each task's own
+# [agent] timeout_sec (the benchmark-defined value); only the SETUP budget is
+# pinned per agent (override_setup_timeout_sec below), identically on both
+# arms. A multiplier here would scale whatever base each arm resolves, so
+# leaving it at 1.0 is what keeps the agent budget equal to the official one.
 timeout_multiplier: 1.0
 
 environment:
@@ -150,12 +151,16 @@ agents:
     # control arm simply finishes early.
     override_setup_timeout_sec: 2700
 
-    # AGENT-phase budget, and it MUST be the same number on both arms. Without
-    # it the budget comes from the task's [agent] timeout_sec -- 120s for
-    # harbor's hello-world -- which the treatment arm has to share with plugin
-    # session-start work the control arm never pays. A treatment-only
-    # AgentTimeoutError would then read as "akm failed the task".
-    override_timeout_sec: 1800
+    # No AGENT-phase override. The task's own [agent] timeout_sec governs, on
+    # both arms -- it is the benchmark-defined budget, and honoring it is what
+    # keeps these numbers comparable to published leaderboard numbers. A flat
+    # override_timeout_sec used to sit here because the treatment arm pays
+    # plugin session-start work inside the agent phase that this arm never
+    # pays, so an asymmetric effective budget could make a treatment-only
+    # AgentTimeoutError read as "akm failed the task". That residual cost is
+    # mitigated, not proven to be zero: install() pre-warms opencode's two
+    # plugin caches and the npm cache, and the install self-check ASSERTS the
+    # warm cache, so the agent phase should not pay a cold plugin fetch.
 
     # NO exclude_logs, and the two arms must collect logs identically or the
     # evidence base is asymmetric. opencode's XDG_DATA_HOME is
@@ -216,10 +221,10 @@ agents:
     # self-check. 360s is not enough.
     override_setup_timeout_sec: 2700
 
-    # Byte-identical to the control arm's. This arm additionally pays plugin
-    # session-start work inside the agent phase, so the task default (120s for
-    # hello-world) would bind here and nowhere else.
-    override_timeout_sec: 1800
+    # No AGENT-phase override, same as the control arm -- the task's own
+    # [agent] timeout_sec governs. This arm's session-start cost is mitigated
+    # by install()'s cache pre-warm plus the self-check that asserts it; that
+    # is a mitigation, not a proof of zero cost.
 
     # NO exclude_logs, for the same reason as the control arm -- and here it is
     # load-bearing rather than merely tidy: opencode's log under XDG_DATA_HOME

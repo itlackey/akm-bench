@@ -112,18 +112,25 @@ PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/p0-smoke.yaml
 
 The treatment arm's setup is long: opencode-ai, then `npm i -g akm-cli`
 (~432MB), then bundle seed + index, then a full opencode boot to warm the plugin
-caches, then the self-check. The job config sets two timeout overrides, both
-**identically on both arms** so the phase budgets match:
+caches, then the self-check. The job config sets one timeout override,
+**identically on both arms** so the setup budgets match:
 
 - `override_setup_timeout_sec: 2700` — Harbor's default agent-setup timeout is
-  360s and the treatment arm will not finish in that. The control arm simply
-  finishes early.
-- `override_timeout_sec: 1800` — the *agent-phase* budget. Without it the
-  budget comes from the task's `[agent] timeout_sec`, which is **120s** for
-  Harbor's `hello-world`. The treatment arm has to share that 120s with plugin
-  session-start work (plugin fetch, CLI resolution, ~4–5s of blocked event loop
-  before the first token) that the control arm never pays, so a treatment-only
-  `AgentTimeoutError` would read as "akm failed the task".
+  360s (`harbor/trial/trial.py:93`, `_AGENT_SETUP_TIMEOUT_SEC`) and the
+  treatment arm will not finish in that. The control arm simply finishes early.
+  This value is *not* benchmark-defined, which is why we set it at all.
+
+The **agent-phase** budget is deliberately *not* overridden: it comes from the
+task's own `[agent] timeout_sec`, which is the benchmark-defined budget, and
+honoring it is what keeps these numbers comparable to published leaderboard
+numbers. An earlier `override_timeout_sec: 1800` was set here because the
+treatment arm pays plugin session-start work (plugin fetch, CLI resolution, a
+few seconds of blocked event loop before the first token) inside the agent
+phase that the control arm never pays, so an asymmetric effective budget could
+make a treatment-only `AgentTimeoutError` read as "akm failed the task". That
+residual cost is mitigated, not proven to be zero: `install()` pre-warms
+opencode's two plugin caches and the npm cache, and the install self-check
+asserts the warm cache, so the agent phase should not pay a cold plugin fetch.
 
 ### Running one arm at a time
 

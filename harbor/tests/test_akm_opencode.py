@@ -1858,22 +1858,25 @@ def test_job_config_arms_share_model_network_and_timeouts(arms):
     assert treatment["override_setup_timeout_sec"] > 360
 
 
-def test_job_config_arms_share_an_explicit_agent_phase_timeout(arms):
-    """Without an override the AGENT budget comes from the task's [agent]
-    timeout_sec -- 120s for harbor's hello-world -- and the treatment arm has
-    to fit plugin session-start work into it that the control arm never pays.
-    A treatment-only AgentTimeoutError would score as "akm failed the task"."""
+def test_job_config_lets_the_task_own_the_agent_phase_budget(arms):
+    """The AGENT budget must come from the task's own [agent] timeout_sec --
+    the benchmark-defined value -- so results stay comparable to published
+    numbers. A flat override_timeout_sec was previously set on both arms
+    because the treatment arm pays plugin session-start work inside the agent
+    phase; that cost is instead mitigated by install()'s cache pre-warm and
+    the self-check that asserts it. Setup, which has no benchmark-defined
+    value, is still overridden -- and identically on both arms."""
     control, treatment = arms
-    assert "override_timeout_sec" in control
-    assert "override_timeout_sec" in treatment
-    assert control["override_timeout_sec"] == treatment["override_timeout_sec"]
-    # Generous relative to the 120s hello-world default it replaces.
-    assert control["override_timeout_sec"] >= 600
+    assert "override_timeout_sec" not in control
+    assert "override_timeout_sec" not in treatment
+    assert (
+        control["override_setup_timeout_sec"] == treatment["override_setup_timeout_sec"]
+    )
 
 
 def test_job_config_does_not_scale_one_phase_out_from_under_the_other(job_config: dict):
-    # A multiplier applies to whatever base each arm resolves, so parity has to
-    # come from the explicit per-agent overrides above.
+    # A multiplier applies to whatever base each arm resolves, so 1.0 is what
+    # keeps the agent phase equal to the task's own benchmark-defined budget.
     assert job_config["timeout_multiplier"] == 1.0
 
 
@@ -2458,6 +2461,66 @@ def ab_three_arms(ab_job_config: dict) -> tuple[dict, dict, dict]:
     static = next(a for a in treatments if "shared_bundle_path" not in a.get("kwargs", {}))
     accumulating = next(a for a in treatments if "shared_bundle_path" in a.get("kwargs", {}))
     return control, static, accumulating
+
+
+def shipped_job_configs() -> list[Path]:
+    """Every job config this repo SHIPS, excluding dot-prefixed local variants.
+
+    An operator's filled-in copy (harbor/jobs/.<name>-local.yaml, gitignored)
+    carries one machine's model name and absolute paths and is not part of the
+    repo's contract -- asserting against it would fail on whatever happens to
+    be lying in a working tree."""
+    jobs_dir = REPO_ROOT / "harbor" / "jobs"
+    return sorted(p for p in jobs_dir.glob("*.yaml") if not p.name.startswith("."))
+
+
+def test_no_shipped_job_config_overrides_the_agent_phase_budget():
+    """Every shipped job config, not just the two the fixtures above parse.
+
+    The agent phase is benchmark-defined: each task's own `[agent]
+    timeout_sec` is the official budget, and Harbor uses
+    `override_timeout_sec or task.config.agent.timeout_sec`
+    (harbor/trial/trial.py:1317-1319), so setting the override silently
+    replaces it. A flat 1800 did exactly that in both directions -- looser
+    than official on the 900-1200s TB2 tasks, and HALF the official budget on
+    `reshard-c4-data` (3600s), where 3 of 6 trials then died with
+    AgentTimeoutError.
+
+    This walks harbor/jobs/*.yaml rather than naming files, so a config added
+    later cannot reintroduce the override unnoticed. Setup is deliberately
+    still overridden -- see
+    test_job_config_lets_the_task_own_the_agent_phase_budget."""
+    configs = shipped_job_configs()
+    assert configs, "no job configs found -- the glob or the directory moved"
+    offenders: list[str] = []
+    for config_path in configs:
+        config = yaml.safe_load(config_path.read_text())
+        for agent in config.get("agents", []):
+            if "override_timeout_sec" in agent:
+                label = agent.get("name") or agent.get("import_path") or "?"
+                offenders.append(f"{config_path.name}:{label}")
+    assert not offenders, (
+        "these arms override the task's own benchmark-defined agent budget: "
+        + ", ".join(offenders)
+    )
+
+
+def test_every_shipped_job_config_keeps_the_setup_override_symmetric():
+    """The other half: setup HAS no benchmark-defined value (Harbor's own
+    default is 360s, harbor/trial/trial.py:93), the treatment install needs far
+    more than that, and a setup budget that differs BETWEEN arms is a confound
+    -- so every arm in every config must carry the same one."""
+    for config_path in shipped_job_configs():
+        config = yaml.safe_load(config_path.read_text())
+        agents = config.get("agents", [])
+        if not agents:
+            continue
+        budgets = {a.get("override_setup_timeout_sec") for a in agents}
+        assert len(budgets) == 1, f"{config_path.name}: asymmetric setup budgets {budgets}"
+        budget = budgets.pop()
+        assert budget is not None and budget > 360, (
+            f"{config_path.name}: setup budget {budget} is missing or below Harbor's 360s default"
+        )
 
 
 def test_ab_job_config_runs_three_distinct_arms(ab_three_arms):

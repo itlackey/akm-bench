@@ -130,15 +130,16 @@ agents:
     # (see AKM-STATIC below); this arm simply finishes early.
     override_setup_timeout_sec: 2700
 
-    # Identical across all three arms. SWE-bench Verified's own verifier
-    # (repo test suite, not a trivial script) commonly runs longer than
-    # TB2's -- 3600s leaves headroom over the swebench adapter's own
-    # default agent/verifier timeout of 3000s
-    # (adapters/swebench/src/swebench_adapter/main.py --timeout default).
-    # Without this override, the AGENT-phase budget would come from each
-    # task's own [agent] timeout_sec, which the treatment arms have to share
-    # with plugin session-start work this arm never pays.
-    override_timeout_sec: 3600
+    # No AGENT-phase override. The task's own [agent] timeout_sec governs, on
+    # all three arms -- it is the benchmark-defined budget, and honoring it is what
+    # keeps these numbers comparable to published leaderboard numbers. A flat
+    # override_timeout_sec used to sit here because the treatment arm pays
+    # plugin session-start work inside the agent phase that this arm never
+    # pays, so an asymmetric effective budget could make a treatment-only
+    # AgentTimeoutError read as "akm failed the task". That residual cost is
+    # mitigated, not proven to be zero: install() pre-warms opencode's two
+    # plugin caches and the npm cache, and the install self-check ASSERTS the
+    # warm cache, so the agent phase should not pay a cold plugin fetch.
 
     # NO exclude_logs -- see tb2-ab.yaml; the run-phase opencode log is
     # load-bearing evidence for the treatment arms and Harbor applies
@@ -184,7 +185,11 @@ agents:
       - registry.npmjs.org
 
     override_setup_timeout_sec: 2700
-    override_timeout_sec: 3600
+
+    # No AGENT-phase override, same as the other two arms -- the task's own
+    # [agent] timeout_sec governs. This arm's session-start cost is mitigated
+    # by install()'s cache pre-warm plus the self-check that asserts it; that
+    # is a mitigation, not a proof of zero cost.
 
     # NO exclude_logs -- load-bearing here, not merely tidy. See tb2-ab.yaml.
 
@@ -224,7 +229,11 @@ agents:
     # confound" logic as BASELINE above -- even though this arm's install()
     # never seeds a bundle (only indexes one, once).
     override_setup_timeout_sec: 2700
-    override_timeout_sec: 3600
+
+    # No AGENT-phase override, same as the other two arms -- the task's own
+    # [agent] timeout_sec governs. This arm's session-start cost is mitigated
+    # by install()'s cache pre-warm plus the self-check that asserts it; that
+    # is a mitigation, not a proof of zero cost.
 
     # NO exclude_logs -- same reason as akm-static above.
 
@@ -240,8 +249,8 @@ agents:
 #
 # At the full 500 tasks that is 500 x 3 x 3 = 4,500 trials -- and SWE-bench
 # trials are individually heavier than TB2's (larger repo checkouts, longer
-# test-suite verifier runs, override_timeout_sec: 3600 above vs tb2-ab.yaml's
-# 1800). Do not point this file at the full dataset. The
+# test-suite verifier runs, and larger per-task [agent] timeout_sec budgets
+# than TB2's). Do not point this file at the full dataset. The
 # akm-accumulating arm is additionally pinned to n_concurrent: 1 -- 500 x 3 =
 # 1,500 of those 4,500 trials have their bundle-touching work (setup's
 # flock-serialized index/self-check steps, AND the n_concurrent-serialized
