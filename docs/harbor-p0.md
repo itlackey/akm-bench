@@ -250,7 +250,7 @@ Expect exactly two distinct names:
 
 ```
 opencode      1.18.21
-akm-opencode  1.18.21+akm-opencode@0.9.202808220049
+akm-opencode  1.18.21+akm-opencode@0.9.1202608242057
 ```
 
 If both say `opencode`, the arms collapsed into one and every downstream
@@ -596,7 +596,7 @@ Three failure signatures worth recognising:
   from the real emitters (`shared/memory-events.ts`,
   `OpenCode._convert_events_to_trajectory`, `TrialResult`).
 - The two marker strings the run-phase proof greps for were checked against the
-  shipped `akm-opencode@0.9.202808220049` tarball, not against memory:
+  shipped `akm-opencode@0.9.1202608242057` tarball, not against memory:
   `"AKM CLI resolved"` is logged at `info` (`index.ts:1420`) and
   `"AKM CLI resolution failed"` at `warn` (`index.ts:1402`), both through
   `writePluginLog() -> client.app.log({service:"akm-opencode", ...})`, and the
@@ -793,13 +793,13 @@ install time" further down, and `harbor/akm_opencode.py`'s own docstrings on
 `_build_align_hoisted_akm_cli_command()` for the complete verified/assumed
 split). Verification for both was done two ways: reading opencode 1.18.21's
 own source (not memory), and live `npm install` runs against the real,
-published `akm-opencode@0.9.202808220049` tarball from the npm registry — not
+published `akm-opencode@0.9.1202608242057` tarball from the npm registry — not
 simulated.
 
 1. **npm `overrides` in `~/.config/opencode/package.json` — implemented,
    verified INERT against today's resolution, kept as insurance.** npm
    `overrides` do constrain transitive dependency versions — verified with a
-   real install: a fresh `npm install akm-opencode@0.9.202808220049` run in a
+   real install: a fresh `npm install akm-opencode@0.9.1202608242057` run in a
    directory pre-seeded with `{"overrides": {"akm-cli": "0.9.0"}}` installed
    `akm-cli@0.9.0`, where the identical install with no overrides file
    resolves `akm-cli@0.9.1` (the natural "latest satisfying `^0.9.0`"). But
@@ -861,7 +861,7 @@ install-time failure to re-diagnose from probe 7's message.
 queried directly: `akm-cli` has exactly two stable `0.9.x` releases, `0.9.0` and
 `0.9.1`, and `dist-tags.latest` is `0.9.1` — so npm's own resolution of the
 plugin's `^0.9.0` today lands on `0.9.1`, which *is* the pin, and candidate 2
-agrees with candidate 3. `akm-opencode@0.9.202808220049` and
+agrees with candidate 3. `akm-opencode@0.9.1202608242057` and
 `opencode-ai@1.18.21` are likewise published and are both their package's
 `latest`. This is the one caveat on this page that has a shelf life: re-check it
 before every run, because nothing in the agent enforces it.
