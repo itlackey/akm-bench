@@ -18,3 +18,11 @@ results/**/*.json
 # Commit analysis reports under results/ instead. Anchored: harbor/jobs/ holds
 # the job CONFIGS and must stay tracked.
 /jobs/
+/.akm-tb2-shared-bundle/
+
+# Harbor-downloaded dataset trees (harbor download <dataset>). Large, upstream
+# content, and they can carry upstream test fixtures that trip secret scanning.
+/terminal-bench/
+/swebench*/
+# Local-only job config variants (filled-in model/paths for one machine).
+harbor/jobs/.*-local.yaml

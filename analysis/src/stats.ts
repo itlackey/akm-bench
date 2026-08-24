@@ -660,6 +660,54 @@ export function computeArmTokenStats(records: readonly TrialRecord[], arm: strin
   };
 }
 
+// ── akm tool engagement ──────────────────────────────────────────────────────
+
+export interface ArmToolUseStats {
+  arm: string;
+  /** Trials whose stdout trajectory was readable — the denominator for every rate below. */
+  nWithTrajectory: number;
+  /** Trials with NO readable trajectory (errored before writing one, or logs excluded). Never folded into a rate. */
+  nWithoutTrajectory: number;
+  /** Trials that called at least one `akm_*` tool. */
+  nWithAkmCall: number;
+  /** `nWithAkmCall / nWithTrajectory`, or null when nothing was readable. */
+  akmEngagementRate: number | null;
+  akmCalls: NullableNumericStats;
+  totalCalls: NullableNumericStats;
+  /** Per-tool call totals across the arm, e.g. `{akm_curate: 6, write: 10}`. */
+  byTool: Record<string, number>;
+}
+
+/**
+ * Did the model actually reach for akm in this arm?
+ *
+ * Deliberately separate from reward: a treatment arm can score identically to
+ * baseline either because akm did not help or because the model never
+ * consulted it, and only this distinguishes them. On a task the corpus built
+ * to reward retrieval, a low engagement rate is the finding.
+ */
+export function computeArmToolUseStats(records: readonly TrialRecord[], arm: string): ArmToolUseStats {
+  const armRecords = records.filter((r) => r.arm === arm);
+  const withTrajectory = armRecords.filter((r) => r.toolUse.akmCalls !== null);
+  const byTool: Record<string, number> = {};
+  for (const record of armRecords) {
+    for (const [tool, count] of Object.entries(record.toolUse.byTool)) {
+      byTool[tool] = (byTool[tool] ?? 0) + count;
+    }
+  }
+  const nWithAkmCall = withTrajectory.filter((r) => (r.toolUse.akmCalls ?? 0) > 0).length;
+  return {
+    arm,
+    nWithTrajectory: withTrajectory.length,
+    nWithoutTrajectory: armRecords.length - withTrajectory.length,
+    nWithAkmCall,
+    akmEngagementRate: withTrajectory.length > 0 ? nWithAkmCall / withTrajectory.length : null,
+    akmCalls: summarizeNullable(armRecords.map((r) => r.toolUse.akmCalls)),
+    totalCalls: summarizeNullable(armRecords.map((r) => r.toolUse.totalCalls)),
+    byTool,
+  };
+}
+
 // ── Top-level orchestration ──────────────────────────────────────────────────
 
 export interface ArmSummary {
@@ -669,6 +717,7 @@ export interface ArmSummary {
   passAt1: Record<ErroredPolicy, ArmPassAt1>;
   rewardStats: Record<ErroredPolicy, ArmRewardStats>;
   tokenStats: ArmTokenStats;
+  toolUseStats: ArmToolUseStats;
 }
 
 export interface AnalysisStats {
@@ -709,6 +758,7 @@ export function computeAnalysisStats(records: readonly TrialRecord[], options: B
       passAt1,
       rewardStats,
       tokenStats: computeArmTokenStats(records, arm),
+      toolUseStats: computeArmToolUseStats(records, arm),
     };
   });
 

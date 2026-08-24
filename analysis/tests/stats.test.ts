@@ -22,6 +22,7 @@ import {
   computeAnalysisStats,
   computeArmRewardStats,
   computeArmTokenStats,
+  computeArmToolUseStats,
   computePairedDelta,
   computePassAt1,
   computeSymmetricPairedDelta,
@@ -31,6 +32,7 @@ import {
   summarizeTaskArmRewards,
   type TaskArmRewardSummary,
 } from "../src/stats";
+import type { TrialRecord } from "../src/types";
 import { buildSyntheticJobTree, CONTROL_ARM, cleanupSyntheticJobTree, TREATMENT_ARM } from "./fixtures";
 
 // A fixed, fast-but-still-seeded bootstrap config used throughout this file.
@@ -540,5 +542,76 @@ describe("bootstrap parameter validation (S18 fix)", () => {
     ];
     expect(() => computePairedDelta(summaries, "A", "B", "errored-as-zero", { resamples: 0 })).toThrow(RangeError);
     expect(() => computeSymmetricPairedDelta(summaries, "A", "B", { alpha: 2 })).toThrow(RangeError);
+  });
+});
+
+describe("computeArmToolUseStats", () => {
+  function baseRecord(): TrialRecord {
+    return {
+      jobId: "job",
+      trialName: "trial",
+      trialDir: "/tmp/trial",
+      taskName: "task-a",
+      arm: "t",
+      agentName: "opencode",
+      agentVersion: "1.18.21",
+      modelName: "m",
+      modelProvider: "p",
+      source: null,
+      rewards: { reward: 1 },
+      reward: 1,
+      otherRewards: {},
+      tokens: { inputTokens: null, cacheTokens: null, outputTokens: null, costUsd: null },
+      toolUse: { akmCalls: null, totalCalls: null, byTool: {} },
+      errored: false,
+      exceptionType: null,
+      startedAt: null,
+      finishedAt: null,
+      timing: { environmentSetup: null, agentSetup: null, agentExecution: null, verifier: null },
+      provenance: { taskChecksum: "", agentKwargs: {}, agentImportPath: null, agentEnv: {} },
+    };
+  }
+
+  function record(arm: string, akmCalls: number | null, totalCalls: number | null): TrialRecord {
+    return {
+      ...baseRecord(),
+      arm,
+      toolUse: {
+        akmCalls,
+        totalCalls,
+        byTool: akmCalls === null ? {} : akmCalls > 0 ? { akm_curate: akmCalls, write: 1 } : { write: 1 },
+      },
+    };
+  }
+
+  test("engagement rate counts trials that called akm, over trials we could read", () => {
+    const records = [record("t", 2, 3), record("t", 0, 1), record("t", 1, 2), record("t", 0, 1)];
+    const stats = computeArmToolUseStats(records, "t");
+    expect(stats.nWithTrajectory).toBe(4);
+    expect(stats.nWithAkmCall).toBe(2);
+    expect(stats.akmEngagementRate).toBe(0.5);
+    expect(stats.akmCalls.mean).toBe(0.75);
+  });
+
+  test("trials with no trajectory are excluded from the rate, not counted as non-engagement", () => {
+    // Folding them in as zeros would make an arm that CRASHED look like an arm
+    // that chose not to use akm -- two opposite conclusions.
+    const records = [record("t", 1, 2), record("t", null, null)];
+    const stats = computeArmToolUseStats(records, "t");
+    expect(stats.nWithTrajectory).toBe(1);
+    expect(stats.nWithoutTrajectory).toBe(1);
+    expect(stats.akmEngagementRate).toBe(1);
+  });
+
+  test("an arm with nothing readable reports a null rate rather than 0", () => {
+    const stats = computeArmToolUseStats([record("t", null, null)], "t");
+    expect(stats.akmEngagementRate).toBeNull();
+    expect(stats.nWithAkmCall).toBe(0);
+  });
+
+  test("per-tool totals sum across the arm", () => {
+    const stats = computeArmToolUseStats([record("t", 2, 3), record("t", 1, 2)], "t");
+    expect(stats.byTool.akm_curate).toBe(3);
+    expect(stats.byTool.write).toBe(2);
   });
 });

@@ -377,6 +377,38 @@ function renderTokenTable(arms: ArmSummary[]): string {
   );
 }
 
+function renderToolUseTable(arms: ArmSummary[]): string {
+  const rows = arms.map((arm) => {
+    const t = arm.toolUseStats;
+    const topAkm = Object.entries(t.byTool)
+      .filter(([tool]) => tool.startsWith("akm_"))
+      .sort((a, b) => b[1] - a[1])
+      .map(([tool, n]) => `${tool}=${n}`)
+      .join(", ");
+    return [
+      arm.arm,
+      `${t.nWithTrajectory} (no trajectory: ${t.nWithoutTrajectory})`,
+      `${t.nWithAkmCall}`,
+      fmtPct(t.akmEngagementRate),
+      fmtNum(t.akmCalls.mean, 2),
+      fmtNum(t.totalCalls.mean, 2),
+      topAkm || "—",
+    ];
+  });
+  return mdTable(
+    [
+      "arm",
+      "trials w/ trajectory",
+      "trials calling akm",
+      "engagement rate",
+      "mean akm calls",
+      "mean tool calls",
+      "akm tools used",
+    ],
+    rows,
+  );
+}
+
 function renderDeltaTable(deltas: PairedDelta[]): string {
   const rows = deltas.map((d) => [
     `${d.armA} vs ${d.armB}`,
@@ -560,6 +592,15 @@ export function renderMarkdown(report: AnalysisReport): string {
     ].join("\n"),
   );
   sections.push(["## Per-arm tokens / cost", "", renderTokenTable(stats.arms)].join("\n"));
+  sections.push(
+    [
+      "## akm tool engagement",
+      "",
+      renderToolUseTable(stats.arms),
+      "",
+      "_Whether the model CHOSE to call an `akm_*` tool, counted from each trial's own opencode stdout trajectory — not from the plugin's event ledger, which records what the plugin offered rather than what the model used. Read this before any reward delta: an arm with a 0% engagement rate was never measured on retrieval at all, whatever it scored, and a treatment-vs-baseline difference there is a difference in injected context alone. Ignoring akm on a trivial task is expected; ignoring it on a task built to reward retrieval is itself the finding. `no trajectory` trials are excluded from the rate and reported separately rather than counted as zero._",
+    ].join("\n"),
+  );
 
   if (stats.deltas.length > 0) {
     sections.push(

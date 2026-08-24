@@ -36,6 +36,16 @@ export interface TrialTiming {
   verifier: TrialTimingWindow | null;
 }
 
+/** Tool-call counts for one trial, from the agent's stdout trajectory. */
+export interface TrialToolUse {
+  /** Calls to the five `akm_*` tools. Null when no trajectory was readable. */
+  akmCalls: number | null;
+  /** All tool calls, akm and otherwise — the denominator that makes `akmCalls` interpretable. */
+  totalCalls: number | null;
+  /** Per-tool counts, e.g. `{akm_curate: 2, akm_show: 3, write: 1}`. Empty when no trajectory was readable. */
+  byTool: Record<string, number>;
+}
+
 export interface TrialProvenance {
   /** `TrialResult.task_checksum`. Empty string when Harbor's result omitted it (should not happen at v0.22.0, but never crash on it). */
   taskChecksum: string;
@@ -90,6 +100,22 @@ export interface TrialRecord {
   /** `rewards` minus the canonical `"reward"` key. Empty object when there are no other keys (the common case under decision D4). */
   otherRewards: Record<string, number>;
   tokens: TokenUsage;
+  /**
+   * akm tool engagement, read from the agent's own stdout trajectory
+   * (`<trialDir>/agent/opencode.txt`).
+   *
+   * This is a SEPARATE question from reward, and the one the corpus is built
+   * to ask: a treatment arm that never calls an `akm_*` tool on a task
+   * designed to reward retrieval has not been measured on retrieval at all,
+   * whatever it scored. Ignoring akm on a trivial task is expected; ignoring
+   * it where it would have helped is itself a finding, so this must be
+   * reportable per arm and per task rather than inferred from a score.
+   *
+   * Null (not 0) when the trajectory file is absent or unreadable — the trial
+   * errored before the agent wrote one, or the environment excluded it.
+   * `0` means the file was read and contained no such call.
+   */
+  toolUse: TrialToolUse;
   /** True iff `TrialResult.exception_info` is present (the trial raised — e.g. Harbor's own `AkmPluginNotLoadedError` run-phase proof, or any setup/agent/verifier exception). */
   errored: boolean;
   /** `exception_info.exception_type`, e.g. `"AkmPluginNotLoadedError"`. Null when the trial did not error. */

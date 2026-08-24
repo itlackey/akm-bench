@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { deriveArm, loadJobs, parseTrialResult } from "../src/loader";
+import { deriveArm, loadJobs, parseTrialResult, readTrialToolUse } from "../src/loader";
 import { buildSyntheticJobTree, CONTROL_ARM, cleanupSyntheticJobTree, TASK_NAMES, TREATMENT_ARM } from "./fixtures";
 
 describe("deriveArm", () => {
@@ -358,5 +358,60 @@ describe("three-arm (D7) separation", () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("readTrialToolUse", () => {
+  function withTrajectory(lines: string[] | null): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "akm-bench-tooluse-"));
+    if (lines !== null) {
+      fs.mkdirSync(path.join(dir, "agent"), { recursive: true });
+      fs.writeFileSync(path.join(dir, "agent", "opencode.txt"), lines.join("\n"));
+    }
+    return dir;
+  }
+
+  const toolEvent = (tool: string) => JSON.stringify({ type: "tool_use", part: { type: "tool", tool } });
+
+  test("counts akm_* calls apart from every other tool", () => {
+    const dir = withTrajectory([
+      toolEvent("akm_curate"),
+      toolEvent("write"),
+      toolEvent("akm_show"),
+      toolEvent("akm_show"),
+      JSON.stringify({ type: "step_start" }),
+    ]);
+    const use = readTrialToolUse(dir);
+    expect(use.akmCalls).toBe(3);
+    expect(use.totalCalls).toBe(4);
+    expect(use.byTool).toEqual({ akm_curate: 1, write: 1, akm_show: 2 });
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a readable trajectory with no akm call is 0, not null", () => {
+    // The distinction the whole metric rests on: the model was offered the
+    // tools and did not use them, which is a finding -- not missing data.
+    const dir = withTrajectory([toolEvent("write"), toolEvent("glob")]);
+    const use = readTrialToolUse(dir);
+    expect(use.akmCalls).toBe(0);
+    expect(use.totalCalls).toBe(2);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a missing trajectory is null, not 0", () => {
+    // A trial that errored before writing one must never be counted as
+    // evidence that the model declined to call akm.
+    const dir = withTrajectory(null);
+    const use = readTrialToolUse(dir);
+    expect(use.akmCalls).toBeNull();
+    expect(use.totalCalls).toBeNull();
+    expect(use.byTool).toEqual({});
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("skips malformed lines instead of throwing", () => {
+    const dir = withTrajectory(["not json at all", "{broken", "", toolEvent("akm_search")]);
+    expect(readTrialToolUse(dir).akmCalls).toBe(1);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

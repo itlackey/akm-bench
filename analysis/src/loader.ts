@@ -41,7 +41,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import type { TokenUsage, TrialProvenance, TrialRecord, TrialTiming, TrialTimingWindow } from "./types";
+import type { TokenUsage, TrialProvenance, TrialRecord, TrialTiming, TrialTimingWindow, TrialToolUse } from "./types";
 
 /**
  * Derive the A/B grouping key for a trial.
@@ -323,6 +323,59 @@ function aggregateStepTokenTotals(stepResults: unknown): TokenTotals {
   return totals;
 }
 
+/** The five tools the akm-opencode plugin registers (`AKM_TOOLS` in harbor/akm_opencode.py). */
+const AKM_TOOL_PREFIX = "akm_";
+
+/** Trajectory file `OpenCode.run()` tees its stdout stream to, inside the trial dir. */
+const OPENCODE_TRAJECTORY_RELPATH = path.join("agent", "opencode.txt");
+
+/**
+ * Count tool calls in one trial's opencode stdout trajectory.
+ *
+ * Reads the file OpenCode itself teed (`/logs/agent/opencode.txt`), not the
+ * plugin's own event ledger: the ledger records what the PLUGIN did, and the
+ * question here is what the MODEL chose to call. A tool the plugin offered and
+ * the model ignored appears in the ledger's session events but in no tool
+ * call — which is exactly the case worth detecting.
+ *
+ * Every field stays null when the file is missing or unreadable, so "the agent
+ * made no akm calls" is never confused with "we could not tell". Malformed
+ * lines are skipped (the stream is line-delimited JSON with occasional
+ * non-JSON noise), matching Harbor's own parser.
+ */
+export function readTrialToolUse(trialDir: string): TrialToolUse {
+  const trajectoryPath = path.join(trialDir, OPENCODE_TRAJECTORY_RELPATH);
+  let text: string;
+  try {
+    text = fs.readFileSync(trajectoryPath, "utf8");
+  } catch {
+    return { akmCalls: null, totalCalls: null, byTool: {} };
+  }
+
+  const byTool: Record<string, number> = {};
+  let total = 0;
+  let akm = 0;
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) continue;
+    let event: unknown;
+    try {
+      event = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    const record = asRecord(event);
+    if (!record || record.type !== "tool_use") continue;
+    const part = asRecord(record.part);
+    const tool = part && typeof part.tool === "string" ? part.tool : null;
+    if (!tool) continue;
+    byTool[tool] = (byTool[tool] ?? 0) + 1;
+    total += 1;
+    if (tool.startsWith(AKM_TOOL_PREFIX)) akm += 1;
+  }
+  return { akmCalls: akm, totalCalls: total, byTool };
+}
+
 interface TrialLocation {
   jobId: string;
   trialName: string;
@@ -411,6 +464,7 @@ export function parseTrialResult(raw: unknown, location: TrialLocation): TrialRe
     reward,
     otherRewards,
     tokens,
+    toolUse: readTrialToolUse(location.trialDir),
     errored,
     exceptionType,
     startedAt: asNullableString(root.started_at),
