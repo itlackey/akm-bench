@@ -1,0 +1,693 @@
+#!/usr/bin/env bash
+# check-harbor-contract -- re-verify the INTERNAL Harbor behaviors this repo
+# leans on, against whatever Harbor is actually installed.
+#
+# Every assumption checked here is UNDOCUMENTED, internal-implementation
+# behavior of Harbor -- not a contract Harbor promises to keep across
+# versions. It was read out of and verified against Harbor v0.22.0 source
+# (commit 39b8587) while writing harbor/akm_opencode.py,
+# harbor/jobs/*.yaml, docs/harbor-p0.md and the analysis layer. Decision D12
+# (docs/plans/benchmark-harness-decisions.md) is "pin a Harbor version and
+# add a CI check that re-verifies these behaviors on bump" -- this script IS
+# that check. Run it:
+#
+#   - after `pip install -r harbor/requirements.txt` in any fresh
+#     environment, to catch a bad install before anything else runs
+#   - before and after ANY change to the harbor==... pin in
+#     harbor/requirements.txt
+#   - in CI, against whatever environment runs harbor/tests and any real
+#     `harbor run`
+#
+# Usage:
+#   bin/check-harbor-contract
+#   HARBOR_PYTHON=/path/to/venv/bin/python bin/check-harbor-contract
+#
+# HARBOR_PYTHON must point at a Python with `harbor` importable (i.e. Harbor
+# installed in that interpreter's environment -- `pip install harbor` or
+# `uv tool install harbor`, matching harbor/requirements.txt). Defaults to
+# `python3` on PATH. Deliberately does NOT set PYTHONPATH to this repo's
+# root -- but note precisely what that does and does not buy, verified
+# rather than assumed: this script feeds its program to python on STDIN, so
+# Python sets sys.path[0] to '' (the CWD), and this repo's own `harbor/`
+# shim package (harbor/__init__.py) is therefore importable regardless of
+# PYTHONPATH whenever this runs from the repo root -- `harbor.__file__` is
+# the repo shim here, not site-packages. What actually makes the checks
+# below exercise the THIRD-PARTY installed distribution is the shim's own
+# `extend_path` + attribute-forwarding (`harbor.__version__` reports the
+# real installed version through it, not a value the shim hardcodes). Not
+# setting PYTHONPATH keeps the repo root off the path for any SUBPROCESS
+# this script spawns; it is not what prevents the shim from loading in this
+# process. See .github/workflows/ci.yml's `harbor-agent` job for the same
+# note where it matters for CI, and docs/harbor-p0.md for more detail.
+#
+# Exit code: 0 if every check passes, 1 if any check fails or errors. Each
+# check prints PASS or a FAIL block naming what broke and what to look at
+# next; a broken check never aborts the ones after it, so one run reports
+# everything that regressed, not just the first thing.
+
+set -euo pipefail
+
+HARBOR_PYTHON="${HARBOR_PYTHON:-python3}"
+
+if ! command -v "${HARBOR_PYTHON}" >/dev/null 2>&1 && [ ! -x "${HARBOR_PYTHON}" ]; then
+    echo "check-harbor-contract: HARBOR_PYTHON=${HARBOR_PYTHON} is not an executable or not on PATH." >&2
+    echo "Point it at a Python with Harbor installed, e.g.:" >&2
+    echo "  HARBOR_PYTHON=/path/to/venv/bin/python bin/check-harbor-contract" >&2
+    exit 1
+fi
+
+exec "${HARBOR_PYTHON}" - "$@" <<'PYEOF'
+"""check-harbor-contract's actual checks.
+
+Embedded in the bash wrapper (rather than a separate .py file) so
+`bin/check-harbor-contract` stays the single file this repo owns for this
+purpose. Every check is independent: one failing check does not stop the
+others from running, so a single invocation reports every regression at
+once instead of the first one alphabetically.
+"""
+
+from __future__ import annotations
+
+import inspect
+import json
+import re
+import shlex
+import sys
+import traceback
+from pathlib import Path
+
+EXPECTED_HARBOR_VERSION = "0.22.0"  # keep in lockstep with harbor/requirements.txt (decision D12)
+
+RESULTS: list[tuple[str, bool, str]] = []  # (name, passed, message)
+
+
+def check(name: str):
+    """Decorator: run *fn*, catch anything, record a (name, passed, message) row."""
+
+    def decorator(fn):
+        try:
+            detail = fn()
+        except AssertionError as exc:
+            RESULTS.append((name, False, str(exc)))
+        except Exception:  # noqa: BLE001 - a check that can't even import is still a FAIL, not a crash
+            RESULTS.append((name, False, "unhandled exception:\n" + traceback.format_exc()))
+        else:
+            RESULTS.append((name, True, detail or "ok"))
+        return fn
+
+    return decorator
+
+
+# ---------------------------------------------------------------------------
+# 1. harbor.__version__
+# ---------------------------------------------------------------------------
+@check("harbor.__version__ == 0.22.0 (decision D12 pin)")
+def _check_version():
+    import harbor
+
+    got = getattr(harbor, "__version__", None)
+    assert got == EXPECTED_HARBOR_VERSION, (
+        f"harbor.__version__ is {got!r}, expected {EXPECTED_HARBOR_VERSION!r}. "
+        "Every other check in this script -- and harbor/akm_opencode.py, "
+        "harbor/jobs/*.yaml, docs/harbor-p0.md and the analysis layer -- was "
+        "verified against exactly this pin (decision D12, "
+        "docs/plans/benchmark-harness-decisions.md). LOOK AT: "
+        "harbor/requirements.txt (reinstall the pinned version: "
+        "`pip install -r harbor/requirements.txt`) if this drifted by "
+        "accident, or re-run this WHOLE script end to end and update both "
+        "the pin and this file together if you are deliberately bumping "
+        "Harbor."
+    )
+    return f"installed harbor=={got}"
+
+
+# ---------------------------------------------------------------------------
+# 2. Job._write_job_result excludes trial_results
+# ---------------------------------------------------------------------------
+@check("Job._write_job_result excludes trial_results from job-level result.json")
+def _check_job_write_excludes_trial_results():
+    from harbor.job import Job
+
+    src = inspect.getsource(Job._write_job_result)
+    pattern = re.compile(r'exclude\s*=\s*\{\s*["\']trial_results["\']\s*\}')
+    assert pattern.search(src), (
+        "harbor.job.Job._write_job_result no longer excludes 'trial_results' "
+        "when writing jobs/<job>/result.json. This breaks the VERIFIED "
+        "HARBOR RESULT CONTRACT assumption (repeated in "
+        "docs/plans/benchmark-harness-consolidation.md §3.1 and the analysis "
+        "layer's loader.ts docstring) that jobs/<job>/result.json NEVER "
+        "carries trial_results on disk, so analysis/src/loader.ts only ever "
+        "walks <job>/<trial>/result.json and never reads the job-level file "
+        "for trial data. If Harbor now writes trial_results at the job "
+        "level too, that is not itself a break -- but re-audit "
+        "analysis/src/loader.ts's docstring and behavior before assuming "
+        "it is still correct to skip the job-level file; it may now be "
+        "an equally valid (or faster) place to read from, and the docstring "
+        "will be stale either way.\n\nSource inspected:\n" + src
+    )
+    return "exclude={'trial_results'} present in source"
+
+
+# ---------------------------------------------------------------------------
+# 3. pass_at_k's k-set starts at 2, not 1
+# ---------------------------------------------------------------------------
+@check("pass_at_k k-set starts at 2 (pass@1 unreachable through Harbor)")
+def _check_pass_at_k_starts_at_2():
+    from harbor.utils.pass_at_k import _eligible_k_values
+
+    at_1 = _eligible_k_values(1)
+    at_2 = _eligible_k_values(2)
+    at_10 = _eligible_k_values(10)
+    assert at_1 == [], (
+        f"harbor.utils.pass_at_k._eligible_k_values(1) returned {at_1!r}, "
+        "expected []. This repo's whole premise that 'pass@1 is unreachable "
+        "through Harbor's own metric' (brief §3.1) depends on k never going "
+        "below 2. If Harbor now supports k=1, re-audit every place this "
+        "repo says pass@1 must be computed by our own analysis layer "
+        "instead (analysis/src/stats.ts::computePassAt1, which exists "
+        "specifically because Harbor could not)."
+    )
+    assert 2 in at_2, (
+        f"harbor.utils.pass_at_k._eligible_k_values(2) returned {at_2!r}, "
+        "expected it to contain 2. The lowest k this repo can ever get from "
+        "Harbor's own pass_at_k as an independent sanity check (decision D4) "
+        "is supposed to be 2 -- if it moved, D4's 'Harbor's own pass_at_k "
+        "keeps working as an independent sanity check' consequence needs "
+        "re-checking against the new minimum k."
+    )
+    return f"_eligible_k_values(1)={at_1}, _eligible_k_values(2)={at_2}, _eligible_k_values(10)={at_10}"
+
+
+# ---------------------------------------------------------------------------
+# 4. path_filter applies exclude AFTER include
+# ---------------------------------------------------------------------------
+@check("path_filter applies exclude_logs after include_logs (exclude wins)")
+def _check_path_filter_exclude_after_include():
+    from harbor.utils.path_filter import filter_paths_by_patterns
+
+    result = filter_paths_by_patterns(
+        ["a/1", "b/1"], include=["a/*", "b/*"], exclude=["a/*"]
+    )
+    assert result == ["b/1"], (
+        f"filter_paths_by_patterns(['a/1','b/1'], include=['a/*','b/*'], "
+        f"exclude=['a/*']) returned {result!r}, expected ['b/1']. Every job "
+        "config in this repo (harbor/jobs/p0-smoke.yaml, tb2-ab.yaml, "
+        "swebench-ab.yaml) is written on the assumption that exclude_logs "
+        "applies AFTER include_logs, so an include can NEVER rescue a path "
+        "an exclude pattern also matches -- this is why none of those job "
+        "configs carry an exclude_logs entry for opencode/xdg-data/** (the "
+        "run-phase plugin-load proof AkmOpenCode._assert_plugin_ran() reads "
+        "would silently vanish on any non-mounted/cloud environment). If "
+        "Harbor changed this to include-after-exclude (or something else), "
+        "every one of those job configs' 'NO exclude_logs' comments is now "
+        "describing the wrong risk."
+    )
+    return f"filter_paths_by_patterns(...) == {result}"
+
+
+# ---------------------------------------------------------------------------
+# 5. TrialPaths.result_path basename is "result.json"
+# ---------------------------------------------------------------------------
+@check('TrialPaths.result_path basename is "result.json" (not "results.json")')
+def _check_result_path_basename():
+    from harbor.models.trial.paths import TrialPaths
+
+    trial_paths = TrialPaths(trial_dir=Path("/tmp/check-harbor-contract-trial"))
+    name = trial_paths.result_path.name
+    assert name == "result.json", (
+        f"TrialPaths(trial_dir=...).result_path.name is {name!r}, expected "
+        "'result.json'. This repo's whole trial-walking contract (VERIFIED "
+        "HARBOR RESULT CONTRACT: 'trial dirs are DIRECT children of "
+        "jobs/<job>/ ... Per-trial result.json fields: ...') and "
+        "analysis/src/loader.ts's `path.join(trialDir, 'result.json')` both "
+        "hardcode this exact filename (note: TrialPaths' own class "
+        "docstring says 'results.json' -- that docstring is stale per "
+        "docs/harbor-p0.md's 'Reading the result' section; this check reads "
+        "the actual property, not the docstring). If this changed, "
+        "analysis/src/loader.ts needs the new filename before it can find "
+        "any trial again."
+    )
+    return f"result_path == {trial_paths.result_path}"
+
+
+# ---------------------------------------------------------------------------
+# 6. OpenCode._build_register_config_command / _deep_merge, with the
+#    documented layering: _DEFAULT_CONFIG -> auto-generated (mcp/provider)
+#    -> job-level opencode_config, dicts recurse, lists replace wholesale.
+# ---------------------------------------------------------------------------
+@check("OpenCode._build_register_config_command / _deep_merge exist with the documented layering")
+def _check_opencode_config_layering():
+    from harbor.agents.installed.opencode import OpenCode
+
+    assert hasattr(OpenCode, "_build_register_config_command"), (
+        "harbor.agents.installed.opencode.OpenCode has no "
+        "_build_register_config_command method. harbor/akm_opencode.py's "
+        "_build_warm_caches_command() calls this directly "
+        "(self._build_register_config_command()) to boot opencode with the "
+        "exact run-phase config during install(); AkmOpenCode cannot warm "
+        "the plugin cache with the real config without it."
+    )
+    assert hasattr(OpenCode, "_deep_merge"), (
+        "harbor.agents.installed.opencode.OpenCode has no _deep_merge "
+        "staticmethod. AkmOpenCode._force_config()'s docstring explicitly "
+        "reasons about OpenCode._deep_merge's list-replacement behavior to "
+        "justify unioning the `plugin` list by hand instead of trusting the "
+        "merge to do it."
+    )
+
+    # 6a. _deep_merge recurses into nested dicts, preserving sibling keys.
+    merged = OpenCode._deep_merge({"a": {"x": 1, "y": 2}}, {"a": {"y": 3, "z": 4}})
+    assert merged == {"a": {"x": 1, "y": 3, "z": 4}}, (
+        f"OpenCode._deep_merge({{'a': {{'x': 1, 'y': 2}}}}, "
+        f"{{'a': {{'y': 3, 'z': 4}}}}) returned {merged!r}, expected "
+        "{'a': {'x': 1, 'y': 3, 'z': 4}} -- i.e. nested dicts must recurse "
+        "and preserve sibling keys, not replace the whole nested dict. "
+        "harbor/akm_opencode.py's _force_config() relies on exactly this "
+        "for `permission` and `tools`: forcing SHARED_PERMISSIONS /  "
+        "AKM_TOOLS into self._opencode_config must not silently drop an "
+        "operator's other keys in those same nested dicts."
+    )
+
+    # 6b. _deep_merge replaces LISTS wholesale rather than recursing/concatenating.
+    merged_list = OpenCode._deep_merge({"plugin": ["a"]}, {"plugin": ["b", "c"]})
+    assert merged_list == {"plugin": ["b", "c"]}, (
+        f"OpenCode._deep_merge({{'plugin': ['a']}}, {{'plugin': ['b', 'c']}}) "
+        f"returned {merged_list!r}, expected {{'plugin': ['b', 'c']}} -- i.e. "
+        "a list value must be REPLACED wholesale, never merged/concatenated "
+        "element-wise. AkmOpenCode._force_config()'s docstring says this "
+        "explicitly and unions the akm plugin spec into the `plugin` list "
+        "BY HAND (`config['plugin'] = [self._akm_plugin_spec, "
+        "*operator_plugins]`) precisely because it cannot rely on the merge "
+        "to do it. If Harbor started recursing into lists (e.g. "
+        "concatenating), that hand-union would start double-adding the akm "
+        "plugin spec on every merge; if it started dropping the override "
+        "list instead, an operator's own `plugin:` entries in a job's "
+        "opencode_config kwarg would silently vanish."
+    )
+
+    # 6c. _build_register_config_command's layering: defaults < auto-generated
+    #     (provider, from model_name) < job-level opencode_config -- and the
+    #     job-level layer merges over the auto-generated one rather than
+    #     replacing it outright.
+    agent = OpenCode(
+        logs_dir=Path("/tmp/check-harbor-contract-agent"),
+        model_name="anthropic/claude-sonnet-4-5",
+        opencode_config={"$schema": "https://check-harbor-contract.test/override.json"},
+    )
+    command = agent._build_register_config_command()
+    assert command is not None, (
+        "OpenCode(...)._build_register_config_command() returned None for "
+        "an agent with a non-empty opencode_config. AkmOpenCode's "
+        "_build_warm_caches_command() treats a None return as fatal "
+        "('the forced plugin/tools/permission config did not reach "
+        "self._opencode_config') -- if stock OpenCode can now return None "
+        "here even with config set, that assertion in akm_opencode.py needs "
+        "re-checking too."
+    )
+    match = re.search(r"echo (.*) > ~/\.config/opencode/opencode\.json", command, re.S)
+    assert match, (
+        "OpenCode(...)._build_register_config_command()'s returned shell "
+        "command no longer matches the expected "
+        "'echo <json> > ~/.config/opencode/opencode.json' shape. "
+        "harbor/akm_opencode.py's install-time cache-warm step "
+        "(_build_warm_caches_command) and docs/harbor-p0.md's config-symmetry "
+        "reproduction script both parse this exact shape out of the command "
+        f"string. Got command:\n{command}"
+    )
+    rendered = json.loads(shlex.split(match.group(1))[0])
+    assert rendered.get("$schema") == "https://check-harbor-contract.test/override.json", (
+        f"The job-level opencode_config's '$schema' override did not win in "
+        f"the rendered config (got {rendered.get('$schema')!r}). The "
+        "documented layering is defaults -> auto-generated (mcp/provider) -> "
+        "job-level opencode_config, with job-level LAST (highest "
+        "precedence) -- AkmOpenCode._force_config() depends on this "
+        "ordering to guarantee its forced plugin/tools/permission block "
+        "cannot be overridden by a job's own opencode_config kwarg."
+    )
+    assert "provider" in rendered and "anthropic" in rendered.get("provider", {}), (
+        f"The auto-generated 'provider' block (derived from model_name="
+        f"'anthropic/claude-sonnet-4-5') is missing from the rendered "
+        f"config (got keys: {sorted(rendered)}) even though the job-level "
+        "opencode_config here only touched '$schema'. The documented "
+        "layering deep-MERGES job-level config over the auto-generated "
+        "layer -- it must not replace the whole auto-generated layer just "
+        "because the job supplied a config with a different key. If "
+        "provider resolution silently broke, every real "
+        "`harbor run -c harbor/jobs/*.yaml` invocation would render an "
+        "opencode.json missing its model registration."
+    )
+    return f"layering verified; rendered $schema={rendered.get('$schema')!r}, provider keys={sorted(rendered.get('provider', {}))}"
+
+
+# ---------------------------------------------------------------------------
+# 7. task.toml [metadata] never reaches result.json at any level
+# ---------------------------------------------------------------------------
+@check("task.toml [metadata] never reaches result.json (the corpus left-join is mandatory)")
+def _check_metadata_never_reaches_result():
+    from harbor.models.trial.result import TrialResult
+    from harbor.models.trial.config import TaskConfig as TrialTaskConfig, TrialConfig
+    from harbor.models.task.config import TaskConfig as OnDiskTaskConfig
+
+    # The on-disk task.toml model DOES carry [metadata] ...
+    assert "metadata" in OnDiskTaskConfig.model_fields, (
+        "harbor.models.task.config.TaskConfig no longer has a `metadata` "
+        "field, so `[metadata]` in a task.toml may not be parsed at all "
+        "any more. Every converted task in harbor/tasks/ puts domain / "
+        "slice / difficulty / memory_ability / stash there, and "
+        "analysis/src/corpus.ts reads that table straight off disk. "
+        "Re-check what task.toml section Harbor now expects."
+    )
+
+    # ... but nothing on the trial-result side does.
+    leaks = []
+    if "metadata" in TrialResult.model_fields:
+        leaks.append("TrialResult.metadata")
+    if "metadata" in TrialConfig.model_fields:
+        leaks.append("TrialConfig.metadata")
+    if "metadata" in TrialTaskConfig.model_fields:
+        leaks.append("TrialConfig.task.metadata (trial-level TaskConfig)")
+
+    assert not leaks, (
+        f"Harbor now carries task metadata into the trial result: {leaks}. "
+        "This repo is built on the opposite (VERIFIED HARBOR RESULT "
+        "CONTRACT; brief \u00a73.1: '`task.toml` `[metadata]` never reaches "
+        "`result.json` at any level'), which is the entire reason "
+        "analysis/src/corpus.ts exists: it re-reads every task.toml from "
+        "disk and left-joins on `task_name`. This is GOOD news, not a "
+        "regression -- but the join is now redundant (and could silently "
+        "disagree with the embedded copy), so re-audit corpus.ts and "
+        "report.ts before leaving both paths in place."
+    )
+    return "no `metadata` field on TrialResult / TrialConfig / trial-level TaskConfig"
+
+
+# ---------------------------------------------------------------------------
+# 8. Agent logs are synced BEFORE the verifier runs
+# ---------------------------------------------------------------------------
+@check("agent output is synced before the verifier runs (run-phase proof can read the log)")
+def _check_agent_sync_precedes_verifier():
+    from harbor.trial.single_step import SingleStepTrial
+
+    src = inspect.getsource(SingleStepTrial._run)
+    i_agent = src.find("_run_agent(")
+    i_verifier = src.find("_run_verifier(")
+    assert i_agent != -1 and i_verifier != -1, (
+        "SingleStepTrial._run no longer calls both _run_agent and "
+        f"_run_verifier by those names.\n\nSource inspected:\n{src}"
+    )
+    assert i_agent < i_verifier, (
+        "SingleStepTrial._run now runs the verifier BEFORE the agent phase. "
+        f"_run_agent at offset {i_agent}, _run_verifier at {i_verifier}."
+    )
+
+    agent_src = inspect.getsource(SingleStepTrial._run_agent)
+    assert "_sync_agent_output" in agent_src, (
+        "SingleStepTrial._run_agent no longer calls _sync_agent_output in "
+        "its `finally` block. AkmOpenCode._assert_plugin_ran() (the "
+        "run-phase plugin proof) reads "
+        "$XDG_DATA_HOME/opencode/log/*.log from the HOST side inside "
+        "populate_context_post_run, which Harbor calls from "
+        "_sync_agent_output AFTER _download_agent_logs. If the download no "
+        "longer happens before the hook, every treatment trial fails with "
+        "'akm run-phase proof MISSING: no readable opencode log' regardless "
+        "of whether the plugin actually loaded.\n\nSource inspected:\n"
+        + agent_src
+    )
+    assert "_sync_agent_output" not in src.split("_run_verifier")[-1], (
+        "SingleStepTrial._run now syncs agent output AFTER _run_verifier as "
+        "well. Harmless on its own, but docs/harbor-p0.md and decision D5 "
+        "both reason about tests/test.sh being able to read "
+        "/logs/agent/trajectory.json because the sync already happened -- "
+        f"re-check that claim.\n\nSource inspected:\n{src}"
+    )
+    return "_run_agent (which syncs in `finally`) precedes _run_verifier in SingleStepTrial._run"
+
+
+# ---------------------------------------------------------------------------
+# 9. Reward-file parsing: reward.json (flat {key: number}) or reward.txt
+# ---------------------------------------------------------------------------
+@check("verifier reads /logs/verifier/reward.json (json first) or reward.txt (bare float)")
+def _check_reward_file_parsing():
+    from harbor.models.trial.paths import TrialPaths
+    from harbor.verifier.verifier import Verifier
+
+    trial_paths = TrialPaths(trial_dir=Path("/tmp/check-harbor-contract-trial"))
+    assert trial_paths.reward_json_path.name == "reward.json", (
+        f"TrialPaths.reward_json_path is {trial_paths.reward_json_path}, "
+        "expected a basename of 'reward.json'. Every converted task's "
+        "tests/test.sh in harbor/tasks/ writes that exact filename; a "
+        "renamed reward file makes every task score as 'no reward file'."
+    )
+    assert trial_paths.reward_json_path.parent.name == "verifier", (
+        f"reward.json is no longer under a 'verifier' directory (got "
+        f"{trial_paths.reward_json_path.parent}). The task-side contract "
+        "documented in docs/corpus-conversion.md is /logs/verifier/reward.json."
+    )
+    assert trial_paths.reward_text_path.name == "reward.txt", (
+        f"TrialPaths.reward_text_path is {trial_paths.reward_text_path}, "
+        "expected a basename of 'reward.txt' (the bare-float fallback)."
+    )
+
+    src = inspect.getsource(Verifier)
+    i_json = src.find("reward_json_path.exists()")
+    i_text = src.find("reward_text_path.exists()")
+    assert i_json != -1 and i_text != -1, (
+        "Verifier no longer probes reward_json_path.exists() / "
+        "reward_text_path.exists(). The reward-shape assumption behind "
+        "decision D4 (a single `reward` key, 0 or 1, written as JSON) is "
+        "read off this code path."
+    )
+    assert i_json < i_text, (
+        "Verifier now checks reward.txt BEFORE reward.json. Every task in "
+        "harbor/tasks/ writes reward.json; a task that (accidentally) wrote "
+        "both would now be scored from the wrong one."
+    )
+
+    parse_src = inspect.getsource(Verifier._parse_reward_json)
+    assert "json.loads" in parse_src, (
+        "Verifier._parse_reward_json no longer json.loads the file. "
+        "Decision D4's canonical shape is a FLAT {key: number} object -- if "
+        "Harbor now expects something nested, every converted task's "
+        "tests/test.sh needs updating.\n\nSource inspected:\n" + parse_src
+    )
+    return f"{trial_paths.reward_json_path.parent}/{{reward.json,reward.txt}}, json probed first"
+
+
+# ---------------------------------------------------------------------------
+# 10. Local `-p <dir>` / datasets[].path scanning is exactly ONE level deep
+# ---------------------------------------------------------------------------
+@check("local task-dir scanning is exactly one level deep (iterdir, never rglob)")
+def _check_local_scan_is_one_level():
+    from harbor.models.job.config import DatasetConfig
+
+    src = inspect.getsource(DatasetConfig._get_local_task_configs)
+    assert "self.path.iterdir()" in src, (
+        "DatasetConfig._get_local_task_configs no longer scans with "
+        "`self.path.iterdir()`. This repo's corpus layout is FLAT "
+        "(harbor/tasks/<domain>--<task-id>/, one level, 46 dirs) precisely "
+        "because a one-level scan resolves a nested tasks/<domain>/<task>/ "
+        "tree to ZERO tasks (brief \u00a73.1). If Harbor now recurses, the flat "
+        "naming is merely redundant rather than required -- but check "
+        "docs/corpus-conversion.md before relying on either.\n\nSource "
+        "inspected:\n" + src
+    )
+    for recursive in ("rglob", "walk(", "**"):
+        assert recursive not in src, (
+            f"DatasetConfig._get_local_task_configs now contains {recursive!r}, "
+            "i.e. it may recurse below one level. See the note above.\n\n"
+            "Source inspected:\n" + src
+        )
+    return "scans self.path.iterdir() only; no rglob/walk/** in the source"
+
+
+# ---------------------------------------------------------------------------
+# 11. ModelInfo splits provider from the bare model name
+# ---------------------------------------------------------------------------
+@check("AgentInfo.model_info splits provider/<model> into separate fields")
+def _check_model_info_is_split():
+    from harbor.agents.installed.opencode import OpenCode
+
+    agent = OpenCode(
+        logs_dir=Path("/tmp/check-harbor-contract-agent"),
+        model_name="anthropic/claude-sonnet-4-5",
+    )
+    info = agent.to_agent_info()
+    assert info.model_info is not None, (
+        "to_agent_info() produced no model_info for model_name="
+        "'anthropic/claude-sonnet-4-5'."
+    )
+    assert info.model_info.name == "claude-sonnet-4-5", (
+        f"AgentInfo.model_info.name is {info.model_info.name!r}, expected the "
+        "BARE model 'claude-sonnet-4-5'. analysis/src/loader.ts::deriveArm "
+        "rebuilds `provider/name` from these two fields to keep the provider "
+        "in every arm label (and therefore in the published provenance "
+        "manifest, brief \u00a76) -- if Harbor now stores the joined form here, "
+        "deriveArm would emit 'anthropic/anthropic/claude-sonnet-4-5'."
+    )
+    assert info.model_info.provider == "anthropic", (
+        f"AgentInfo.model_info.provider is {info.model_info.provider!r}, "
+        "expected 'anthropic'. deriveArm drops the provider segment entirely "
+        "when this is null, which would silently merge two providers of the "
+        "same model into one arm."
+    )
+    return f"model_info.name={info.model_info.name!r}, .provider={info.model_info.provider!r}"
+
+
+# ---------------------------------------------------------------------------
+# 12. Trial dirs are DIRECT children of the job dir (no per-task level)
+# ---------------------------------------------------------------------------
+@check("trial dirs are direct children of jobs/<job>/ (no intervening per-task dir)")
+def _check_trial_dir_is_direct_child_of_job_dir():
+    from harbor.job import Job
+    from harbor.trial.trial import Trial
+    from harbor.models.trial.config import TrialConfig, TaskConfig as TrialTaskConfig
+
+    # (a) Job hands the job dir itself down as trials_dir.
+    job_src = inspect.getsource(Job)
+    assert re.search(r"trials_dir\s*=\s*self\.job_dir", job_src), (
+        "harbor.job.Job no longer passes `trials_dir=self.job_dir` when "
+        "creating trials, so trial directories may no longer be direct "
+        "children of jobs/<job>/. analysis/src/loader.ts walks EXACTLY two "
+        "levels (<jobsDir>/<job>/<trial>/result.json) and would find zero "
+        "trials under a deeper layout; harbor/jobs/*.yaml and "
+        "docs/harbor-p0.md's jq globs assume the same shape."
+    )
+
+    # (b) Trial composes trial_dir as trials_dir / trial_name -- one level.
+    trial_src = inspect.getsource(Trial.__init__)
+    assert re.search(
+        r"TrialPaths\(\s*trial_dir\s*=\s*\(?\s*config\.trials_dir\s*/\s*config\.trial_name",
+        trial_src,
+    ), (
+        "harbor.trial.trial.Trial.__init__ no longer builds "
+        "TrialPaths(trial_dir=config.trials_dir / config.trial_name). See "
+        "the note above -- the loader's two-level walk depends on this "
+        f"being exactly one path component.\n\nSource inspected:\n{trial_src}"
+    )
+
+    # (c) ...and the generated trial name is a single component of the
+    #     documented `<task[:32]>__<shortuuid7>` shape.
+    cfg = TrialConfig(task=TrialTaskConfig(path=Path("/corpus/a-task-name")))
+    name = cfg.trial_name
+    assert "/" not in name, (
+        f"Generated trial_name {name!r} contains a '/', which would make the "
+        "trial dir more than one level below the job dir."
+    )
+    assert re.fullmatch(r".{1,32}__[A-Za-z0-9]{7}", name), (
+        f"Generated trial_name {name!r} no longer matches "
+        "'<task-name[:32]>__<7 chars>'. analysis/src/loader.ts's docstring "
+        "and TrialRecord.trialName both describe that shape, and "
+        "docs/harbor-p0.md tells operators to read the task out of it."
+    )
+    return f"trials_dir=job_dir, trial_dir=trials_dir/<trial_name>, sample trial_name={name!r}"
+
+
+# ---------------------------------------------------------------------------
+# 13. OpenCode.run() exports XDG_DATA_HOME to the fixed path this agent's
+#     run-phase plugin proof reads
+# ---------------------------------------------------------------------------
+@check("OpenCode.run() exports XDG_DATA_HOME to the run-phase log path AkmOpenCode reads")
+def _check_opencode_run_exports_xdg_data_home():
+    from harbor.agents.installed.opencode import OpenCode
+
+    # Literal, not imported from harbor.akm_opencode: this script deliberately
+    # does NOT put the repo root on PYTHONPATH (see the module docstring at
+    # the top of this file), specifically so `import harbor` resolves the
+    # INSTALLED distribution, not this repo's shadow package -- so it cannot
+    # import RUN_XDG_DATA_HOME from harbor/akm_opencode.py either. Keep this
+    # literal in lockstep with that constant by hand; same convention as
+    # EXPECTED_HARBOR_VERSION above being a literal copy of
+    # harbor/requirements.txt's pin.
+    expected_xdg_data_home = "/logs/agent/opencode/xdg-data"
+
+    src = inspect.getsource(OpenCode.run)
+    assert 'env["XDG_DATA_HOME"]' in src or "env['XDG_DATA_HOME']" in src, (
+        "harbor.agents.installed.opencode.OpenCode.run() no longer assigns "
+        "env[\"XDG_DATA_HOME\"]. harbor/akm_opencode.py's RUN_XDG_DATA_HOME "
+        f"constant hardcodes the value this used to be ({expected_xdg_data_home!r}), "
+        "and AkmOpenCode._assert_plugin_ran() greps opencode's session log "
+        "under that exact path for the 'AKM CLI resolved' / 'AKM CLI "
+        "resolution failed' markers. If Harbor stops exporting this env var "
+        "(or renames/relocates it), every treatment-arm trial raises "
+        "AkmPluginNotLoadedError with 'no readable opencode log' regardless "
+        "of whether the plugin actually loaded -- this check exists so that "
+        "failure mode is diagnosed as a Harbor version bump, not an "
+        "akm-opencode regression.\n\nSource inspected:\n" + src
+    )
+    assert (
+        f'"{expected_xdg_data_home}"' in src or f"'{expected_xdg_data_home}'" in src
+    ), (
+        f"OpenCode.run() no longer exports XDG_DATA_HOME={expected_xdg_data_home!r} "
+        "(harbor/akm_opencode.py's RUN_XDG_DATA_HOME constant) -- it assigns "
+        "env[\"XDG_DATA_HOME\"] to something else now. Update RUN_XDG_DATA_HOME "
+        "(and RUN_LOG_RELDIR alongside it) in harbor/akm_opencode.py to match, "
+        "or _assert_plugin_ran() greps the wrong directory on every treatment "
+        "trial.\n\nSource inspected:\n" + src
+    )
+    return f"OpenCode.run() exports XDG_DATA_HOME={expected_xdg_data_home!r}"
+
+
+# ---------------------------------------------------------------------------
+# 14. _sync_agent_output() downloads agent logs BEFORE populating the agent
+#     context (i.e. before calling populate_context_post_run)
+# ---------------------------------------------------------------------------
+@check("Trial._sync_agent_output downloads agent logs before populate_context_post_run runs")
+def _check_sync_agent_output_downloads_before_populating_context():
+    from harbor.trial.trial import Trial
+
+    src = inspect.getsource(Trial._sync_agent_output)
+    i_download = src.find("_download_agent_logs(")
+    i_populate = src.find("_populate_agent_context(")
+    assert i_download != -1 and i_populate != -1, (
+        "Trial._sync_agent_output no longer calls both _download_agent_logs "
+        f"and _populate_agent_context by those names.\n\nSource inspected:\n{src}"
+    )
+    assert i_download < i_populate, (
+        "Trial._sync_agent_output now calls _populate_agent_context (which "
+        "reaches populate_context_post_run -> AkmOpenCode._assert_plugin_ran) "
+        "BEFORE _download_agent_logs. AkmOpenCode's run-phase plugin proof "
+        "reads the opencode log from the HOST side and depends entirely on "
+        "the download having already happened -- if the order flipped, every "
+        "treatment trial would read an empty/stale log directory and fail "
+        "with 'no readable opencode log' even on a run where the plugin "
+        f"loaded fine.\n\nSource inspected:\n{src}"
+    )
+    return "_download_agent_logs precedes _populate_agent_context in Trial._sync_agent_output"
+
+
+# ---------------------------------------------------------------------------
+# Report
+# ---------------------------------------------------------------------------
+def main() -> int:
+    width = max((len(name) for name, _, _ in RESULTS), default=0)
+    n_failed = 0
+    print("check-harbor-contract -- internal Harbor behavior checks\n")
+    for name, passed, message in RESULTS:
+        status = "PASS" if passed else "FAIL"
+        print(f"[{status}] {name}")
+        if passed:
+            print(f"       {message}")
+        else:
+            n_failed += 1
+            for line in message.splitlines():
+                print(f"       {line}")
+        print()
+
+    total = len(RESULTS)
+    print(f"{total - n_failed}/{total} checks passed.")
+    if n_failed:
+        print(
+            f"\n{n_failed} check(s) FAILED. Do not trust harbor/akm_opencode.py, "
+            "harbor/jobs/*.yaml, docs/harbor-p0.md or the analysis layer "
+            "against this Harbor install until the failures above are "
+            "understood and, if the pin was bumped deliberately, this "
+            "script and harbor/requirements.txt are updated together "
+            "(decision D12)."
+        )
+        return 1
+    print("\nAll internal Harbor behaviors this repo leans on are confirmed for this install.")
+    return 0
+
+
+sys.exit(main())
+PYEOF

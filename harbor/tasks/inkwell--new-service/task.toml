@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/inkwell--new-service"
+version = "1.0.0"
+description = "Create a new inkwell Service definition for api-gateway"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "inkwell/new-service"
+domain = "inkwell"
+slice = "eval"
+difficulty = "easy"
+stash = "inkwell"
+budget_tokens = 25000
+budget_wall_ms = 360000
+gold_ref = "skills/inkwell"
+gold_ref_legacy = "skill:inkwell"
+memory_ability = "procedural_lookup"
+task_family = "inkwell/service"
+akm_keywords = "inkwell service apiVersion kind metadata spec runtime image port"
+
+[verifier]
+timeout_sec = 1080.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "inkwell"

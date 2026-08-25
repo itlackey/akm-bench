@@ -1,0 +1,31 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/reference--example-task"
+version = "1.0.0"
+description = "Example task — write 'hello' to greeting.txt"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "_example/example-task"
+domain = "_example"
+slice = "train"
+difficulty = "easy"
+stash = "minimal"
+budget_tokens = 1000
+budget_wall_ms = 30000
+notes = "This task exists for unit-testing the bench corpus loader and verifier dispatcher. It is not part of the real corpus; the _example/ prefix excludes it from corpus statistics. Real tasks land in #237."
+
+[verifier]
+timeout_sec = 120.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "minimal"

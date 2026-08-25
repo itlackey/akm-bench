@@ -20,6 +20,7 @@
       "fixtures/**",
       "config/**",
       "tests/**",
+      "analysis/**",
       "README.md",
       ".gitignore",
       "package.json",

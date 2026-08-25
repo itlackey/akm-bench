@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  computeFixtureIndexFingerprint,
-  type FixtureIndexRuntimeFingerprint,
-} from "../src/fixture-index-cache";
+import { computeFixtureIndexFingerprint, type FixtureIndexRuntimeFingerprint } from "../src/fixture-index-cache";
 
 function runtime(overrides: Partial<FixtureIndexRuntimeFingerprint> = {}): FixtureIndexRuntimeFingerprint {
   return {

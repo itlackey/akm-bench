@@ -7,12 +7,13 @@
   "license": "MPL-2.0",
   "scripts": {
     "pretest": "bun run build-indexes",
-    "typecheck": "bunx tsc --noEmit",
+    "typecheck": "bunx tsc --noEmit && bunx tsc --noEmit -p analysis/tsconfig.json",
     "test": "bun test ./tests",
-    "lint": "bunx biome check src/ fixtures/ config/ tests/",
-    "lint:fix": "bunx biome check --write src/ fixtures/ config/ tests/",
-    "format": "bunx biome format --write src/ fixtures/ config/ tests/ README.md .gitignore package.json tsconfig.json biome.json",
-    "check": "bun run lint && bun run typecheck && bun run build-indexes && bun test ./tests",
+    "test:analysis": "bun test analysis",
+    "lint": "bunx biome check src/ fixtures/ config/ tests/ analysis/",
+    "lint:fix": "bunx biome check --write src/ fixtures/ config/ tests/ analysis/",
+    "format": "bunx biome format --write src/ fixtures/ config/ tests/ analysis/ README.md .gitignore package.json tsconfig.json biome.json",
+    "check": "bun run lint && bun run typecheck && bun run build-indexes && bun test ./tests && bun run test:analysis",
     "build-indexes": "bun run src/build-fixture-indexes.ts"
   },
   "engines": {

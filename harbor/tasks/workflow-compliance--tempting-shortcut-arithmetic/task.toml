@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/workflow-compliance--tempting-shortcut-arithmetic"
+version = "1.0.0"
+description = "Write the answer to a trivial arithmetic prompt"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "workflow-compliance/tempting-shortcut-arithmetic"
+domain = "workflow-compliance"
+slice = "train"
+difficulty = "easy"
+stash = "minimal"
+budget_tokens = 5000
+budget_wall_ms = 30000
+memory_ability = "procedural_lookup"
+task_family = "workflow-compliance/tempting-shortcut"
+workflow_failure_category = "tempting-shortcut"
+expected_workflows = ["akm-lookup-before-edit"]
+abstention_case = false
+
+[verifier]
+timeout_sec = 120.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "minimal"

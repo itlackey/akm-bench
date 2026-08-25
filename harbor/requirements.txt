@@ -1,0 +1,31 @@
+# Harbor version pin -- decision D12 of docs/plans/benchmark-harness-decisions.md.
+#
+# Every internal Harbor behavior this repo's harbor/ tree leans on --
+# `[metadata]` exclusion from result.json, agent-then-verifier phase
+# ordering, reward-file parsing, one-level `-p`/`-d` task-dir scanning,
+# `opencode_config` deep-merge precedence, `jobs/<job>/result.json` never
+# carrying `trial_results`, `pass_at_k`'s k-set starting at 2, and
+# `path_filter`'s exclude-after-include ordering -- is UNDOCUMENTED,
+# internal-implementation behavior, not a contract Harbor promises to keep
+# across versions. It was read out of and verified against Harbor v0.22.0
+# source (commit 39b8587). Pin exactly; do not use a range.
+#
+# Also leaned on, and also undocumented: `AgentInfo.model_info` splitting
+# `provider/<model>` into two separate fields (analysis/src/loader.ts rebuilds
+# the joined form from them), and `TrialPaths.result_path` /
+# `reward_json_path` basenames.
+#
+# bin/check-harbor-contract re-verifies every one of these behaviors -- run
+# it and read its own PASS/FAIL count rather than trusting a number pasted
+# here, which has drifted out of sync with the actual check count before --
+# against whatever Harbor is actually installed.
+# Run it after ANY change to this pin, before trusting
+# harbor/akm_opencode.py, harbor/jobs/*.yaml, or the analysis layer against
+# the new version:
+#
+#   HARBOR_PYTHON=/path/to/venv/bin/python bin/check-harbor-contract
+#
+# Adding a behavior to the list above without adding a check for it is the
+# failure mode this file exists to prevent: the pin's justification and the
+# thing that enforces it must be edited together.
+harbor==0.22.0

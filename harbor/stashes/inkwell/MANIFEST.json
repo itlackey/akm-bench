@@ -1,0 +1,14 @@
+{
+  "name": "inkwell",
+  "description": "Fictional inkwell YAML config skill stash for benchmark evaluation tasks.",
+  "purpose": "Provides the inkwell skill used by eval tasks that test akm stash lookup with fictional toolchains not in model training data.",
+  "assets": {
+    "skill": 1,
+    "memory": 1,
+    "workflow": 1
+  },
+  "consumers": [
+    "fixtures/corpus/tasks/inkwell/*"
+  ],
+  "notes": "workflows/configure-inkwell-service.md was migrated from the pre-0.9 workflow format to the akm 0.9.1 workflow-asset schema in the execution-validation pass so that it indexes (entryCount 3) and `akm show workflows/configure-inkwell-service` resolves. fixtures/stashes/inkwell/ still carries the unmigrated original."
+}

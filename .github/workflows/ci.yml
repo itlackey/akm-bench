@@ -25,3 +25,98 @@ jobs:
 
       - name: Run deterministic benchmark CLI smoke
         run: AKM_BENCH_RUN_CLI_TESTS=1 bun test ./tests/cli.test.ts
+
+  # Independent of `check` above (which is legacy src/ and was already red on
+  # main before this job was added -- see docs/plans/benchmark-harness-
+  # decisions.md's "CI wiring" open question). No Docker, no API keys, no
+  # network beyond installing harbor from PyPI.
+  harbor-agent:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Node is a REAL dependency of this job, not incidental: several tests in
+      # harbor/tests execute the shell fragments akm_opencode.py generates
+      # (the hoisted-akm-cli realignment and the shared-bundle index command),
+      # and those shell out to `node`. Without this step the job passes only by
+      # borrowing whatever node the ubuntu-latest image happens to preinstall,
+      # and fails with a bare `node: command not found` (verified: 6 failures
+      # from a PATH with no node) the moment that changes or the job moves to a
+      # container runner.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # harbor/requirements.txt pins the single `harbor==<version>` line this
+      # whole harbor/ tree is verified against (decision D12 in
+      # docs/plans/benchmark-harness-decisions.md); pytest and pyyaml are the
+      # test suite's own extra dependencies, not part of that pin.
+      - name: Install harbor and test dependencies
+        run: pip install -r harbor/requirements.txt pytest pyyaml
+
+      # PYTHONPATH is required: harbor.akm_opencode only resolves when this
+      # repo's root is importable (see docs/harbor-p0.md's "PYTHONPATH trap").
+      #
+      # harbor/tests/test_akm_opencode.py module-level `importorskip`s on
+      # harbor.agents.installed.opencode rather than failing collection (see
+      # that file's own docstring) -- raising the question of whether a
+      # broken `harbor` install in CI (a Harbor bump that moves/renames that
+      # module) would report this job green having executed 0 assertions.
+      # Checked directly, not assumed: pytest (9.1.1, same as installed
+      # above -- this file pins no pytest version) reports that as "collected
+      # 0 items / 1 skipped" and **exit code 5**, which `run:` treats as a
+      # failed step like any other nonzero exit -- verified with
+      # `PYTHONPATH="$(pwd)" python3 -m pytest harbor/tests` against a
+      # Python with no `harbor` installed. So this already fails loudly with
+      # no extra guard needed; a nonzero exit here means either a real test
+      # failure or the whole suite being skipped, and both are job failures.
+      - name: Run harbor agent unit tests
+        run: pytest harbor/tests -q
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      # Re-verifies, against whatever `harbor` pip actually installed, every
+      # undocumented internal Harbor behavior harbor/akm_opencode.py and
+      # harbor/jobs/*.yaml lean on. PYTHONPATH is deliberately left unset, but
+      # note what that does and does not buy: check-harbor-contract feeds its
+      # program to python on STDIN, so sys.path[0] is '' (the CWD) and this
+      # repo's own harbor/ package is importable regardless -- verified,
+      # `harbor.__file__` is the repo shim here, not site-packages. What makes
+      # the check still exercise the INSTALLED distribution is harbor/__init__
+      # .py's extend_path + attribute forwarding (harbor.__version__ reports
+      # 0.22.0 through it). Unsetting PYTHONPATH keeps the repo root off the
+      # path for any SUBPROCESS the check spawns; it is not what prevents the
+      # shim from loading.
+      - name: Run the Harbor contract check
+        run: HARBOR_PYTHON=python bin/check-harbor-contract
+
+  # Independent of `check` and `harbor-agent`. No Docker, no API keys, no
+  # network beyond bun's own package install -- analysis/ imports nothing but
+  # relative modules and bun/node builtins (bun:test, node:fs, node:path,
+  # node:os, node:crypto), so this job exercises the analysis layer on its
+  # own without any of the legacy src/ machinery `check` covers.
+  analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run analysis tests
+        run: bun test analysis

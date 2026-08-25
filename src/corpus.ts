@@ -109,6 +109,16 @@ export interface TaskMetadata {
   taskFamily?: string;
 
   /**
+   * Identifier shared by the members of one repeated-failure scenario
+   * (e.g. the train tasks whose repeated failure triggers reflection and
+   * the eval task that measures the resulting transfer). Members share
+   * verifier structure BY DESIGN, so cross-task leakage checks must not
+   * treat overlap inside a group as accidental. Optional; only the
+   * `workflow-compliance/repeated-failure` family uses it today.
+   */
+  repeatedFailureGroup?: string;
+
+  /**
    * Task-family identifiers from which a successful agent SHOULD have
    * carried over knowledge. Optional. Each entry follows the same
    * `<domain>/<short-name>` grammar as `task_family`.
@@ -332,6 +342,7 @@ interface RawTask {
   memory_ability?: unknown;
   workflow_focus?: unknown;
   task_family?: unknown;
+  repeated_failure_group?: unknown;
   expected_transfer_from?: unknown;
   abstention_case?: unknown;
   conflict_case?: unknown;
@@ -402,6 +413,8 @@ export function parseTaskYaml(text: string, taskDir: string): TaskMetadata | und
   if (workflowFocus !== undefined) meta.workflowFocus = workflowFocus;
   const taskFamily = asString(raw.task_family);
   if (taskFamily !== undefined) meta.taskFamily = taskFamily;
+  const repeatedFailureGroup = asString(raw.repeated_failure_group);
+  if (repeatedFailureGroup !== undefined) meta.repeatedFailureGroup = repeatedFailureGroup;
   const expectedTransferFrom = asStringArray(raw.expected_transfer_from);
   if (expectedTransferFrom !== undefined) meta.expectedTransferFrom = expectedTransferFrom;
   const abstentionCase = asBoolean(raw.abstention_case);

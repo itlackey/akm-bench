@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/drillbit--rotate-secret"
+version = "1.0.0"
+description = "Rotate a drillbit cluster secret using ed25519"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+legacy_task_id = "drillbit/rotate-secret"
+domain = "drillbit"
+slice = "eval"
+difficulty = "easy"
+stash = "drillbit"
+budget_tokens = 25000
+budget_wall_ms = 360000
+gold_ref = "skills/drillbit"
+gold_ref_legacy = "skill:drillbit"
+memory_ability = "procedural_lookup"
+task_family = "drillbit/secret"
+akm_keywords = "drillbit secret rotate algorithm path"
+
+[verifier]
+timeout_sec = 1080.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "drillbit"

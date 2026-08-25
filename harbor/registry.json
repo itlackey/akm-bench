@@ -1,0 +1,208 @@
+[
+  {
+    "name": "akm-tasks-train",
+    "version": "1.0",
+    "description": "akm-bench legacy corpus, train slice (29 tasks: az-cli, docker-homelab, drillbit, inkwell, opencode, workflow-compliance, plus the reference fixture task).",
+    "tasks": [
+      {
+        "name": "reference--example-task",
+        "path": "harbor/tasks/reference--example-task"
+      },
+      {
+        "name": "az-cli--aks-get-credentials",
+        "path": "harbor/tasks/az-cli--aks-get-credentials"
+      },
+      {
+        "name": "az-cli--assign-managed-identity",
+        "path": "harbor/tasks/az-cli--assign-managed-identity"
+      },
+      {
+        "name": "az-cli--create-resource-group",
+        "path": "harbor/tasks/az-cli--create-resource-group"
+      },
+      {
+        "name": "az-cli--keyvault-secret-set",
+        "path": "harbor/tasks/az-cli--keyvault-secret-set"
+      },
+      {
+        "name": "az-cli--query-by-tag",
+        "path": "harbor/tasks/az-cli--query-by-tag"
+      },
+      {
+        "name": "az-cli--storage-account-create",
+        "path": "harbor/tasks/az-cli--storage-account-create"
+      },
+      {
+        "name": "docker-homelab--bridge-network",
+        "path": "harbor/tasks/docker-homelab--bridge-network"
+      },
+      {
+        "name": "docker-homelab--compose-version-upgrade",
+        "path": "harbor/tasks/docker-homelab--compose-version-upgrade"
+      },
+      {
+        "name": "docker-homelab--env-from-file",
+        "path": "harbor/tasks/docker-homelab--env-from-file"
+      },
+      {
+        "name": "docker-homelab--named-volume",
+        "path": "harbor/tasks/docker-homelab--named-volume"
+      },
+      {
+        "name": "docker-homelab--redis-healthcheck",
+        "path": "harbor/tasks/docker-homelab--redis-healthcheck"
+      },
+      {
+        "name": "docker-homelab--restart-policy",
+        "path": "harbor/tasks/docker-homelab--restart-policy"
+      },
+      {
+        "name": "drillbit--backup-policy-train",
+        "path": "harbor/tasks/drillbit--backup-policy-train"
+      },
+      {
+        "name": "drillbit--scale-replicas-train",
+        "path": "harbor/tasks/drillbit--scale-replicas-train"
+      },
+      {
+        "name": "drillbit--fix-runbook-train",
+        "path": "harbor/tasks/drillbit--fix-runbook-train"
+      },
+      {
+        "name": "inkwell--add-healthcheck-train",
+        "path": "harbor/tasks/inkwell--add-healthcheck-train"
+      },
+      {
+        "name": "inkwell--new-service-train",
+        "path": "harbor/tasks/inkwell--new-service-train"
+      },
+      {
+        "name": "inkwell--new-service-scaled-train",
+        "path": "harbor/tasks/inkwell--new-service-scaled-train"
+      },
+      {
+        "name": "opencode--opencode-config-model",
+        "path": "harbor/tasks/opencode--opencode-config-model"
+      },
+      {
+        "name": "opencode--system-prompt-snippet",
+        "path": "harbor/tasks/opencode--system-prompt-snippet"
+      },
+      {
+        "name": "opencode--tool-allowlist",
+        "path": "harbor/tasks/opencode--tool-allowlist"
+      },
+      {
+        "name": "workflow-compliance--feedback-trap-az-tag-list",
+        "path": "harbor/tasks/workflow-compliance--feedback-trap-az-tag-list"
+      },
+      {
+        "name": "workflow-compliance--feedback-trap-docker-compose-render",
+        "path": "harbor/tasks/workflow-compliance--feedback-trap-docker-compose-render"
+      },
+      {
+        "name": "workflow-compliance--repeated-fail-opencode-disable-provider",
+        "path": "harbor/tasks/workflow-compliance--repeated-fail-opencode-disable-provider"
+      },
+      {
+        "name": "workflow-compliance--repeated-fail-opencode-provider-token-train",
+        "path": "harbor/tasks/workflow-compliance--repeated-fail-opencode-provider-token-train"
+      },
+      {
+        "name": "workflow-compliance--repeated-fail-storage-lifecycle-a",
+        "path": "harbor/tasks/workflow-compliance--repeated-fail-storage-lifecycle-a"
+      },
+      {
+        "name": "workflow-compliance--repeated-fail-storage-lifecycle-b",
+        "path": "harbor/tasks/workflow-compliance--repeated-fail-storage-lifecycle-b"
+      },
+      {
+        "name": "workflow-compliance--tempting-shortcut-arithmetic",
+        "path": "harbor/tasks/workflow-compliance--tempting-shortcut-arithmetic"
+      }
+    ]
+  },
+  {
+    "name": "akm-tasks-eval",
+    "version": "1.0",
+    "description": "akm-bench legacy corpus, eval slice (19 tasks: drillbit, inkwell, opencode, workflow-compliance).",
+    "tasks": [
+      {
+        "name": "drillbit--backup-policy",
+        "path": "harbor/tasks/drillbit--backup-policy"
+      },
+      {
+        "name": "drillbit--canary-enable",
+        "path": "harbor/tasks/drillbit--canary-enable"
+      },
+      {
+        "name": "drillbit--provision-edge",
+        "path": "harbor/tasks/drillbit--provision-edge"
+      },
+      {
+        "name": "drillbit--rotate-secret",
+        "path": "harbor/tasks/drillbit--rotate-secret"
+      },
+      {
+        "name": "drillbit--scale-replicas",
+        "path": "harbor/tasks/drillbit--scale-replicas"
+      },
+      {
+        "name": "inkwell--add-healthcheck",
+        "path": "harbor/tasks/inkwell--add-healthcheck"
+      },
+      {
+        "name": "inkwell--configure-scaling",
+        "path": "harbor/tasks/inkwell--configure-scaling"
+      },
+      {
+        "name": "inkwell--cpu-scaling",
+        "path": "harbor/tasks/inkwell--cpu-scaling"
+      },
+      {
+        "name": "inkwell--full-config",
+        "path": "harbor/tasks/inkwell--full-config"
+      },
+      {
+        "name": "inkwell--new-service",
+        "path": "harbor/tasks/inkwell--new-service"
+      },
+      {
+        "name": "inkwell--set-rate-limit",
+        "path": "harbor/tasks/inkwell--set-rate-limit"
+      },
+      {
+        "name": "inkwell--workflow-configure-scaling",
+        "path": "harbor/tasks/inkwell--workflow-configure-scaling"
+      },
+      {
+        "name": "opencode--agents-md-akm-snippet",
+        "path": "harbor/tasks/opencode--agents-md-akm-snippet"
+      },
+      {
+        "name": "opencode--provider-akm-feedback",
+        "path": "harbor/tasks/opencode--provider-akm-feedback"
+      },
+      {
+        "name": "opencode--select-correct-skill",
+        "path": "harbor/tasks/opencode--select-correct-skill"
+      },
+      {
+        "name": "workflow-compliance--abstention-rust-async-haiku",
+        "path": "harbor/tasks/workflow-compliance--abstention-rust-async-haiku"
+      },
+      {
+        "name": "workflow-compliance--distractor-docker-port-publish",
+        "path": "harbor/tasks/workflow-compliance--distractor-docker-port-publish"
+      },
+      {
+        "name": "workflow-compliance--repeated-fail-opencode-provider-token-eval",
+        "path": "harbor/tasks/workflow-compliance--repeated-fail-opencode-provider-token-eval"
+      },
+      {
+        "name": "workflow-compliance--repeated-fail-storage-lifecycle-eval",
+        "path": "harbor/tasks/workflow-compliance--repeated-fail-storage-lifecycle-eval"
+      }
+    ]
+  }
+]

@@ -58,7 +58,6 @@ for (const f of fixtures) {
   const entry = resolveFixtureIndexCacheEntry(f, fixtureContentHash(f));
   if (!entry) {
     process.exitCode = 1;
-    continue;
   }
 }
 

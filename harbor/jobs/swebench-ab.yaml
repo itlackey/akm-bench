@@ -1,0 +1,312 @@
+# SWE-bench Verified three-arm A/B: baseline (stock opencode) vs akm-static
+# (pristine per-trial akm bundle) vs akm-accumulating (shared, mutable akm
+# bundle across trials). Same three-arm shape as harbor/jobs/tb2-ab.yaml --
+# decision D7 of docs/plans/benchmark-harness-decisions.md -- read that
+# file's header comment for the full rationale; this one only calls out
+# what differs for swebench-verified@1.0.
+#
+# Read harbor/akm_opencode.py (the AkmOpenCode class docstring) and
+# docs/harbor-p0.md before editing this file.
+#
+#   PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/swebench-ab.yaml
+#
+# PYTHONPATH is REQUIRED -- see tb2-ab.yaml's header and docs/harbor-p0.md's
+# "PYTHONPATH trap" section for why.
+#
+# BEFORE YOU RUN, edit:
+#   1. every `model_name:` below (three arms, must match exactly)
+#   2. `environment.mounts[0].source` -- absolute host path for the
+#      akm-accumulating arm's shared bundle, PRE-POPULATED with a valid,
+#      seeded akm bundle before the first trial -- e.g. a copy of
+#      harbor/treatment-library/ (the hand-authored generic SWE skills
+#      bundle, decision D6 -- NOT harbor/seed-library/, the P0 smoke
+#      placeholder) run through `akm bundle create` + `akm index --full`
+#      (AkmOpenCode with shared_bundle_path set only indexes a shared
+#      bundle, it never seeds one)
+#   3. the `datasets:` block -- READ THE COST WARNING NEAR THE BOTTOM FIRST.
+#      swebench-verified is 500 tasks. Do not point this file at the full
+#      dataset without subsetting; see that section for exactly how.
+#
+# NOT resolved by this file -- decision D3 (network policy for the akm arms)
+# is still OPEN. See tb2-ab.yaml's header comment for the full explanation;
+# it applies here unchanged. SWE-bench task images additionally tend to be
+# large, pinned-dependency Python/JS/Go repo checkouts (registry.json's
+# swebench-verified entries resolve to a fixed git_commit_id per instance),
+# so egress policy interacts with base-image build time in a way TB2's
+# smaller images mostly don't -- budget accordingly on force_build: true.
+
+job_name: akm-swebench-ab
+
+jobs_dir: jobs
+
+# Attempts per (task x agent). Kept lower than tb2-ab.yaml's 5 because
+# swebench-verified trials are individually more expensive (larger repos,
+# longer test suites) and the task count is already 5.6x larger (500 vs 89)
+# -- see the COST WARNING below for the actual trial-count math. Still >=2 so
+# Harbor's own pass_at_k (k starts at 2; harbor/utils/pass_at_k.py) has
+# something to compute as an independent sanity check on our statistics
+# (decision D4).
+n_attempts: 3
+
+# Same reasoning as tb2-ab.yaml: this is a ceiling, not a per-arm setting.
+# The akm-accumulating arm below pins its own n_concurrent to 1 regardless.
+n_concurrent_trials: 4
+
+quiet: false
+
+# No global scaling -- every phase budget that matters is pinned per-agent
+# below, identically on all three arms.
+timeout_multiplier: 1.0
+
+environment:
+  type: docker
+  force_build: false
+  delete: true
+
+  # The akm-accumulating arm's persistent bundle. Reaches every container in
+  # this job regardless of arm (EnvironmentConfig.mounts has no per-agent
+  # scoping -- see trial.py: Trial._agent_env_mounts) -- harmless on the
+  # other two arms, since nothing in their env points AKM_BUNDLE_DIR here.
+  # Same ServiceVolumeConfig schema as the `--mounts` / `--mounts-json` CLI
+  # flag (harbor/cli/jobs.py:885-895); this yaml form is used so the mount
+  # travels with the job config under version control. Verified against the
+  # local Docker backend only; cloud sandbox backends are unverified.
+  mounts:
+    - type: bind
+      # >>> EDIT ME <<< absolute host path, pre-populated with a seeded akm
+      # bundle. Use a DIFFERENT path from tb2-ab.yaml's mount unless you
+      # deliberately want the SWE-bench and TB2 accumulating arms sharing
+      # one akm bundle -- decision D7 says nothing about cross-dataset
+      # sharing, and mixing TB2 and SWE-bench-derived memory into one bundle
+      # is a scope decision this file does not make for you.
+      source: /ABSOLUTE/PATH/TO/akm-swebench-shared-bundle
+      target: /shared/akm-bundle
+
+agents:
+  # ------------------------------------------------------------------ BASELINE
+  - name: opencode
+
+    # >>> EDIT ME <<< must be byte-identical to the other two arms' model_name.
+    model_name: PROVIDER/MODEL
+
+    kwargs:
+      # opencode-ai npm pin, repeated from OPENCODE_VERSION in
+      # harbor/akm_opencode.py. Must match all three arms in this file.
+      version: "1.18.21"
+
+      opencode_config:
+        "$schema": https://opencode.ai/config.json
+        autoupdate: false
+        # Mirrors AkmOpenCode.SHARED_PERMISSIONS -- the complete key set
+        # opencode 1.18.21's Config.permission declares
+        # (@opencode-ai/sdk dist/gen/types.gen.d.ts:1161-1169). Belt-and-
+        # braces (Harbor's OpenCode.run() already passes
+        # --dangerously-skip-permissions) and must stay byte-identical
+        # across all three arms -- see tb2-ab.yaml for the full rationale.
+        permission:
+          edit: allow
+          bash: allow
+          webfetch: allow
+          doom_loop: allow
+          external_directory: allow
+
+    # Identical across all three arms even though this arm fetches no
+    # plugin. See the D3 note in the header comment.
+    extra_allowed_hosts:
+      - registry.npmjs.org
+
+    # Belt-and-braces with opencode_config.autoupdate: false above, and
+    # deliberately symmetric with the two treatment arms: AkmOpenCode.AKM_ENV
+    # sets OPENCODE_DISABLE_AUTOUPDATE=true in their process env, a SECOND
+    # mechanism for the same intent that this arm otherwise has no
+    # equivalent of. If the config key were ever weaker than the env var in
+    # opencode 1.18.21, only this arm would attempt an autoupdate network
+    # call at session start -- a confound (network + latency), not a
+    # convenience.
+    env:
+      OPENCODE_DISABLE_AUTOUPDATE: "true"
+
+    # Identical across all three arms. Sized for the treatment arms' install
+    # (see AKM-STATIC below); this arm simply finishes early.
+    override_setup_timeout_sec: 2700
+
+    # No AGENT-phase override. The task's own [agent] timeout_sec governs, on
+    # all three arms -- it is the benchmark-defined budget, and honoring it is what
+    # keeps these numbers comparable to published leaderboard numbers. A flat
+    # override_timeout_sec used to sit here because the treatment arm pays
+    # plugin session-start work inside the agent phase that this arm never
+    # pays, so an asymmetric effective budget could make a treatment-only
+    # AgentTimeoutError read as "akm failed the task". That residual cost is
+    # mitigated, not proven to be zero: install() pre-warms opencode's two
+    # plugin caches and the npm cache, and the install self-check ASSERTS the
+    # warm cache, so the agent phase should not pay a cold plugin fetch.
+
+    # NO exclude_logs -- see tb2-ab.yaml; the run-phase opencode log is
+    # load-bearing evidence for the treatment arms and Harbor applies
+    # exclude_logs AFTER include_logs (harbor/utils/path_filter.py), so
+    # collecting logs identically on all three arms keeps the evidence base
+    # symmetric.
+
+  # ---------------------------------------------------------------- AKM-STATIC
+  # opencode + akm-opencode, a pristine per-trial bundle. See tb2-ab.yaml's
+  # akm-static arm for the full comment set on every field repeated here;
+  # only what's SWE-bench-specific is called out below.
+  - import_path: harbor.akm_opencode:AkmOpenCode
+
+    # >>> EDIT ME <<< must equal the other two arms' model_name exactly.
+    model_name: PROVIDER/MODEL
+
+    kwargs:
+      version: "1.18.21"
+
+      # The cold-start library, decision D6 -- see tb2-ab.yaml's akm-static
+      # arm for the full rationale. Relative to the repo root, matching this
+      # file's own documented invocation (`cd akm-bench` then
+      # `PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/swebench-ab.yaml`) --
+      # AkmOpenCode resolves a relative seed_library_dir against the process
+      # CWD at install time, not against this YAML file's location.
+      seed_library_dir: harbor/treatment-library
+      #
+      # NOT set here, on purpose (same as tb2-ab.yaml):
+      #   opencode_config -- AkmOpenCode force-merges plugin/tools/permission
+      #     at the highest-precedence layer; see _force_config().
+      #   stash_root -- defaults to harbor/stashes/ when that directory
+      #     exists, else the plain seed-library. A converted SWE-bench task
+      #     selects its own stash via AKM_TASK_STASH in its task.toml
+      #     [environment] env -- this job config does not name one. Watch
+      #     for train/eval leakage specifically here: decision D6 explicitly
+      #     rejects per-domain `akm import` of real repo docs for SWE-bench
+      #     instances as task-contaminating; whatever populates
+      #     harbor/stashes/ for this dataset must have made the same call.
+      #   akm_plugin_spec / akm_cli_spec -- pinned by module constants in
+      #     harbor/akm_opencode.py.
+
+    extra_allowed_hosts:
+      - registry.npmjs.org
+
+    override_setup_timeout_sec: 2700
+
+    # No AGENT-phase override, same as the other two arms -- the task's own
+    # [agent] timeout_sec governs. This arm's session-start cost is mitigated
+    # by install()'s cache pre-warm plus the self-check that asserts it; that
+    # is a mitigation, not a proof of zero cost.
+
+    # NO exclude_logs -- load-bearing here, not merely tidy. See tb2-ab.yaml.
+
+    env: {}
+
+  # ----------------------------------------------------------- AKM-ACCUMULATING
+  # opencode + akm-opencode, a shared mutable bundle across trials. See
+  # tb2-ab.yaml's akm-accumulating arm for the full comment set; only what's
+  # SWE-bench-specific is called out below.
+  #
+  # ARM IDENTITY (same as tb2-ab.yaml, read that file's longer note) --
+  # setting shared_bundle_path below makes AkmOpenCode.arm_name() report
+  # `akm-opencode-accumulating`, so this arm is distinct from akm-static in
+  # every result.json; analysis/src/loader.ts::deriveArm additionally folds a
+  # digest of `config.agent.kwargs` into the arm label as a second,
+  # independent guard. Decision D7 requires the two arms never be pooled.
+  - import_path: harbor.akm_opencode:AkmOpenCode
+
+    # >>> EDIT ME <<< must equal the other two arms' model_name exactly.
+    model_name: PROVIDER/MODEL
+
+    # REQUIRED to be 1 -- see tb2-ab.yaml. A per-AGENT field
+    # (AgentConfig.n_concurrent), NOT a kwarg.
+    n_concurrent: 1
+
+    kwargs:
+      version: "1.18.21"
+
+      # MUST equal environment.mounts[0].target above exactly. See
+      # tb2-ab.yaml for what happens if these two values diverge.
+      shared_bundle_path: /shared/akm-bundle
+
+    extra_allowed_hosts:
+      - registry.npmjs.org
+
+    # Identical to the other two arms, on the same "asymmetric budget is a
+    # confound" logic as BASELINE above -- even though this arm's install()
+    # never seeds a bundle (only indexes one, once).
+    override_setup_timeout_sec: 2700
+
+    # No AGENT-phase override, same as the other two arms -- the task's own
+    # [agent] timeout_sec governs. This arm's session-start cost is mitigated
+    # by install()'s cache pre-warm plus the self-check that asserts it; that
+    # is a mitigation, not a proof of zero cost.
+
+    # NO exclude_logs -- same reason as akm-static above.
+
+    env: {}
+
+# ============================================================================
+# COST WARNING -- read before touching n_tasks, task_names, or n_attempts
+# ============================================================================
+# swebench-verified@1.0 ships 500 tasks. This job runs THREE arms over every
+# task selected below, so total trial count is:
+#
+#     (tasks selected) x 3 arms x n_attempts (3 above)
+#
+# At the full 500 tasks that is 500 x 3 x 3 = 4,500 trials -- and SWE-bench
+# trials are individually heavier than TB2's (larger repo checkouts, longer
+# test-suite verifier runs, and larger per-task [agent] timeout_sec budgets
+# than TB2's). Do not point this file at the full dataset. The
+# akm-accumulating arm is additionally pinned to n_concurrent: 1 -- 500 x 3 =
+# 1,500 of those 4,500 trials have their bundle-touching work (setup's
+# flock-serialized index/self-check steps, AND the n_concurrent-serialized
+# measured run) run STRICTLY SEQUENTIALLY regardless of n_concurrent_trials
+# above -- see tb2-ab.yaml's matching COST WARNING for the full reasoning
+# behind why BOTH mechanisms (flock in AkmOpenCode, and this n_concurrent
+# field) are required for that to hold, not n_concurrent alone.
+#
+# SUBSET FIRST. Two different mechanisms, depending on where your task
+# directories come from:
+#
+#   - Pulling from the registry (what this file's `datasets:` block below
+#     does -- name: swebench-verified / version: "1.0"): use
+#     `task_names:` / `exclude_task_names:` (glob-matched;
+#     models/job/config.py DatasetConfig._filter_task_ids) or `n_tasks:` in
+#     the datasets block (applied AFTER name filtering), or the CLI's
+#     `-i/--include-task-name`, `-x/--exclude-task-name`, `-l/--n-tasks`
+#     flags (harbor/cli/jobs.py) -- all three override this file's dataset
+#     selection without editing it.
+#   - Materializing task directories yourself instead of pulling the
+#     registry entry (e.g. to convert only a hand-picked subset of SWE-bench
+#     instances): the swebench adapter's OWN `--limit N` flag
+#     (adapters/swebench/src/swebench_adapter/main.py) caps how many
+#     instances it converts when run with `--all`; `--instance-id` /
+#     `--task-ids` select specific ones instead. That path produces a local
+#     task directory you would point at with a `path:` dataset entry instead
+#     of the `name:`/`version:` registry entry below -- a different
+#     DatasetConfig shape, not a drop-in edit of this file.
+#
+# tb2-ab.yaml's version of this warning is smaller (89 tasks, not 500) --
+# read it too before running both in the same budget cycle. D9 (judge/cost
+# budget) is still OPEN in docs/plans/benchmark-harness-decisions.md and
+# explicitly names this tripling as something to force a number on before
+# any full sweep of either file.
+
+datasets:
+  - name: swebench-verified
+    version: "1.0"
+    # >>> EDIT ME <<< left commented out, the dataset resolves to all 500
+    # tasks -- a very expensive default. See the COST WARNING above; do not
+    # remove these comments without first choosing a subset.
+    # task_names:
+    #   - <task-name-or-glob>
+    # exclude_task_names:
+    #   - <task-name-or-glob>
+    # n_tasks: 10
+
+# ============================================================================
+# Cross-workflow contract
+# (docs/plans/benchmark-harness-decisions.md D7; also stated in the system
+# prompt that produced this file as "CROSS-WORKFLOW CONTRACT")
+# ============================================================================
+# Identical to tb2-ab.yaml's closing note: a converted SWE-bench task MAY set
+# `[environment] env = { AKM_TASK_STASH = "<stash-name>" }` in its own
+# task.toml; AkmOpenCode reads it container-side at bundle-seed time, only on
+# the akm-static arm, and fails setup loudly (never silently falls back) if
+# the named stash is absent from the uploaded stash_root. This file does not
+# reference individual stashes and does not set stash_root -- it defaults to
+# harbor/stashes/ when present, else None, per AkmOpenCode.__init__.

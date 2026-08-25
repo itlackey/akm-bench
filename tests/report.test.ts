@@ -297,7 +297,7 @@ describe("serializeRunForReport", () => {
     const run = makeRun({
       outcome: "budget_exceeded",
       terminationCause: "agent_timeout",
-      firstErrorLine: "agent CLI \"opencode\" timed out after 120000ms",
+      firstErrorLine: 'agent CLI "opencode" timed out after 120000ms',
     });
     const row = serializeRunForReport(run);
     expect(row.termination_cause).toBe("agent_timeout");

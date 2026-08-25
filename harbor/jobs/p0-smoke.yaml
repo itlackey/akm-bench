@@ -1,0 +1,259 @@
+# LOCAL RUN VALUES. `model_name` and the dataset `path` below are filled in for
+# this machine's setup -- an OpenAI-compatible endpoint on the LAN
+# (OPENAI_BASE_URL=http://192.168.0.99:1234/v1, OPENAI_API_KEY=any non-empty
+# string; Harbor's OpenCode agent is passthrough, so it forwards both into the
+# container AND writes provider.openai.options.baseURL into opencode.json).
+#
+# The model is NOT arbitrary: the plugin injects its context as ADDITIONAL
+# entries in opencode's `system` array, so the treatment arm sends more than one
+# system message. Chat templates that require a single leading system message
+# (qwen3.6-35b-a3b, devstral-small-2) return HTTP 500 on the treatment arm only
+# -- an arm-asymmetric hard failure. Verified accepting: qwen3-30b-a3b-2507,
+# qwen3-coder-30b, gpt-oss-20b.
+# P0 smoke: opencode WITH the akm-opencode plugin vs. stock opencode.
+#
+# Runs BOTH arms over ONE task in a single job, so the A/B is one invocation and
+# the two arms share an identical environment, task and attempt count.
+#
+#   PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/p0-smoke.yaml
+#
+# PYTHONPATH is REQUIRED. Harbor resolves `import_path` with a plain
+# importlib.import_module -- no sys.path manipulation, no file-path support --
+# so `harbor.akm_opencode:AkmOpenCode` only resolves when the repo root is
+# importable.
+#
+# BEFORE YOU RUN, edit two things:
+#   1. every `model_name:` below (there are two, they MUST match)
+#   2. the `datasets:` block at the bottom
+# See docs/harbor-p0.md.
+#
+# Shape follows harbor's examples/configs/agents/opencode-job.yaml, with the
+# deprecated `orchestrator:` block replaced by the top-level keys that superseded
+# it (harbor still accepts `orchestrator:` but emits a DeprecationWarning).
+
+job_name: akm-p0-smoke
+
+# Where trial directories are written, relative to the working directory.
+# Results land in <jobs_dir>/<job_name>/<trial>/ -- trial dirs are DIRECT
+# children of the job dir, with NO intervening per-task directory level.
+# VERIFIED against Harbor v0.22.0 source (see tb2-ab.yaml's jobs_dir comment
+# for the exact citation); bin/check-harbor-contract re-asserts it on every
+# Harbor bump. analysis/src/loader.ts walks exactly this two-level shape.
+jobs_dir: jobs
+
+# One attempt per (task x agent). P0 only asks "did akm_* tools get called",
+# which is a binary observation, not a rate -- raise this only once you start
+# comparing scores.
+n_attempts: 1
+
+# Run trials sequentially. Both arms npm-install into their own container and
+# the treatment arm pulls ~432MB; concurrency here mostly buys registry
+# throttling and noisy timing.
+n_concurrent_trials: 1
+
+# Show trial progress. Set true for CI.
+quiet: false
+
+# No timeout scaling. The AGENT phase budget comes from each task's own
+# [agent] timeout_sec (the benchmark-defined value); only the SETUP budget is
+# pinned per agent (override_setup_timeout_sec below), identically on both
+# arms. A multiplier here would scale whatever base each arm resolves, so
+# leaving it at 1.0 is what keeps the agent budget equal to the official one.
+timeout_multiplier: 1.0
+
+environment:
+  # Local Docker. Requires a running Docker daemon -- `docker ps` must work.
+  type: docker
+  # Reuse a cached task image when one exists. Set true to force a rebuild
+  # after editing a task's Dockerfile.
+  force_build: false
+  # Remove containers after each trial. MUST stay true: the akm bundle is
+  # seeded per container and akm_remember / auto-feedback write into it during
+  # a trial, so a reused container would let trials contaminate each other.
+  delete: true
+
+agents:
+  # ------------------------------------------------------------------ CONTROL
+  # Stock opencode. Every field below is chosen so the ONLY differences from
+  # the treatment arm are (a) the `plugin` array, (b) the top-level `tools` map
+  # that enables the five akm_* tools and (c) the AKM_* environment. Anything
+  # else that differs is a confound.
+  - name: opencode
+
+    # >>> EDIT ME <<< must be byte-identical to the treatment arm's model_name.
+    # NOTE: `-m/--model` on the command line does NOT override this. Harbor only
+    # applies -m when --agent is also passed, and --agent REPLACES the entire
+    # agents list from this file. Edit the value here.
+    model_name: openai/qwen/qwen3-30b-a3b-2507
+
+    kwargs:
+      # opencode-ai npm pin. Repeated verbatim from OPENCODE_VERSION in
+      # harbor/akm_opencode.py -- the control arm cannot import that constant,
+      # so harbor/tests/test_akm_opencode.py asserts the two stay in sync.
+      # Both arms must run the same opencode binary.
+      version: "1.18.21"
+
+      opencode_config:
+        # Mirrors AkmOpenCode._DEFAULT_CONFIG so the two arms write the same
+        # base config.
+        "$schema": https://opencode.ai/config.json
+        autoupdate: false
+
+        # Mirrors SHARED_PERMISSIONS in harbor/akm_opencode.py: the COMPLETE
+        # set of keys opencode 1.18.21's Config.permission declares
+        # (@opencode-ai/sdk dist/gen/types.gen.d.ts:1161-1169), and nothing
+        # else. There is no read/write/grep/glob/list/patch key in that schema,
+        # and the akm_* tools are not permission keys at all -- they live in the
+        # separate top-level `tools` map that only the treatment arm carries.
+        #
+        # Honest rationale: Harbor's OpenCode.run() already passes
+        # --dangerously-skip-permissions, so this block gates nothing today. It
+        # is belt-and-braces against a Harbor upgrade that drops that flag --
+        # and it is repeated here because belt-and-braces on ONE arm is a
+        # confound: it would entangle "plugin present" with "permissions
+        # granted". harbor/tests/test_akm_opencode.py asserts this block equals
+        # SHARED_PERMISSIONS exactly.
+        #
+        # Side benefit of a non-empty config here: OpenCode.model_connection
+        # applies without_inferred_base_url() whenever opencode_config is
+        # truthy. The treatment arm always has a truthy config, so giving the
+        # control arm one too keeps both arms on the same base-URL branch.
+        permission:
+          edit: allow
+          bash: allow
+          webfetch: allow
+          doom_loop: allow
+          external_directory: allow
+
+    # Same allowlist entry as the treatment arm. The control arm has no plugin
+    # to fetch at session start, so it will not use this -- it is here to keep
+    # the two arms' network policy identical.
+    extra_allowed_hosts:
+      - registry.npmjs.org
+      # Local OpenAI-compatible inference endpoint (LM Studio on the LAN).
+      # Identical on both arms -- a host allowed on one arm only is a confound.
+      - 192.168.0.99
+
+    # Belt-and-braces with `opencode_config.autoupdate: false` above, and
+    # deliberately symmetric with the treatment arm: AkmOpenCode.AKM_ENV sets
+    # OPENCODE_DISABLE_AUTOUPDATE=true in the treatment process env (a SECOND,
+    # independent mechanism for the same intent), which this arm has no
+    # equivalent of without this. Two different mechanisms enforcing the same
+    # thing are not provably equivalent in opencode 1.18.21 -- if the config
+    # key were ever weaker than the env var, only this arm would attempt an
+    # autoupdate network call, which is a confound (a network call and a
+    # latency difference on the control arm only), not a convenience.
+    env:
+      OPENCODE_DISABLE_AUTOUPDATE: "true"
+
+    # Harbor's default agent-setup timeout is 360s, which the treatment arm
+    # will blow through. Set on both arms so the phase budgets match; the
+    # control arm simply finishes early.
+    override_setup_timeout_sec: 2700
+
+    # No AGENT-phase override. The task's own [agent] timeout_sec governs, on
+    # both arms -- it is the benchmark-defined budget, and honoring it is what
+    # keeps these numbers comparable to published leaderboard numbers. A flat
+    # override_timeout_sec used to sit here because the treatment arm pays
+    # plugin session-start work inside the agent phase that this arm never
+    # pays, so an asymmetric effective budget could make a treatment-only
+    # AgentTimeoutError read as "akm failed the task". That residual cost is
+    # mitigated, not proven to be zero: install() pre-warms opencode's two
+    # plugin caches and the npm cache, and the install self-check ASSERTS the
+    # warm cache, so the agent phase should not pay a cold plugin fetch.
+
+    # NO exclude_logs, and the two arms must collect logs identically or the
+    # evidence base is asymmetric. opencode's XDG_DATA_HOME is
+    # /logs/agent/opencode/xdg-data, and its session log --
+    # /logs/agent/opencode/xdg-data/opencode/log/*.log -- is where the plugin's
+    # client.app.log() lines land: the "AKM CLI resolved" marker that
+    # AkmOpenCode._assert_plugin_ran() requires before it will let a treatment
+    # trial score, plus the akm.<surface>.<outcome> lines. On this arm the same
+    # log is the negative control -- it should contain no akm lines at all.
+    # Excluding "opencode/xdg-data/**" is inert on Docker (a mounted
+    # environment short-circuits log filtering) but deletes exactly that
+    # evidence on any non-mounted/cloud environment, and it cannot be paired
+    # with an include: Harbor applies exclude AFTER include
+    # (harbor/utils/path_filter.py), so exclude always wins. Trial-dir size is
+    # not worth an arm that cannot be verified.
+
+  # ---------------------------------------------------------------- TREATMENT
+  # opencode + akm-opencode. Deliberately terse: the agent class force-injects
+  # the plugin array, the `tools` map, the permission block and the AKM_*
+  # environment, so this arm CANNOT silently degrade into a no-plugin run if
+  # this file is wrong -- and if the plugin fails to load at run time anyway,
+  # populate_context_post_run() errors the trial instead of scoring it.
+  - import_path: harbor.akm_opencode:AkmOpenCode
+
+    # >>> EDIT ME <<< must equal the control arm's model_name exactly.
+    model_name: openai/qwen/qwen3-30b-a3b-2507
+
+    kwargs:
+      # Same opencode pin as the control arm. AkmOpenCode defaults to
+      # OPENCODE_VERSION when this is omitted; stated explicitly so the two
+      # arms are visibly pinned together in one file.
+      version: "1.18.21"
+      #
+      # NOT set here, on purpose:
+      #   opencode_config -- the class force-merges `plugin` and `permission`
+      #     into the highest-precedence layer. Anything set here is merged
+      #     UNDER those two keys, so use it only for genuinely extra config.
+      #   akm_plugin_spec / akm_cli_spec -- pinned by AKM_PLUGIN_SPEC and
+      #     AKM_CLI_SPEC in harbor/akm_opencode.py. Override only to test a
+      #     different plugin build.
+      #   seed_library_dir -- defaults to harbor/seed-library next to the
+      #     module.
+
+    # Required. opencode installs npm plugins at SESSION START, i.e. during
+    # agent.run(), where the task's agent-phase network policy applies. If the
+    # task uses an allowlist network mode, the plugin fetch fails there even
+    # though setup had network. install() also pre-warms the cache, so this is
+    # the second of two independent mitigations.
+    extra_allowed_hosts:
+      - registry.npmjs.org
+      # Local OpenAI-compatible inference endpoint (LM Studio on the LAN).
+      # Identical on both arms -- a host allowed on one arm only is a confound.
+      - 192.168.0.99
+
+    # This arm's install() does: node + opencode-ai, then `npm i -g akm-cli`
+    # (~432MB), then bundle seed + index, then a full opencode boot (with this
+    # arm's real config and model name) to warm both plugin caches, then the
+    # self-check. 360s is not enough.
+    override_setup_timeout_sec: 2700
+
+    # No AGENT-phase override, same as the control arm -- the task's own
+    # [agent] timeout_sec governs. This arm's session-start cost is mitigated
+    # by install()'s cache pre-warm plus the self-check that asserts it; that
+    # is a mitigation, not a proof of zero cost.
+
+    # NO exclude_logs, for the same reason as the control arm -- and here it is
+    # load-bearing rather than merely tidy: opencode's log under XDG_DATA_HOME
+    # carries the "AKM CLI resolved" line that this arm's
+    # populate_context_post_run() requires. Excluding "opencode/xdg-data/**"
+    # would turn every treatment trial into an error on a non-mounted
+    # environment. See docs/harbor-p0.md section 4.
+
+    # Operator escape hatch. Values here reach the container as a Trial scoped
+    # exec-env overlay, which BaseEnvironment._merge_env applies LAST -- so
+    # anything set here overrides the class's AKM_ENV defaults. Left empty
+    # because the defaults are already the benchmark-correct ones; uncomment to
+    # flip a kill switch without editing Python.
+    env: {}
+      # AKM_AUTO_CURATE: "0"
+      # AKM_AUTO_HINTS: "0"
+
+# >>> EDIT ME <<<
+# ONE task. `path` is relative to the working directory you run harbor from.
+#
+# The easiest starting point is harbor's own example task set: clone the harbor
+# repo and point `path` at its `examples/tasks`, which contains `hello-world`.
+# That task is trivial, so treat a green P0 as "the plumbing works and the model
+# can reach akm_* tools", never as evidence that akm helps.
+#
+# A task that actually rewards recall from the seeded library is the natural
+# next step, and picking one is an open decision (see harbor/seed-library/
+# README.md).
+datasets:
+  - path: /home/founder3/code/github/harbor-src/examples/tasks
+    task_names:
+      - hello-world

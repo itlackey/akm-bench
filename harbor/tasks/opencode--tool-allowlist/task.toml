@@ -1,0 +1,34 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/opencode--tool-allowlist"
+version = "1.0.0"
+description = "Restrict opencode tools to bash, edit, read"
+authors = []
+keywords = []
+
+[metadata]
+legacy_task_id = "opencode/tool-allowlist"
+domain = "opencode"
+slice = "train"
+difficulty = "medium"
+stash = "multi-domain"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "skills/opencode"
+gold_ref_legacy = "skill:opencode"
+memory_ability = "procedural_lookup"
+task_family = "opencode/config-basics"
+akm_keywords = "opencode tool allowlist restrict config"
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "multi-domain"

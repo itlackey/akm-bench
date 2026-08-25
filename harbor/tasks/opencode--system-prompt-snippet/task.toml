@@ -1,0 +1,34 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/opencode--system-prompt-snippet"
+version = "1.0.0"
+description = "Author a system.txt snippet that records akm feedback after asset use"
+authors = []
+keywords = []
+
+[metadata]
+legacy_task_id = "opencode/system-prompt-snippet"
+domain = "opencode"
+slice = "train"
+difficulty = "easy"
+stash = "multi-domain"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "skills/opencode"
+gold_ref_legacy = "skill:opencode"
+memory_ability = "procedural_lookup"
+task_family = "opencode/config-basics"
+akm_keywords = "opencode system prompt akm feedback"
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "multi-domain"

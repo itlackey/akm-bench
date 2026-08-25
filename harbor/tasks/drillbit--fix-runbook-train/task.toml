@@ -1,0 +1,35 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/drillbit--fix-runbook-train"
+version = "1.0.0"
+description = "Repair a stale drillbit provision command in an existing runbook"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+domain = "drillbit"
+slice = "train"
+difficulty = "easy"
+stash = "drillbit"
+budget_tokens = 25000
+budget_wall_ms = 360000
+gold_ref = "skills/drillbit"
+gold_ref_legacy = "skill:drillbit"
+memory_ability = "procedural_lookup"
+task_family = "drillbit/provision"
+akm_keywords = "drillbit provision tier region edge cluster"
+notes = "Authored (not converted from the legacy corpus) for issue #6: the only edit-shaped drillbit task, so that task SHAPE (pre-existing artifact to modify vs. artifact created from nothing) is no longer perfectly correlated with tool FAMILY. The correct spellings (--tier, not --type; az-west, not a cloud-provider region name) are documented only in harbor/stashes/drillbit."
+
+[verifier]
+timeout_sec = 1080.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "drillbit"

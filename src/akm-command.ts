@@ -31,7 +31,11 @@ export function resolveAkmRuntime(): ResolvedAkmRuntime {
   const override = process.env.AKM_BENCH_AKM_BIN?.trim();
   if (override) {
     if (fs.existsSync(override)) return resolveFileRuntime(override);
-    return { command: [override], binPath: override, ...(path.isAbsolute(override) ? { binDir: path.dirname(override) } : {}) };
+    return {
+      command: [override],
+      binPath: override,
+      ...(path.isAbsolute(override) ? { binDir: path.dirname(override) } : {}),
+    };
   }
   if (fs.existsSync(LOCAL_AKM_BIN)) {
     return resolveFileRuntime(LOCAL_AKM_BIN);
