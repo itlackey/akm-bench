@@ -200,20 +200,52 @@ AKM_TASK_STASH = "<stash>"
   belongs in the agent layer (`harbor/akm_opencode.py`'s `install()`, or
   the baseline `OpenCode` agent's own config handling) or in job config, not
   in a per-task `workdir` override.
-  **Update — the risk is now confirmed, not hypothetical, and one of the 5
-  is fixed.** Reproduced against opencode 1.18.11: a real `opencode run` in a
-  directory holding `opencode.json` loads that file as its own project config,
-  applies it to the session, and rewrites it with a
-  `"$schema": "https://opencode.ai/config.json"` line before the model's first
-  turn. `opencode--opencode-config-model` was the one task whose *graded*
-  artifact sat at `/app/opencode.json`, so the agent under test was mutating
-  the thing being scored; its fixture, instruction, README, solution and
-  verifier now use `config/opencode.json` instead (opencode's discovery is a
-  `findUp` from cwd and never descends, so a subdirectory is out of reach).
+  **Update — the risk is confirmed, not hypothetical, and all 5 tasks are now
+  fixed.** Reproduced against opencode 1.18.11 and re-confirmed against the
+  pinned 1.18.21: a real `opencode run` in a directory holding `opencode.json`
+  loads that file as its own project config, applies it to the session, and
+  rewrites it with a `"$schema": "https://opencode.ai/config.json"` line before
+  the model's first turn. In all 5 tasks the *graded* artifact sat at
+  `/app/opencode.json`, so the agent under test was reading — and applying —
+  the thing it was being scored on. Three of the five were worse than a
+  rewrite, at 1.18.21:
+
+  | task | what the graded answer did to the agent |
+  | --- | --- |
+  | `opencode--tool-allowlist` | `tools` as an ARRAY is invalid against opencode's own `Record<string, boolean>` schema → `Configuration is invalid … Expected object \| undefined`, opencode exits 1 and never starts |
+  | `workflow-compliance--repeated-fail-opencode-disable-provider` | `"openai": false` → `Configuration is invalid … Expected ProviderConfig, got false`, opencode exits 1 and never starts |
+  | `workflow-compliance--repeated-fail-opencode-provider-token-{train,eval}` | `provider.anthropic.options.apiKey` HIJACKS the agent's own credential: the outbound request carried the fixture's `{env:ANTHROPIC_API_KEY}` value instead of the agent's configured key |
+  | `opencode--opencode-config-model` | the fixture's bogus model was applied to the agent's own session |
+
+  Each task's fixture, instruction, README, solution and verifier now use
+  `config/opencode.json` (opencode's discovery is a `findUp` from cwd and never
+  descends, so a subdirectory is out of reach). Where the graded file is
+  *created* rather than shipped, the task Dockerfile pre-creates `/app/config`
+  so the move costs the agent no step the original task did not ask for.
   `workdir` stays `/app` — the fix is the artifact's path, not the convention.
-  The other 4 tasks are unchanged and still carry the risk in its original
-  form; see `harbor/tasks/opencode--opencode-config-model/tests/verify.sh` for
-  the full rationale and the evidence.
+  What each task measures is unchanged: same literals, same checks, same
+  `expected_workflows`. Each task's own `tests/verify.sh` carries the full
+  rationale and the per-task evidence.
+  **Second, separate defect — same cause, different opencode subsystem:
+  project INSTRUCTION files.** `OPENCODE_DISABLE_PROJECT_CONFIG` does not
+  cover this one, because the file is loaded as instructions, not as config.
+  opencode's `Instruction.systemPaths` walks UP from cwd over the names
+  `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md` (`findUp(name, directory,
+  worktree)`) and splices whatever it finds VERBATIM into the system prompt
+  of the agent under test, prefixed `Instructions from: <path>`. Two eval
+  tasks graded an artifact at `/app/AGENTS.md`
+  (`opencode--agents-md-akm-snippet`, `opencode--select-correct-skill`), so
+  the model's own graded output became the model's own instructions mid-trial
+  — a feedback loop, strictly worse than the config rewrite above. Both now
+  grade `agent-guidance.md`; no other filename is matched, and the graded file
+  stays at the workspace root so the rename costs the agent no step.
+  Verified in a container at the pinned `opencode-ai@1.18.21` against a
+  listener that logged the outbound request body: the same marker content at
+  `AGENTS.md`/`CLAUDE.md`/`CONTEXT.md` appeared in the system prompt, while at
+  `agent-guidance.md` (and at `docs/AGENTS.md`) the request was byte-identical
+  to the no-instruction-file baseline. Full rationale and evidence live in
+  `harbor/tasks/opencode--agents-md-akm-snippet/tests/verify.sh` and
+  `harbor/tasks/opencode--select-correct-skill/tests/test_select_skill.py`.
 - **`[environment.env].AKM_TASK_STASH`**: the legacy task.yaml `stash:`
   value, verbatim — must equal a directory name under `harbor/stashes/`.
   This is the entire cross-workflow contract with `AkmOpenCode`; get the
@@ -265,8 +297,11 @@ drop a bare `.gitkeep` placeholder (only the `_example` fixture has one — a
 real task's `workspace/` always has real content) and drop
 `workspace/AGENTS.md` (see §3 — that file is legacy akm-arm scaffolding,
 never task content, and shipping it would let the agent read akm-specific
-hints Harbor never intended to expose uniformly). If, after those two
-exclusions, `environment/workspace/` would be empty, delete the directory
+hints Harbor never intended to expose uniformly; in the two opencode
+fixtures whose graded deliverable IS that file it now ships as
+`workspace/agent-guidance.md` — see §1's instruction-file note — and must be
+dropped just the same). If, after those two exclusions,
+`environment/workspace/` would be empty, delete the directory
 entirely and drop the `COPY workspace/ /app/` line from the Dockerfile (this
 guide's worked example is the only task in the corpus where that applies).
 
@@ -293,7 +328,7 @@ known instances as of this writing:
 | --- | --- |
 | `inkwell/full-config/tests/test_full_config.py` | `SERVICE = pathlib.Path(__file__).parent.parent / "workspace" / "service.yaml"` → `SERVICE = pathlib.Path("service.yaml")` |
 | `inkwell/workflow-configure-scaling/tests/test_workflow_scaling.py` | same fix, same variable |
-| `opencode/select-correct-skill/tests/test_select_skill.py` | `AGENTS = pathlib.Path(__file__).parent.parent / "workspace" / "AGENTS.md"` → `AGENTS = pathlib.Path("AGENTS.md")` |
+| `opencode/select-correct-skill/tests/test_select_skill.py` | `AGENTS = pathlib.Path(__file__).parent.parent / "workspace" / "agent-guidance.md"` → `AGENTS = pathlib.Path("agent-guidance.md")` |
 
 This is a silent-failure trap, not a loud one: the unfixed test raises
 `FileNotFoundError` (or resolves to a nonexistent `/workspace/...` path) and
@@ -369,7 +404,7 @@ Required workflow (for reproducibility):
 2. Run `akm show skill:opencode`.                                             [STRIP — solving method]
 3. Then edit files.
 
-Update `opencode.json` to satisfy these constraints:                          [KEEP — deliverable spec]
+Update `config/opencode.json` to satisfy these constraints:                   [KEEP — deliverable spec]
 - set `model` to the anthropic default model required for this
   provider-token train variant,
 - ensure a `provider` object exists,
@@ -1057,8 +1092,9 @@ unfailable task into an unpassable one.
 
 `workflow-compliance--repeated-fail-opencode-disable-provider` is the **only**
 task in the corpus whose `environment/workspace/` content was *authored* rather
-than ported. It now ships a starting `opencode.json` that is deliberately not a
-passing state but from which every value the verifier checks is derivable:
+than ported. It now ships a starting `config/opencode.json` that is
+deliberately not a passing state but from which every value the verifier
+checks is derivable:
 
 - the `model` string — the file declares provider `shredder` with a single
   entry under `models`, and the `noisy` stash's opencode skill states that
@@ -1084,7 +1120,10 @@ intermediate conversion passes:
 
 1. **`workspace/AGENTS.md` files (5 tasks)** — pure akm-arm scaffolding ("You
    MUST run `akm search` before attempting the task"). **Dropped entirely** for
-   arm neutrality.
+   arm neutrality. (In `opencode/agents-md-akm-snippet` and
+   `opencode/select-correct-skill` that legacy file is also the task's own
+   graded deliverable, and is now named `workspace/agent-guidance.md` — see
+   §1's instruction-file note. It is still dropped.)
 2. **`Use \`akm search ...\`` hint lines and retired-grammar commands
    (`akm show skill:inkwell`, `akm workflow next 'workflow:...'`) in READMEs
    (12 lines across docker-homelab and inkwell)** — **deleted, not rewritten.**

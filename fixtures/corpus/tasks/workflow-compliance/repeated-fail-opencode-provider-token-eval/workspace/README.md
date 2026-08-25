@@ -12,7 +12,7 @@ Required workflow (for reproducibility):
 2. Run `akm show skill:opencode`.
 3. Then edit files.
 
-Update `opencode.json` to satisfy these constraints:
+Update `config/opencode.json` to satisfy these constraints:
 
 - set `model` to the anthropic default model required for this provider-token eval variant,
 - ensure a `provider` object exists,

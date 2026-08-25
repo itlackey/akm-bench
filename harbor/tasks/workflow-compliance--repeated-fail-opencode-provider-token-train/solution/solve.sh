@@ -1,6 +1,9 @@
 #!/bin/bash
+# Path note: the graded file is config/opencode.json, NOT ./opencode.json.
+# See tests/verify.sh for why -- do not "tidy" it back to the workspace root.
 set -euo pipefail
-cat > opencode.json <<'JSON'
+mkdir -p config
+cat > config/opencode.json <<'JSON'
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "anthropic/claude-opus-4-7",

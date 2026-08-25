@@ -1,6 +1,6 @@
 Your working directory is `/app`.
 
-Update `opencode.json` to satisfy these constraints:
+Update `config/opencode.json` to satisfy these constraints:
 
 - set `model` to the anthropic default model required for this
   provider-token eval variant,

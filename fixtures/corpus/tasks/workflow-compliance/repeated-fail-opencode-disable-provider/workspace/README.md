@@ -12,7 +12,7 @@ Required workflow (for reproducibility):
 2. Run `akm show skill:opencode`.
 3. Then edit files.
 
-Update `opencode.json` to satisfy these constraints:
+Update `config/opencode.json` to satisfy these constraints:
 
 - set `model` to the shredder default model required for this disable-provider variant,
 - ensure a `provider` object exists,
