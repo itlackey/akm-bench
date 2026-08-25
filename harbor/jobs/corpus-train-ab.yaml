@@ -272,7 +272,7 @@ datasets:
     # THE LEAK. akm-opencode ships a format-declaration write gate: on the
     # first edit to a file whose format the stash documents, it blocks the
     # edit and names the exact stash ref to akm_show. This task's
-    # environment/workspace/opencode.json carries
+    # environment/workspace/config/opencode.json carries
     #     "$schema": "https://opencode.ai/config.json"
     # so the gate's extractor yields the token `opencode`; the task declares
     # stash = "noisy" and gold_ref = "skills/opencode", and

@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY workspace/ /app/
 
-# NOTE: the legacy fixture's workspace/opencode.json and workspace/prep-note.txt
+# NOTE: the legacy fixture's workspace config/opencode.json and prep-note.txt
 # already contained the exact values this task's verifier requires -- i.e. the
 # starting workspace already satisfied tests/verify.sh with zero agent action
 # (confirmed by running verify.sh against the pristine legacy workspace: exit 0),
@@ -15,7 +15,7 @@ COPY workspace/ /app/
 # `noisy` stash (grep -r shredder harbor/stashes/noisy -> no hits). Only the
 # oracle solve.sh knew it, so every real trial in both arms would score 0.
 #
-# This conversion therefore ships a SEEDED opencode.json that is deliberately
+# This conversion therefore ships a SEEDED config/opencode.json that is deliberately
 # NOT a passing state (pristine workspace -> reward 0) but from which every
 # value verify.sh checks is derivable:
 #   - "model": the file declares provider `shredder` with a single entry under
@@ -32,3 +32,8 @@ COPY workspace/ /app/
 #
 # This is the one task in the conversion whose environment content was authored
 # rather than ported. See docs/corpus-conversion.md "Seeded-workspace exception".
+
+# Path note: the graded config is /app/config/opencode.json, NOT
+# /app/opencode.json -- the latter is the path opencode claims as its OWN
+# project config, and this task's answer (`"openai": false`) makes opencode
+# refuse to start when it sits there. tests/verify.sh carries the evidence.

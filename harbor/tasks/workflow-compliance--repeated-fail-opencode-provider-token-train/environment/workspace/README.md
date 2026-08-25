@@ -1,6 +1,6 @@
 # Task: Set opencode provider env token and model for anthropic
 
-Update `opencode.json` to satisfy these constraints:
+Update `config/opencode.json` to satisfy these constraints:
 
 - set `model` to the anthropic default model required for this
   provider-token train variant,
