@@ -1,20 +1,21 @@
-# Corpus A/B: the 19-task eval slice, baseline vs akm-static.
+# Corpus A/B: the 28-task train slice, baseline vs akm-static.
 #
-# This is the run that can actually test whether akm HELPS, as opposed to
-# whether the plumbing works (that is p0-corpus.yaml). The slice's drillbit--*
-# and inkwell--* families name FICTIONAL tools whose syntax exists only in the
-# per-task stash, so a baseline arm has to invent it; the workflow-compliance--*
-# families deliberately test the opposite reflex (a `noisy` stash full of
-# plausible-but-wrong material, or a `minimal` stash with no answer at all),
-# where NOT reaching for akm is the correct behaviour. Read the per-task
-# engagement breakdown in the analysis report before reading any aggregate:
-# those two families should not be expected to move in the same direction.
+# The train counterpart of corpus-eval-ab.yaml, and identical to it in every
+# field except `job_name` and the task list below -- the two arms, their
+# pins, their permission blocks and their budgets are deliberately kept
+# byte-identical across the two files so a train result and an eval result
+# differ only in which tasks ran. This slice is where tuning decisions are
+# made; keep the eval slice for the number you report.
 #
-#   PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/corpus-eval-ab.yaml
+# The train slice is 29 tasks in `akm-tasks-train` (harbor/registry.json);
+# this file runs 28. See the MEASUREMENT EXCLUSION block above
+# `exclude_task_names` for the one that is barred and why.
+#
+#   PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/corpus-train-ab.yaml
 #
 # >>> EDIT ME <<< both model_name values (they MUST match) before running.
 #
-job_name: akm-corpus-eval-ab
+job_name: akm-corpus-train-ab
 
 # Where trial directories are written, relative to the working directory.
 # Results land in <jobs_dir>/<job_name>/<trial>/ -- trial dirs are DIRECT
@@ -229,59 +230,87 @@ agents:
       # AKM_AUTO_HINTS: "0"
 
 # >>> EDIT ME <<<
-# ONE task. `path` is relative to the working directory you run harbor from.
-#
-# The easiest starting point is harbor's own example task set: clone the harbor
-# repo and point `path` at its `examples/tasks`, which contains `hello-world`.
-# That task is trivial, so treat a green P0 as "the plumbing works and the model
-# can reach akm_* tools", never as evidence that akm helps.
-#
-# A task that actually rewards recall from the seeded library is the natural
-# next step, and picking one is an open decision (see harbor/seed-library/
-# README.md).
+# The train slice, listed by name so this file -- not a directory scan and not
+# a registry lookup -- is the source of truth for what a train A/B runs.
+# `path` is relative to the working directory you run harbor from.
 datasets:
   - path: harbor/tasks
     task_names:
-      - drillbit--backup-policy
-      - drillbit--canary-enable
-      - drillbit--provision-edge
-      - drillbit--rotate-secret
-      - drillbit--scale-replicas
-      - inkwell--add-healthcheck
-      - inkwell--configure-scaling
-      - inkwell--cpu-scaling
-      - inkwell--full-config
-      - inkwell--new-service
-      - inkwell--set-rate-limit
-      - inkwell--workflow-configure-scaling
-      - opencode--agents-md-akm-snippet
-      - opencode--provider-akm-feedback
-      - opencode--select-correct-skill
-      - workflow-compliance--abstention-rust-async-haiku
-      - workflow-compliance--distractor-docker-port-publish
-      - workflow-compliance--repeated-fail-opencode-provider-token-eval
-      - workflow-compliance--repeated-fail-storage-lifecycle-eval
+      - reference--example-task
+      - az-cli--aks-get-credentials
+      - az-cli--assign-managed-identity
+      - az-cli--create-resource-group
+      - az-cli--keyvault-secret-set
+      - az-cli--query-by-tag
+      - az-cli--storage-account-create
+      - docker-homelab--bridge-network
+      - docker-homelab--compose-version-upgrade
+      - docker-homelab--env-from-file
+      - docker-homelab--named-volume
+      - docker-homelab--redis-healthcheck
+      - docker-homelab--restart-policy
+      - drillbit--backup-policy-train
+      - drillbit--scale-replicas-train
+      - drillbit--fix-runbook-train
+      - inkwell--add-healthcheck-train
+      - inkwell--new-service-train
+      - inkwell--new-service-scaled-train
+      - opencode--opencode-config-model
+      - opencode--system-prompt-snippet
+      - opencode--tool-allowlist
+      - workflow-compliance--feedback-trap-az-tag-list
+      - workflow-compliance--feedback-trap-docker-compose-render
+      - workflow-compliance--repeated-fail-opencode-provider-token-train
+      - workflow-compliance--repeated-fail-storage-lifecycle-a
+      - workflow-compliance--repeated-fail-storage-lifecycle-b
+      - workflow-compliance--tempting-shortcut-arithmetic
     # ------------------------------------------------- MEASUREMENT EXCLUSION
-    # workflow-compliance--repeated-fail-opencode-disable-provider is a TRAIN
-    # task, so it is already absent from the 19 names above. The bar is stated
-    # here anyway because Harbor applies exclude_task_names AFTER task_names
-    # (harbor/models/job/config.py:_filter_task_ids), so it survives that list
-    # being regenerated from a registry slice or widened to a glob.
+    # workflow-compliance--repeated-fail-opencode-disable-provider
+    # is in the `akm-tasks-train` registry slice (29 tasks) but is barred from
+    # every A/B arm comparison, here and in corpus-eval-ab.yaml.
     #
-    # THE LEAK, in short: akm-opencode's format-declaration write gate reads
-    # the `"$schema": "https://opencode.ai/config.json"` in that task's
-    # environment/workspace/opencode.json, resolves it against the task's own
-    # stash = "noisy", and hands the model `skills/opencode` -- which is that
-    # task's gold_ref -- unasked. The task exists to measure whether the model
-    # CHOOSES to look that asset up (expected_workflows =
-    # ["akm-lookup-before-edit", ...]), and the gate exists only on the akm
-    # arm, so the pass would accrue to the treatment arm from the harness
-    # rather than from the model. Full write-up, including the sweep of all 74
-    # workspace files that found no other affected task, is in
-    # harbor/jobs/corpus-train-ab.yaml at the same block.
+    # THE LEAK. akm-opencode ships a format-declaration write gate: on the
+    # first edit to a file whose format the stash documents, it blocks the
+    # edit and names the exact stash ref to akm_show. This task's
+    # environment/workspace/opencode.json carries
+    #     "$schema": "https://opencode.ai/config.json"
+    # so the gate's extractor yields the token `opencode`; the task declares
+    # stash = "noisy" and gold_ref = "skills/opencode", and
+    # harbor/stashes/noisy/skills/opencode exists -- so the ref resolves and
+    # the gate hands the model `skills/opencode` unasked.
     #
-    # This is a MEASUREMENT decision, not a broken task: the task, its verifier
-    # and its stash are correct and unmodified, and it still runs and scores
-    # normally under the oracle and nop agents and in any single-arm run.
+    # WHY THAT MATTERS HERE AND NOWHERE ELSE. This task exists specifically to
+    # measure whether the model CHOOSES to look the asset up: instruction.md
+    # requires it to write `akm-show-ref: skill:opencode`, and task.toml sets
+    # expected_workflows = ["akm-lookup-before-edit", ...]. The gate makes that
+    # choice for it, so the observation stops being an observation of the
+    # model. A sweep of all 74 files under harbor/tasks/*/environment/workspace
+    # found exactly 8 that declare a schema authority ($schema, apiVersion/kind
+    # or a yaml-language-server comment): the seven inkwell service.yaml
+    # (apiVersion: inkwell/v2) and this one. The inkwell tasks are scored on
+    # whether the edit is correct, not on akm-lookup-before-edit, so the gate
+    # firing there IS the mechanism under test doing its job. This is the only
+    # task in the corpus whose declared schema token resolves to its own
+    # gold_ref while its score also counts akm-lookup-before-edit.
+    #
+    # IT IS TREATMENT-ONLY. The gate exists only on the akm arm; the control
+    # arm has no plugin and gets nothing. So the adherence pass would accrue to
+    # one arm from the harness rather than from the model -- an arm-asymmetric
+    # confound, not a result.
+    #
+    # THIS IS A MEASUREMENT DECISION, NOT A BROKEN TASK. The task, its verifier
+    # and its stash are correct and were not modified. It still runs and scores
+    # normally under the oracle and nop agents, and under any single-arm run
+    # (`harbor run -p harbor/tasks ...`, or `--registry-path
+    # harbor/registry.json -d akm-tasks-train@1.0`, which still resolves all 29
+    # -- the published slice was deliberately left intact, see
+    # harbor/registry.json). Firing on a real user's opencode.json is correct
+    # product behaviour, so this is fixed benchmark-side rather than by making
+    # the plugin benchmark-aware.
+    #
+    # Belt-and-braces with the omission from the list above: Harbor applies
+    # exclude_task_names AFTER task_names
+    # (harbor/models/job/config.py:_filter_task_ids), so the bar holds even if
+    # that list is ever regenerated from the registry slice.
     exclude_task_names:
       - workflow-compliance--repeated-fail-opencode-disable-provider
