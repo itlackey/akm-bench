@@ -123,7 +123,7 @@ AKM_CLI_VERSION = "0.9.1"
 #: akm-opencode plugin npm version. Pinned exactly (never a bare package name):
 #: a bare name resolves ``latest`` at every session start, which is both
 #: unpinnable and changes opencode's plugin cache directory name.
-AKM_PLUGIN_VERSION = "0.9.1202608242057"
+AKM_PLUGIN_VERSION = "0.9.1202608250804"
 
 AKM_CLI_SPEC = f"akm-cli@{AKM_CLI_VERSION}"
 AKM_PLUGIN_SPEC = f"akm-opencode@{AKM_PLUGIN_VERSION}"
@@ -1710,7 +1710,7 @@ class AkmOpenCode(OpenCode):
         whose PROJECT ROOT is the directory holding that ``package.json``.
         Confirmed with a real, live install against the published
         akm-opencode tarball: a fresh
-        ``npm install akm-opencode@0.9.1202608242057`` run in a directory
+        ``npm install akm-opencode@0.9.1202608250804`` run in a directory
         pre-seeded with ``{"overrides": {"akm-cli": "0.9.0"}}`` installed
         ``akm-cli@0.9.0`` into that directory's ``node_modules`` -- where the
         identical install with no overrides file resolves
