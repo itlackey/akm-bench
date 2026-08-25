@@ -409,7 +409,7 @@ agents:
 #     dataset selection without editing it -- useful for a quick smoke run,
 #     but the selection then lives on a command line instead of in version
 #     control
-# swebench-ab.yaml's version of this warning is worse (500 tasks, not 89) --
+# (An equivalent SWE-bench config was removed -- see below.)
 # read it too before running both in the same budget cycle.
 
 datasets:

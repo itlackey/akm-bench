@@ -218,7 +218,7 @@ agents:
       # The D6 treatment library, not the smoke fixture: this task is an
       # akm-relevant corpus task, so the arm must carry the library the corpus
       # was authored against. Relative to the process working directory, same
-      # as tb2-ab.yaml / swebench-ab.yaml.
+      # as tb2-ab.yaml.
       seed_library_dir: harbor/treatment-library
 
     # Required. opencode installs npm plugins at SESSION START, i.e. during

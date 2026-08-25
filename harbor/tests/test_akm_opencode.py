@@ -2418,7 +2418,7 @@ def test_overrides_manifest_is_valid_json_pinning_the_akm_cli_version(agent):
 
 
 # --------------------------------------------------------------------------
-# The three-arm A/B job configs (tb2-ab.yaml, swebench-ab.yaml)
+# The three-arm A/B job config (tb2-ab.yaml)
 #
 # Everything above this section that starts with `test_job_config_` reads
 # JOB_CONFIG_PATH == harbor/jobs/p0-smoke.yaml ONLY. Neither of the two
@@ -2435,7 +2435,6 @@ def test_overrides_manifest_is_valid_json_pinning_the_akm_cli_version(agent):
 
 AB_JOB_CONFIG_PATHS = {
     "tb2-ab": REPO_ROOT / "harbor" / "jobs" / "tb2-ab.yaml",
-    "swebench-ab": REPO_ROOT / "harbor" / "jobs" / "swebench-ab.yaml",
 }
 
 
