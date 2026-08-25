@@ -3,7 +3,7 @@ schema_version = "1.4"
 [task]
 name = "akm-bench/opencode--agents-md-akm-snippet"
 version = "1.0.0"
-description = "Write AGENTS.md telling the agent to akm search before coding"
+description = "Write agent-guidance.md telling the agent to akm search before coding"
 authors = []
 keywords = []
 

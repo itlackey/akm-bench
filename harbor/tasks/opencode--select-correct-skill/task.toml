@@ -3,7 +3,7 @@ schema_version = "1.4"
 [task]
 name = "akm-bench/opencode--select-correct-skill"
 version = "1.0.0"
-description = "Add the correct akm search snippet to AGENTS.md without docker guidance"
+description = "Add the correct akm search snippet to agent-guidance.md without docker guidance"
 authors = []
 keywords = []
 
