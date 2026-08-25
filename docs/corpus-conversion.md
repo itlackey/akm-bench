@@ -200,6 +200,20 @@ AKM_TASK_STASH = "<stash>"
   belongs in the agent layer (`harbor/akm_opencode.py`'s `install()`, or
   the baseline `OpenCode` agent's own config handling) or in job config, not
   in a per-task `workdir` override.
+  **Update — the risk is now confirmed, not hypothetical, and one of the 5
+  is fixed.** Reproduced against opencode 1.18.11: a real `opencode run` in a
+  directory holding `opencode.json` loads that file as its own project config,
+  applies it to the session, and rewrites it with a
+  `"$schema": "https://opencode.ai/config.json"` line before the model's first
+  turn. `opencode--opencode-config-model` was the one task whose *graded*
+  artifact sat at `/app/opencode.json`, so the agent under test was mutating
+  the thing being scored; its fixture, instruction, README, solution and
+  verifier now use `config/opencode.json` instead (opencode's discovery is a
+  `findUp` from cwd and never descends, so a subdirectory is out of reach).
+  `workdir` stays `/app` — the fix is the artifact's path, not the convention.
+  The other 4 tasks are unchanged and still carry the risk in its original
+  form; see `harbor/tasks/opencode--opencode-config-model/tests/verify.sh` for
+  the full rationale and the evidence.
 - **`[environment.env].AKM_TASK_STASH`**: the legacy task.yaml `stash:`
   value, verbatim — must equal a directory name under `harbor/stashes/`.
   This is the entire cross-workflow contract with `AkmOpenCode`; get the
