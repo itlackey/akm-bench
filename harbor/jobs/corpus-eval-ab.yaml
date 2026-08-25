@@ -270,10 +270,10 @@ datasets:
     #
     # THE LEAK, in short: akm-opencode's format-declaration write gate reads
     # the `"$schema": "https://opencode.ai/config.json"` in that task's
-    # environment/workspace/opencode.json, resolves it against the task's own
-    # stash = "noisy", and hands the model `skills/opencode` -- which is that
-    # task's gold_ref -- unasked. The task exists to measure whether the model
-    # CHOOSES to look that asset up (expected_workflows =
+    # environment/workspace/config/opencode.json, resolves it against the
+    # task's own stash = "noisy", and hands the model `skills/opencode` --
+    # which is that task's gold_ref -- unasked. The task exists to measure
+    # whether the model CHOOSES to look that asset up (expected_workflows =
     # ["akm-lookup-before-edit", ...]), and the gate exists only on the akm
     # arm, so the pass would accrue to the treatment arm from the harness
     # rather than from the model. Full write-up, including the sweep of all 74

@@ -1,6 +1,6 @@
 # Task: set shredder as default and disable openai provider
 
-Update `opencode.json` to satisfy these constraints:
+Update `config/opencode.json` to satisfy these constraints:
 
 - set `model` to the shredder default model required for this
   disable-provider variant,
@@ -20,5 +20,5 @@ Then add two provenance lines in `prep-note.txt`:
 - `akm-search-query: opencode config`
 - `akm-show-ref: skill:opencode`
 
-Keep any existing unrelated keys in `opencode.json` unchanged. Do not run
-opencode.
+Keep any existing unrelated keys in `config/opencode.json` unchanged. Do
+not run opencode.

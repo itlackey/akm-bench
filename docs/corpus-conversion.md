@@ -200,20 +200,32 @@ AKM_TASK_STASH = "<stash>"
   belongs in the agent layer (`harbor/akm_opencode.py`'s `install()`, or
   the baseline `OpenCode` agent's own config handling) or in job config, not
   in a per-task `workdir` override.
-  **Update — the risk is now confirmed, not hypothetical, and one of the 5
-  is fixed.** Reproduced against opencode 1.18.11: a real `opencode run` in a
-  directory holding `opencode.json` loads that file as its own project config,
-  applies it to the session, and rewrites it with a
-  `"$schema": "https://opencode.ai/config.json"` line before the model's first
-  turn. `opencode--opencode-config-model` was the one task whose *graded*
-  artifact sat at `/app/opencode.json`, so the agent under test was mutating
-  the thing being scored; its fixture, instruction, README, solution and
-  verifier now use `config/opencode.json` instead (opencode's discovery is a
-  `findUp` from cwd and never descends, so a subdirectory is out of reach).
+  **Update — the risk is confirmed, not hypothetical, and all 5 tasks are now
+  fixed.** Reproduced against opencode 1.18.11 and re-confirmed against the
+  pinned 1.18.21: a real `opencode run` in a directory holding `opencode.json`
+  loads that file as its own project config, applies it to the session, and
+  rewrites it with a `"$schema": "https://opencode.ai/config.json"` line before
+  the model's first turn. In all 5 tasks the *graded* artifact sat at
+  `/app/opencode.json`, so the agent under test was reading — and applying —
+  the thing it was being scored on. Three of the five were worse than a
+  rewrite, at 1.18.21:
+
+  | task | what the graded answer did to the agent |
+  | --- | --- |
+  | `opencode--tool-allowlist` | `tools` as an ARRAY is invalid against opencode's own `Record<string, boolean>` schema → `Configuration is invalid … Expected object \| undefined`, opencode exits 1 and never starts |
+  | `workflow-compliance--repeated-fail-opencode-disable-provider` | `"openai": false` → `Configuration is invalid … Expected ProviderConfig, got false`, opencode exits 1 and never starts |
+  | `workflow-compliance--repeated-fail-opencode-provider-token-{train,eval}` | `provider.anthropic.options.apiKey` HIJACKS the agent's own credential: the outbound request carried the fixture's `{env:ANTHROPIC_API_KEY}` value instead of the agent's configured key |
+  | `opencode--opencode-config-model` | the fixture's bogus model was applied to the agent's own session |
+
+  Each task's fixture, instruction, README, solution and verifier now use
+  `config/opencode.json` (opencode's discovery is a `findUp` from cwd and never
+  descends, so a subdirectory is out of reach). Where the graded file is
+  *created* rather than shipped, the task Dockerfile pre-creates `/app/config`
+  so the move costs the agent no step the original task did not ask for.
   `workdir` stays `/app` — the fix is the artifact's path, not the convention.
-  The other 4 tasks are unchanged and still carry the risk in its original
-  form; see `harbor/tasks/opencode--opencode-config-model/tests/verify.sh` for
-  the full rationale and the evidence.
+  What each task measures is unchanged: same literals, same checks, same
+  `expected_workflows`. Each task's own `tests/verify.sh` carries the full
+  rationale and the per-task evidence.
 - **`[environment.env].AKM_TASK_STASH`**: the legacy task.yaml `stash:`
   value, verbatim — must equal a directory name under `harbor/stashes/`.
   This is the entire cross-workflow contract with `AkmOpenCode`; get the
@@ -369,7 +381,7 @@ Required workflow (for reproducibility):
 2. Run `akm show skill:opencode`.                                             [STRIP — solving method]
 3. Then edit files.
 
-Update `opencode.json` to satisfy these constraints:                          [KEEP — deliverable spec]
+Update `config/opencode.json` to satisfy these constraints:                   [KEEP — deliverable spec]
 - set `model` to the anthropic default model required for this
   provider-token train variant,
 - ensure a `provider` object exists,
@@ -1057,8 +1069,9 @@ unfailable task into an unpassable one.
 
 `workflow-compliance--repeated-fail-opencode-disable-provider` is the **only**
 task in the corpus whose `environment/workspace/` content was *authored* rather
-than ported. It now ships a starting `opencode.json` that is deliberately not a
-passing state but from which every value the verifier checks is derivable:
+than ported. It now ships a starting `config/opencode.json` that is
+deliberately not a passing state but from which every value the verifier
+checks is derivable:
 
 - the `model` string — the file declares provider `shredder` with a single
   entry under `models`, and the `noisy` stash's opencode skill states that
