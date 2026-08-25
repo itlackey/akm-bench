@@ -2,7 +2,7 @@
   {
     "name": "akm-tasks-train",
     "version": "1.0",
-    "description": "akm-bench legacy corpus, train slice (29 tasks: az-cli, docker-homelab, drillbit, inkwell, opencode, workflow-compliance, plus the reference fixture task).",
+    "description": "akm-bench legacy corpus, train slice (29 tasks: az-cli, docker-homelab, drillbit, inkwell, opencode, workflow-compliance, plus the reference fixture task). MEMBERSHIP IS UNCHANGED AND ALL 29 STILL RESOLVE HERE. One member, workflow-compliance--repeated-fail-opencode-disable-provider, is barred from A/B ARM COMPARISONS ONLY, by exclude_task_names in harbor/jobs/corpus-train-ab.yaml: the akm-opencode plugin's format-declaration write gate reads the $schema in that task's workspace opencode.json and hands the model that task's own gold_ref (skills/opencode) unasked, on the treatment arm only, which is exactly the lookup the task is scored on choosing to make. The task itself is correct and unmodified and runs normally in any single-arm run of this slice; the exclusion is a measurement decision, documented in full in harbor/jobs/corpus-train-ab.yaml.",
     "tasks": [
       {
         "name": "reference--example-task",

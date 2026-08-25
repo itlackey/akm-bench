@@ -3,7 +3,7 @@ schema_version = "1.4"
 [task]
 name = "akm-bench/opencode--opencode-config-model"
 version = "1.0.0"
-description = "Pin opencode model to anthropic/claude-opus-4-7 via opencode.json"
+description = "Pin opencode model to anthropic/claude-opus-4-7 via config/opencode.json"
 authors = []
 keywords = []
 
