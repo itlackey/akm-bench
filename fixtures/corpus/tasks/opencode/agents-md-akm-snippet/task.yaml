@@ -1,5 +1,5 @@
 id: opencode/agents-md-akm-snippet
-title: "Write AGENTS.md telling the agent to akm search before coding"
+title: "Write agent-guidance.md telling the agent to akm search before coding"
 domain: opencode
 difficulty: easy
 slice: eval
