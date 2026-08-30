@@ -119,12 +119,12 @@ from harbor.models.trajectories import Trajectory
 OPENCODE_VERSION = "1.18.21"
 
 #: akm CLI npm version, installed globally so a real ``akm`` is on PATH.
-AKM_CLI_VERSION = "0.9.1"
+AKM_CLI_VERSION = "0.9.3"
 
 #: akm-opencode plugin npm version. Pinned exactly (never a bare package name):
 #: a bare name resolves ``latest`` at every session start, which is both
 #: unpinnable and changes opencode's plugin cache directory name.
-AKM_PLUGIN_VERSION = "0.9.1202608250804"
+AKM_PLUGIN_VERSION = "0.9.2202608290901"
 
 AKM_CLI_SPEC = f"akm-cli@{AKM_CLI_VERSION}"
 AKM_PLUGIN_SPEC = f"akm-opencode@{AKM_PLUGIN_VERSION}"
@@ -152,9 +152,18 @@ AKM_ACCUMULATING_ARM_NAME = f"{AKM_ARM_NAME}-accumulating"
 AKM_CLI_VERSION_PREFIX = "0.9."
 
 #: Minimum Node major. ``akm-cli``'s preinstall script hard-fails below this.
-#: Harbor's glibc path installs Node 22 via nvm, but the musl branch of
-#: ``OpenCode.install()`` takes whatever ``apk`` ships — hence the assertion.
-MIN_NODE_MAJOR = 22
+#: ``akm-cli@0.9.3``'s ``package.json`` raised its ``engines.node`` floor from
+#: ``>=22`` to ``>=24`` (verified against the published tarballs) -- above
+#: what Harbor's glibc path installs by default (nvm installs Node 22; see
+#: ``harbor.agents.installed.node_install.DEFAULT_NODE_MAJOR``, which
+#: ``OpenCode.install()`` calls with no override). ``_build_install_akm_cli_command()``
+#: therefore runs ``nvm install {MIN_NODE_MAJOR}`` itself, immediately before
+#: the akm-cli install, whenever nvm is present. The musl branch of
+#: ``OpenCode.install()`` still takes whatever ``apk`` ships and has no nvm to
+#: re-target -- for that path this constant remains only the self-check
+#: assertion below, which now correctly fails those trials loudly instead of
+#: silently degrading.
+MIN_NODE_MAJOR = 24
 
 # ---------------------------------------------------------------------------
 # Container paths
@@ -1395,6 +1404,19 @@ class AkmOpenCode(OpenCode):
         return (
             "set -euo pipefail; "
             "[ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; "
+            # Harbor's own OpenCode.install() (step 1, above) installs Node via
+            # nvm with no override hook and no knowledge of akm-cli's engine
+            # floor, so install a second nvm-managed Node here and `nvm use`
+            # (NOT `nvm alias default`) it for the rest of THIS command only.
+            # nvm's global npm installs are per-version directories, not
+            # shared, so opencode-ai (installed under step 1's Node) would
+            # vanish from PATH for every later command that sources nvm.sh --
+            # which the run() command does on every invocation -- if the
+            # DEFAULT alias moved instead of just this shell's active
+            # version. `command -v nvm` is false on musl, where there is no
+            # nvm to re-target and the assertion below is the only guard.
+            f"command -v nvm >/dev/null 2>&1 && "
+            f"{{ nvm install {MIN_NODE_MAJOR} && nvm use {MIN_NODE_MAJOR}; }} || true; "
             'NODE_MAJOR="$(node -p "process.versions.node.split(\'.\')[0]")"; '
             f'if [ "$NODE_MAJOR" -lt {MIN_NODE_MAJOR} ]; then '
             f'echo "AKM-BOOTSTRAP FATAL: node $NODE_MAJOR < {MIN_NODE_MAJOR}; '
@@ -1414,10 +1436,18 @@ class AkmOpenCode(OpenCode):
         ``|| true`` on each `command -v` is required: under ``set -e`` an
         assignment inherits the command substitution's exit status, so a plain
         `$(command -v akm)` would abort with no message at all.
+
+        This is a NEW shell, so the `nvm use MIN_NODE_MAJOR` from
+        ``_build_install_akm_cli_command()`` is gone -- sourcing nvm.sh here
+        re-activates the (untouched) DEFAULT alias, under which `akm` is not
+        on PATH at all (it was installed under MIN_NODE_MAJOR, not the
+        default). Re-issue the same `nvm use` before resolving so both
+        binaries come from the version akm-cli actually runs under.
         """
         return (
             "set -euo pipefail; "
             "[ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; "
+            f"command -v nvm >/dev/null 2>&1 && nvm use {MIN_NODE_MAJOR} >/dev/null 2>&1 || true; "
             'AKM_BIN="$(command -v akm || true)"; '
             'NODE_BIN="$(command -v node || true)"; '
             '[ -n "$AKM_BIN" ] || { echo "AKM-BOOTSTRAP FATAL: akm not found '
@@ -1454,55 +1484,82 @@ class AkmOpenCode(OpenCode):
                 )
         return found["AKM_BIN"], found["NODE_BIN"]
 
-    @staticmethod
-    def _build_link_binaries_command(akm_bin: str, node_bin: str) -> str:
-        # dist/akm is a `#!/usr/bin/env node` launcher, so `node` must be
-        # reachable too or the shebang dies whenever PATH is minimal.
-        #
+    #: First line written into the /usr/local/bin/akm wrapper (see
+    #: ``_build_link_binaries_command``), so a retried install can recognize
+    #: and safely overwrite ITS OWN prior wrapper without loosening the guard
+    #: against a task image's real pre-existing binary.
+    _AKM_WRAPPER_MARKER = "# akm-bench-managed wrapper -- see AkmOpenCode._build_link_binaries_command"
+
+    @classmethod
+    def _build_link_binaries_command(cls, akm_bin: str, node_bin: str) -> str:
         # /usr/local/bin is on the default PATH of every Harbor base image,
         # which is what lets AKM_ENV leave PATH alone — see the note there for
         # why pinning PATH on this arm only would be a confound. The final
-        # `test -x` follows the symlinks, so a dangling link fails setup here
-        # instead of degrading the plugin at run time.
+        # `test -x` follows the symlink/wrapper, so a dangling one fails setup
+        # here instead of degrading the plugin at run time.
         #
-        # Refuse to `ln -sf` OVER a pre-existing non-symlink at either target
-        # path first. `ln -sf` force-replaces whatever is already there with
-        # no check, and nothing upstream of this guarantees the task image
-        # doesn't already ship a real binary at /usr/local/bin/node (the
-        # standard nodejs base-image location for a pinned toolchain version).
-        # Silently repointing it to this arm's nvm-installed Node would
-        # change which Node runtime the agent runs under -- a confound on
-        # this arm ONLY, not the control arm, which never touches this path.
-        # A pre-existing SYMLINK is fine to replace (idempotent across a
-        # retried setup); only a real file or directory is refused.
+        # `node` is a plain symlink, same as always. `akm` is NOT: dist/akm is
+        # a `#!/usr/bin/env node` launcher, and `env` re-resolves `node`
+        # against whatever PATH is active AT INVOCATION TIME -- which, once
+        # akm-cli needed a newer Node than opencode-ai does (MIN_NODE_MAJOR >
+        # the nvm DEFAULT; see _build_install_akm_cli_command), is the
+        # OPPOSITE Node major whenever something sources nvm.sh first (every
+        # `opencode run` invocation does). A plain `ln -sf` symlink here would
+        # make the plugin's `execFileSync("akm", ...)` silently run akm-cli
+        # under the wrong Node and hit its own version gate. The wrapper
+        # hardcodes the absolute, already-resolved node_bin instead of
+        # relying on any PATH lookup, so it is correct regardless of which
+        # nvm version is active in the caller's shell.
+        #
+        # Refuse to clobber a pre-existing non-symlink, non-wrapper file at
+        # either target path first: nothing upstream guarantees the task
+        # image doesn't already ship a real binary at /usr/local/bin/node
+        # (the standard nodejs base-image location for a pinned toolchain
+        # version). Silently repointing it to this arm's nvm-installed Node
+        # would change which Node runtime the agent runs under -- a confound
+        # on this arm ONLY, not the control arm, which never touches this
+        # path. A pre-existing SYMLINK, or an akm wrapper carrying this
+        # class's own marker line, is fine to replace (idempotent across a
+        # retried setup); any other real file or directory is refused.
         akm = shlex.quote(akm_bin)
         node = shlex.quote(node_bin)
+        marker = shlex.quote(cls._AKM_WRAPPER_MARKER)
         # Guarded with an explicit `if`, not a bare `&&` chain: under
         # `set -e`, a standalone `[ -e "$x" ] && [ ! -L "$x" ] && fail` list
         # would itself exit non-zero (and abort the whole script) the moment
         # `[ -e "$x" ]` is false -- which is the NORMAL case on a fresh
-        # container, since neither target exists yet before the ln -sf
-        # below. `if ... ; then ... ; fi` is the construct `set -e` actually
-        # exempts from that trap.
+        # container, since neither target exists yet before the write below.
+        # `if ... ; then ... ; fi` is the construct `set -e` actually exempts
+        # from that trap.
         guard = (
-            'for _akm_bench_target in /usr/local/bin/akm /usr/local/bin/node; do '
-            'if [ -e "$_akm_bench_target" ] && [ ! -L "$_akm_bench_target" ]; then '
-            'echo "AKM-BOOTSTRAP FATAL: $_akm_bench_target already exists and '
+            'if [ -e /usr/local/bin/node ] && [ ! -L /usr/local/bin/node ]; then '
+            'echo "AKM-BOOTSTRAP FATAL: /usr/local/bin/node already exists and '
             'is not a symlink -- refusing to overwrite it. The task image '
             'likely ships its own toolchain there (a pinned Node runtime is '
             'the common case for /usr/local/bin/node); force-replacing it '
             'would change which runtime the agent runs under on this arm '
             'ONLY, which is exactly the kind of treatment-only confound '
             'AKM_ENV deliberately avoids for PATH. Use a base image that '
-            'does not pre-populate /usr/local/bin/{akm,node}." >&2; exit 1; '
-            "fi; done; "
+            'does not pre-populate /usr/local/bin/node." >&2; exit 1; fi; '
+            'if [ -e /usr/local/bin/akm ] && [ ! -L /usr/local/bin/akm ] '
+            f"&& ! sed -n 2p /usr/local/bin/akm 2>/dev/null | grep -qxF {marker}; then "
+            'echo "AKM-BOOTSTRAP FATAL: /usr/local/bin/akm already exists and '
+            'is neither a symlink nor an akm-bench-managed wrapper -- refusing '
+            'to overwrite it. Use a base image that does not pre-populate '
+            '/usr/local/bin/akm." >&2; exit 1; fi; '
         )
+        # Shebang MUST be byte 0 of the file for the kernel to honor it, so
+        # the marker is line 2 (a shell comment) rather than line 1.
+        wrapper_script = f"#!/bin/sh\n{cls._AKM_WRAPPER_MARKER}\nexec {node} {akm} \"$@\"\n"
         return (
             "set -euo pipefail; "
             "install -d -m 0755 /usr/local/bin && "
             + guard
-            + f"ln -sf {akm} /usr/local/bin/akm && "
-            f"ln -sf {node} /usr/local/bin/node && "
+            + f"ln -sf {node} /usr/local/bin/node && "
+            + "cat > /usr/local/bin/akm <<'AKM_BENCH_WRAPPER_EOF'\n"
+            + wrapper_script
+            + "AKM_BENCH_WRAPPER_EOF\n"
+            + "chmod +x /usr/local/bin/akm && "
             "test -x /usr/local/bin/akm && test -x /usr/local/bin/node"
         )
 
