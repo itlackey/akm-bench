@@ -42,7 +42,13 @@ performance. It does not touch the legacy Bun harness in `src/`.
 3. **A model API key** in the environment. Harbor's OpenCode agent declares
    `ModelConnectionSpec(passthrough=True)`, so provider variables reach the
    container under their own names — `ANTHROPIC_API_KEY` for
-   `anthropic/...`, `OPENAI_API_KEY` for `openai/...`, and so on.
+   `anthropic/...`, `OPENAI_API_KEY` for `openai/...`, and so on. For
+   `model_name: opencode/...` (every job config in `harbor/jobs/`) that
+   variable is **`OPENCODE_API_KEY`**, not `OPENAI_API_KEY` — akm-eval's
+   LongMemEval evaluator uses `OPENAI_API_KEY` for its own OpenAI client, a
+   different repo's variable for a different consumer. `AkmOpenCode` fails
+   fast and names the missing variable if it's absent, and accepts
+   `OPENAI_API_KEY` as a warned-about fallback (see itlackey/akm-bench#10).
 4. **Egress to `registry.npmjs.org`** from the container. Both arms npm-install
    during agent **setup**; the treatment arm pulls ~432MB of akm CLI
    (`better-sqlite3` and friends). Separately, opencode installs plugins at

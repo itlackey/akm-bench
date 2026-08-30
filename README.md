@@ -321,6 +321,11 @@ akm-opencode plugin enabled**, so it can be compared against the stock
 - `harbor/seed-library/` -- the smoke-fixture akm bundle seeded into the container
 - `harbor/tests/` -- unit tests; no Docker, no network, no credentials
 
+Set **`OPENCODE_API_KEY`** before running any Harbor job (`model_name:
+opencode/...`) -- akm-eval's `OPENAI_API_KEY` is a different repo's variable
+for a different consumer (its LongMemEval evaluator's own OpenAI client), not
+this one's. See `docs/harbor-p0.md` prerequisite 3.
+
 **This path has not been executed live yet.** Nothing below has run in a
 container: it is Harbor 0.22.0 source reading plus host-side simulation. It does
 not affect any of the workflows documented above.
