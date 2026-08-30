@@ -102,6 +102,7 @@ from pathlib import Path
 from typing import Any, override
 
 from harbor.agents.installed.opencode import OpenCode
+from harbor.agents.model_connection import PROVIDERS
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.result import AgentInfo
@@ -675,6 +676,83 @@ class AkmOpenCode(OpenCode):
         self._proof_checked = False
 
         self._force_config()
+        self._preflight_model_connection()
+
+    # -- auth preflight -------------------------------------------------------
+
+    #: The wrong-but-plausible variable name operators carry over from
+    #: akm-eval, where it is correct: LongMemEval's evaluator builds its own
+    #: OpenAI client from OPENAI_API_KEY + OPENAI_BASE_URL. Harbor's opencode
+    #: provider (harbor.agents.model_connection.PROVIDERS["opencode"]) only
+    #: ever reads OPENCODE_API_KEY. See itlackey/akm-bench#10.
+    _OPENCODE_FALLBACK_ENV = "OPENAI_API_KEY"
+
+    def _preflight_model_connection(self) -> None:
+        """Abort construction if the resolved provider has no usable API key.
+
+        ``self.model_connection`` (``BaseAgent.model_connection``, inherited
+        unchanged -- see the class docstring) is exactly what
+        ``OpenCode.run()`` and ``install()`` use to build the real container
+        env, so checking it here checks the same resolution the run itself
+        depends on. Harbor constructs one agent instance per trial in
+        ``Trial._init_agent()``, called from ``Trial.__init__`` BEFORE
+        ``Trial._init_agent_environment()`` ever creates a container
+        (verified against harbor 0.22.0's ``trial/trial.py``) -- so raising
+        here aborts the trial before any Docker/model spend, rather than
+        producing a generic "Unexpected server error" once opencode actually
+        tries to call the model.
+
+        Which env var is "the" one is derived from
+        ``harbor.agents.model_connection.PROVIDERS`` (the same table
+        ``resolve_model_connection`` consults) rather than hardcoded, so this
+        stays correct if a job ever points ``model_name`` at a different
+        provider.
+
+        The one exception is provider ``opencode``: a Zen key exported as
+        ``OPENAI_API_KEY`` (correct for akm-eval's own OpenAI client, wrong
+        here) is accepted as a fallback, WITH a warning naming the canonical
+        variable -- silently aliasing it would hide the very divergence
+        between the two repos that makes this trap easy to fall into twice.
+        """
+        connection = self.model_connection
+        provider = connection.provider
+        if provider is None or connection.api_key:
+            return
+
+        if provider == "opencode":
+            fallback_value = self._get_env(self._OPENCODE_FALLBACK_ENV)
+            if fallback_value:
+                self.logger.warning(
+                    "OPENCODE_API_KEY is not set for provider 'opencode' "
+                    "(model %r); falling back to %s. Set OPENCODE_API_KEY "
+                    "instead -- akm-eval's LongMemEval evaluator uses "
+                    "OPENAI_API_KEY for its own OpenAI client, but that is a "
+                    "DIFFERENT repo's variable. Harbor's opencode provider "
+                    "always reads OPENCODE_API_KEY (itlackey/akm-bench#10).",
+                    self.model_name,
+                    self._OPENCODE_FALLBACK_ENV,
+                )
+                # Written into _extra_env (not os.environ): _resolve_env()
+                # checks _extra_env first, so every later
+                # self.model_connection access -- including OpenCode.run()'s
+                # `env = dict(self.model_connection.env)` -- resolves
+                # OPENCODE_API_KEY from this value too.
+                self._extra_env["OPENCODE_API_KEY"] = fallback_value
+                return
+
+        provider_spec = PROVIDERS.get(provider)
+        required_envs = provider_spec.api_key_envs if provider_spec else ()
+        required = " or ".join(required_envs) if required_envs else "its API key"
+        note = (
+            " (OPENAI_API_KEY is akm-eval's variable, not this one's -- "
+            "provider 'opencode' always reads OPENCODE_API_KEY.)"
+            if provider == "opencode"
+            else ""
+        )
+        raise RuntimeError(
+            f"Missing API key for provider {provider!r} (model "
+            f"{self.model_name!r}): set {required}.{note}"
+        )
 
     # -- config injection ---------------------------------------------------
 

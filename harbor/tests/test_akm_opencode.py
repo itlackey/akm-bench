@@ -94,6 +94,21 @@ def isolate_default_stash_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     )
 
 
+@pytest.fixture(autouse=True)
+def default_model_credentials(monkeypatch: pytest.MonkeyPatch):
+    """Every existing test builds agents with model_name="anthropic/..." and
+    expects that to succeed without real credentials (this suite's whole
+    premise: no Docker, no network, no model credentials -- see the module
+    docstring). The __init__-time auth preflight (itlackey/akm-bench#10) now
+    requires the resolved provider's API key env var to be present and
+    non-empty, so a fake, non-empty value satisfies it here without asserting
+    anything about a real key's shape. Tests that exercise the preflight
+    itself (TestModelConnectionPreflight) override this per-test with
+    monkeypatch.delenv/setenv.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+
+
 def run_shell(
     script: str, extra_env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -201,6 +216,79 @@ def make_agent(tmp_path: Path, **kwargs) -> AkmOpenCode:
 # --------------------------------------------------------------------------
 # Identity
 # --------------------------------------------------------------------------
+
+
+# --------------------------------------------------------------------------
+# Auth preflight -- itlackey/akm-bench#10
+#
+# Provider 'opencode' resolves to model_name="opencode/..." (every real job
+# config in harbor/jobs/*.yaml and jobs/akm-corpus-train-ab-093/config.json
+# uses exactly that shape). The default_model_credentials autouse fixture
+# above sets ANTHROPIC_API_KEY for every OTHER test in this file, so it is
+# monkeypatch.delenv'd here wherever it would otherwise mask these.
+# --------------------------------------------------------------------------
+
+
+def test_preflight_aborts_when_the_required_variable_is_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.delenv("OPENCODE_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    # "set OPENCODE_API_KEY" (not just the substring anywhere) pins the
+    # variable name to the derived-requirement slot, not to the separate
+    # "OPENAI_API_KEY is akm-eval's variable" note that also happens to
+    # mention OPENCODE_API_KEY -- a weaker substring match would still pass
+    # even if the derivation itself were dropped.
+    with pytest.raises(RuntimeError, match=r"set OPENCODE_API_KEY\b"):
+        make_agent(tmp_path, model_name="opencode/qwen3.5-plus")
+
+
+def test_preflight_names_the_variable_generically_for_a_non_opencode_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """The required-variable name must come from Harbor's own per-provider
+    table (harbor.agents.model_connection.PROVIDERS), not a hardcoded
+    opencode-only mapping -- proven here with a provider that never gets the
+    opencode fallback/note text, so ANTHROPIC_API_KEY can only appear because
+    it was actually derived from the resolved provider.
+    """
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match=r"set ANTHROPIC_API_KEY\b"):
+        make_agent(tmp_path, model_name="anthropic/claude-sonnet-4-5")
+
+
+def test_preflight_passes_when_the_required_variable_is_present(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("OPENCODE_API_KEY", "real-opencode-key")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    agent = make_agent(tmp_path, model_name="opencode/qwen3.5-plus")
+    assert agent.model_connection.api_key == "real-opencode-key"
+
+
+def test_preflight_accepts_openai_api_key_as_a_fallback_with_a_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """The exact reported scenario: a Zen key exported as OPENAI_API_KEY,
+    OPENCODE_API_KEY unset. Must work (not hard-fail) AND must warn, naming
+    the canonical variable -- silent aliasing would hide the divergence
+    between akm-eval (OPENAI_API_KEY) and akm-bench (OPENCODE_API_KEY).
+    """
+    monkeypatch.delenv("OPENCODE_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "zen-key-under-the-wrong-name")
+    with caplog.at_level("WARNING"):
+        agent = make_agent(tmp_path, model_name="opencode/qwen3.5-plus")
+
+    # The fallback actually works: the real run-time connection resolves the
+    # OpenAI-named value under the canonical opencode name.
+    assert agent.model_connection.api_key == "zen-key-under-the-wrong-name"
+    assert agent.model_connection.env["OPENCODE_API_KEY"] == (
+        "zen-key-under-the-wrong-name"
+    )
+
+    # The warning is load-bearing: it must name the canonical variable.
+    warnings = [r.message for r in caplog.records if r.levelname == "WARNING"]
+    assert any("OPENCODE_API_KEY" in message for message in warnings), warnings
 
 
 def test_subclasses_opencode():
