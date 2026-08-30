@@ -614,11 +614,18 @@ def test_install_creates_and_chowns_the_akm_root_as_root(installed):
 def test_install_symlinks_akm_and_node_onto_path(installed):
     _, env = installed
     root_commands = "\n".join(env.commands_for_user("root"))
-    # The absolute paths come from the agent-user probe, not from a nested su.
-    assert "ln -sf /opt/node/bin/akm /usr/local/bin/akm" in root_commands
-    # The dist/akm launcher is `#!/usr/bin/env node`, so node must be linked too.
+    # node is a plain symlink; the absolute path comes from the agent-user
+    # probe, not from a nested su.
     assert "ln -sf /opt/node/bin/node /usr/local/bin/node" in root_commands
-    # A dangling symlink must fail setup, not degrade the plugin at run time.
+    # akm is a wrapper that hardcodes the resolved node_bin, not a symlink --
+    # see _build_link_binaries_command's docstring on why a plain `ln -sf`
+    # symlink cannot survive the DEFAULT nvm alias pointing at a different
+    # Node major than MIN_NODE_MAJOR.
+    assert "cat > /usr/local/bin/akm" in root_commands
+    assert "exec /opt/node/bin/node /opt/node/bin/akm" in root_commands
+    assert AkmOpenCode._AKM_WRAPPER_MARKER in root_commands
+    # A dangling symlink/wrapper must fail setup, not degrade the plugin at
+    # run time.
     assert "test -x /usr/local/bin/akm" in root_commands
 
 
@@ -2163,7 +2170,11 @@ def test_link_binaries_command_refuses_to_overwrite_a_real_pre_existing_file(
     # pitfall of a bare `[ -e ] && [ ! -L ] && fail` list).
     ok = run_shell(templated)
     assert ok.returncode == 0, ok.stderr
-    assert (fake_local_bin / "akm").is_symlink()
+    # akm is a wrapper (regular executable file), not a symlink -- see
+    # _build_link_binaries_command's docstring.
+    assert not (fake_local_bin / "akm").is_symlink()
+    assert (fake_local_bin / "akm").stat().st_mode & 0o111
+    assert AkmOpenCode._AKM_WRAPPER_MARKER in (fake_local_bin / "akm").read_text()
     assert (fake_local_bin / "node").is_symlink()
 
     # Case 2: a REAL (non-symlink) file already at the node target -- as a
