@@ -210,15 +210,41 @@ if [ ! -d "$jobs_out" ]; then
   fail "harbor wrote no job directory at ${jobs_out}; nothing to analyze. See ${report_base}.log"
 fi
 
+# akm-bench-analyze takes the JOBS dir and walks <jobsDir>/<job>/<trial>/, so
+# handing it "$jobs_out" (a JOB dir) finds nothing, and handing it "jobs" would
+# sweep in every unrelated job sitting there and pool them into one number.
+# Mirror just this run's trials into a private jobs dir, as the 2026-08-29
+# round did by hand. Only result.json and agent/opencode.txt are ever read
+# (~5MB of a ~370MB job tree), so this is cheap; lock.json carries the Harbor
+# version into the report's header.
+mirror="jobs/.analysis-${job_name}"
+rm -rf "$mirror"
+mkdir -p "$mirror/${job_name}"
+mirrored=0
+for trial_dir in "$jobs_out"/*/; do
+  [ -f "${trial_dir}result.json" ] || continue
+  trial_name="$(basename "$trial_dir")"
+  mkdir -p "$mirror/${job_name}/${trial_name}/agent"
+  cp "${trial_dir}result.json" "$mirror/${job_name}/${trial_name}/result.json"
+  [ -f "${trial_dir}agent/opencode.txt" ] \
+    && cp "${trial_dir}agent/opencode.txt" "$mirror/${job_name}/${trial_name}/agent/opencode.txt"
+  mirrored=$((mirrored + 1))
+done
+[ -f "$jobs_out/lock.json" ] && cp "$jobs_out/lock.json" "$mirror/${job_name}/lock.json"
+
+if [ "$mirrored" = "0" ]; then
+  fail "no trial result.json under ${jobs_out}; nothing to analyze. See ${report_base}.log"
+fi
+
 # Analyze even on a nonzero harbor exit: a partial run still has trials worth
 # reading, and the report's own disclosure block records what was missing.
-echo "ab-run: analyzing ${jobs_out}"
-"$BIN_DIR/akm-bench-analyze" "$jobs_out" \
+echo "ab-run: analyzing ${mirrored} trials from ${jobs_out}"
+"$BIN_DIR/akm-bench-analyze" "$mirror" \
   --corpus harbor/tasks \
   --md "${report_base}.md" \
   --json "${report_base}.json"
 
-trials="$(find "$jobs_out" -mindepth 2 -maxdepth 2 -name result.json | wc -l)"
+trials="$mirrored"
 echo
 echo "ab-run: ${trials} trials -> ${report_base}.md"
 echo "ab-run: record the pins above in that report; a delta vs an older report"
