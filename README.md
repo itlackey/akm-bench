@@ -31,6 +31,45 @@ Part of the broader akm ecosystem:
 - [itlackey/akm-plugins](https://github.com/itlackey/akm-plugins) -- optional editor and agent integrations, including OpenCode support
 - [itlackey/akm-eval](https://github.com/itlackey/akm-eval) -- eval framework for running benchmark packs through authoritative upstream harnesses
 
+## Reproduce the published results
+
+Everything in `results/` comes from these commands. Two credentials, one of
+which `bin/ab-run` will load from `akm env` if you keep it there:
+`OPENCODE_API_KEY` (both arms' model provider) and a running Docker daemon.
+
+```sh
+bin/ab-run train --dry-run       # render + preflight, run nothing
+bin/ab-run train                 # 28-task train slice, 168 trials, ~3h
+bin/ab-run train-v2              # 9-task calibrated slice
+bin/ab-run local-convention      # 8-task candidate slice, 48 trials, ~45m
+```
+
+Each writes `results/harbor/<date>/<slice>-<pin>-<stamp>.{md,json,log}`. The
+report includes the engagement-conditioned split, which is the number to read
+before the aggregate — see `docs/comparability.md` B6.
+
+**Check whether a slice can measure akm at all:**
+
+```sh
+bin/akm-bench-calibrate jobs/.analysis-<job-name>
+```
+
+Reports each task's no-skill control pass rate. A task whose control already
+passes cannot measure akm, however carefully it is run. On the v1 train slice,
+19 of 28 tasks fail this gate — they are disclosed by name in
+`results/calibration/`, not hidden.
+
+**Version pins** live in `harbor/akm_opencode.py` and nowhere else. Changing
+them there is enough; `bin/ab-run` prints what it resolved and refuses to start
+if the pinned `akm-cli` falls outside the pinned plugin's own compatibility
+range, which would otherwise leave the plugin unloaded and score every treatment
+trial as a baseline.
+
+**Do not compare a v2 number to a v1 number** without
+`results/calibration/transition-v1-v2-0910.md`. v2 excludes the tasks that
+contribute ~zero, so its aggregate is arithmetically larger on the same build —
+composition, not improvement.
+
 ## What You Need
 
 - `bun`
