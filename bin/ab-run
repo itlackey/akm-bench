@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# One-command Harbor A/B: render a runnable job config from the committed
+# template, preflight the things that silently ruin a 3-hour run, execute it,
+# and analyze the output into a dated report.
+#
+#   bin/ab-run train              # 28-task train slice (tuning)
+#   bin/ab-run eval               # eval slice (the number you report)
+#   bin/ab-run train --dry-run    # render + preflight only, run nothing
+#   bin/ab-run train --model opencode/qwen3.5-plus
+#
+# The model defaults to the one the committed baselines used, so a fresh run
+# stays comparable to results/harbor/ by default. Version pins come from
+# harbor/akm_opencode.py and are never passed here -- change them there.
+
+BIN_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "$BIN_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
+# The model every committed A/B report used. Both arms MUST get the same value;
+# an asymmetric model is not an A/B, it is two unrelated runs.
+DEFAULT_MODEL="opencode/qwen3.5-plus"
+
+orig_args=("$@")
+slice=""
+model="${AKM_BENCH_MODEL:-$DEFAULT_MODEL}"
+dry_run=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    train|eval) slice="$1"; shift ;;
+    --model) model="${2:?--model requires a value}"; shift 2 ;;
+    --dry-run) dry_run=1; shift ;;
+    -h|--help) sed -n '3,16p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
+    *) echo "ab-run: unexpected argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$slice" ]; then
+  echo "ab-run: which slice? 'train' (tuning) or 'eval' (the reported number)" >&2
+  exit 2
+fi
+
+template="harbor/jobs/corpus-${slice}-ab.yaml"
+[ -f "$template" ] || { echo "ab-run: missing $template" >&2; exit 1; }
+
+python_bin="$REPO_ROOT/.venv/bin/python"
+harbor_bin="$REPO_ROOT/.venv/bin/harbor"
+[ -x "$python_bin" ] || python_bin="$(command -v python3)"
+[ -x "$harbor_bin" ] || harbor_bin="$(command -v harbor || true)"
+
+export PYTHONPATH="$REPO_ROOT"
+
+# ------------------------------------------------------------------- preflight
+fail() { echo "ab-run: $*" >&2; exit 1; }
+
+# The key usually lives in an akm env asset rather than the shell. Re-exec
+# under `akm env run` so it is injected the way akm intends -- akm's own help
+# says to do this rather than `source` the raw file, and --only keeps every
+# OTHER credential in that file out of a 3-hour run's environment (and out of
+# every container harbor hands it to).
+if [ -z "${OPENCODE_API_KEY:-}" ] && [ -z "${AB_RUN_ENV_REEXEC:-}" ] && command -v akm >/dev/null 2>&1; then
+  env_ref="$(akm env list --format json 2>/dev/null \
+    | jq -r 'first(.. | objects | select(has("keys") and (.keys | index("OPENCODE_API_KEY"))) | .ref) // empty' 2>/dev/null || true)"
+  if [ -n "$env_ref" ]; then
+    echo "ab-run: OPENCODE_API_KEY not in the environment; injecting it from akm env '${env_ref}'."
+    export AB_RUN_ENV_REEXEC=1
+    exec akm env run "$env_ref" --only OPENCODE_API_KEY -- "${BASH_SOURCE[0]}" "${orig_args[@]}"
+  fi
+fi
+[ -n "${OPENCODE_API_KEY:-}" ] || fail "OPENCODE_API_KEY is unset, and no akm env asset provides it. Both arms need it; an unset key fails every trial at the agent step, ~3h in."
+docker ps >/dev/null 2>&1 || fail "docker daemon unreachable ('docker ps' failed). Every trial runs in a container."
+[ -n "$harbor_bin" ] || fail "harbor not found (looked in .venv/bin and PATH)."
+command -v bun >/dev/null || fail "bun not found; bin/akm-bench-analyze needs it."
+
+read -r cli_version plugin_version opencode_version < <(
+  "$python_bin" -c 'import harbor.akm_opencode as m; print(m.AKM_CLI_VERSION, m.AKM_PLUGIN_VERSION, m.OPENCODE_VERSION)'
+) || fail "could not import harbor.akm_opencode to read its pins."
+
+# The pinned CLI must satisfy the pinned plugin's own compatibility range, or
+# the plugin declines to load and every treatment trial silently scores as a
+# baseline. harbor.akm_opencode asserts that at import (so a bare `harbor run`
+# is covered too); what it CANNOT know is whether its mirrored copy of the
+# range has gone stale. Read the real value from the published tarball and
+# compare, reusing the module's own matcher rather than a second copy of it.
+"$python_bin" - <<'PY' || exit 1
+import json, re, sys, tarfile, tempfile, urllib.request
+from harbor.akm_opencode import (
+    AKM_CLI_VERSION, AKM_PLUGIN_VERSION, AKM_PLUGIN_REQUIRED_CLI_RANGE, satisfies_caret,
+)
+
+try:
+    meta = json.load(urllib.request.urlopen(
+        f"https://registry.npmjs.org/akm-opencode/{AKM_PLUGIN_VERSION}", timeout=30))
+    with tempfile.TemporaryDirectory() as d:
+        tgz = f"{d}/p.tgz"
+        urllib.request.urlretrieve(meta["dist"]["tarball"], tgz)
+        with tarfile.open(tgz) as t:
+            src = t.extractfile("package/shared/akm-version.ts").read().decode()
+except Exception as exc:  # offline, npm down, module moved -- not fatal
+    print(f"ab-run: WARNING -- could not read the published plugin's range ({exc.__class__.__name__}); "
+          f"trusting the mirrored {AKM_PLUGIN_REQUIRED_CLI_RANGE}.", file=sys.stderr)
+    sys.exit(0)
+
+m = re.search(r'AKM_VERSION_RANGE\s*=\s*"([^"]+)"', src)
+if not m:
+    print("ab-run: WARNING -- no AKM_VERSION_RANGE in the published plugin; skipping the staleness check.",
+          file=sys.stderr)
+    sys.exit(0)
+
+real = m.group(1)
+if real != AKM_PLUGIN_REQUIRED_CLI_RANGE:
+    print(f"ab-run: akm-opencode {AKM_PLUGIN_VERSION} really gates on {real}, but "
+          f"harbor/akm_opencode.py mirrors {AKM_PLUGIN_REQUIRED_CLI_RANGE}.", file=sys.stderr)
+    print(f"ab-run: update AKM_PLUGIN_REQUIRED_CLI_RANGE to {real} before running.", file=sys.stderr)
+    sys.exit(1)
+if not satisfies_caret(AKM_CLI_VERSION, real):
+    print(f"ab-run: akm-cli {AKM_CLI_VERSION} does not satisfy {real}; the plugin would not load.",
+          file=sys.stderr)
+    sys.exit(1)
+print(f"ab-run: plugin gate {real} accepts akm-cli {AKM_CLI_VERSION} (mirror in akm_opencode.py is current).")
+PY
+
+# ------------------------------------------------------------------- render it
+# Suffix the job name with the CLI pin so a new run cannot land trials in an
+# older run's directory. analyze() walks <jobs-dir>/<job>/<trial>, so mixing two
+# runs there silently pools them into one bogus statistic.
+job_base="akm-corpus-${slice}-ab-$(tr -d . <<<"$cli_version")"
+job_name="$job_base"
+attempt=2
+while [ -e "jobs/${job_name}" ]; do
+  job_name="${job_base}-r${attempt}"
+  attempt=$((attempt + 1))
+done
+if [ "$job_name" != "$job_base" ]; then
+  echo "ab-run: jobs/${job_base}/ exists; this run goes to jobs/${job_name}/ instead."
+  echo "ab-run: (a fresh directory per run is REQUIRED -- akm-bench-analyze walks the whole"
+  echo "        tree, so two runs sharing one directory pool into a single meaningless number.)"
+fi
+local_config="harbor/jobs/.corpus-${slice}-ab-local.yaml"   # gitignored
+
+task_count="$(
+"$python_bin" - "$template" "$local_config" "$model" "$job_name" "$slice" <<'PY'
+import pathlib, sys, yaml
+template, out, model, job_name, slice_ = sys.argv[1:6]
+s = pathlib.Path(template).read_text()
+n = s.count("model_name: PROVIDER/MODEL")
+if n != 2:
+    sys.exit(f"ab-run: expected 2 model_name placeholders in {template}, found {n}. "
+             "The template changed shape -- re-check it before running.")
+s = s.replace("model_name: PROVIDER/MODEL", f"model_name: {model}")
+old_name = f"job_name: akm-corpus-{slice_}-ab\n"
+if old_name not in s:
+    sys.exit(f"ab-run: could not find '{old_name.strip()}' in {template}.")
+s = s.replace(old_name, f"job_name: {job_name}\n", 1)
+pathlib.Path(out).write_text(s)
+
+# Task count for the banner. exclude_task_names shares task_names' indent, so
+# this has to come from the parsed document, not a grep.
+cfg = yaml.safe_load(s)
+names, excluded = set(), set()
+for ds in cfg.get("datasets") or []:
+    names |= set(ds.get("task_names") or [])
+    excluded |= set(ds.get("exclude_task_names") or [])
+print(len(names - excluded))
+PY
+)" || exit 1
+
+grep -q "job_name: ${job_name}" "$local_config" || fail "job_name substitution failed in $local_config"
+arms="$(grep -c "model_name: ${model}" "$local_config")"
+[ "$arms" = "2" ] || fail "expected both arms on model '${model}', found ${arms}."
+
+jobs_out="jobs/${job_name}"
+
+date_dir="results/harbor/$(date -u +%Y-%m-%d)"
+stamp="$(date -u +%H-%M-%SZ)"
+report_base="${date_dir}/${slice}-$(tr -d . <<<"$cli_version")-${stamp}"
+mkdir -p "$date_dir"
+
+cat <<INFO
+
+ab-run: slice        ${slice} (${task_count} tasks)
+ab-run: model        ${model}  (both arms)
+ab-run: akm-cli      ${cli_version}
+ab-run: plugin       ${plugin_version}
+ab-run: opencode     ${opencode_version}
+ab-run: config       ${local_config}
+ab-run: job output   ${jobs_out}/
+ab-run: report       ${report_base}.{md,json,log}
+
+INFO
+
+if [ "$dry_run" = "1" ]; then
+  echo "ab-run: --dry-run, stopping before execution. Validate the rendered config with:"
+  echo "  PYTHONPATH=\"\$(pwd)\" ${harbor_bin} run -c ${local_config} --print-config"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------- run it
+echo "ab-run: starting. This is a long run -- output is tee'd to ${report_base}.log"
+start="$(date -u +%s)"
+set +e
+"$harbor_bin" run -c "$local_config" 2>&1 | tee "${report_base}.log"
+harbor_status="${PIPESTATUS[0]}"
+set -e
+elapsed=$(( $(date -u +%s) - start ))
+printf 'ab-run: harbor exited %s after %dh%02dm\n' "$harbor_status" $((elapsed/3600)) $(((elapsed%3600)/60))
+
+if [ ! -d "$jobs_out" ]; then
+  fail "harbor wrote no job directory at ${jobs_out}; nothing to analyze. See ${report_base}.log"
+fi
+
+# Analyze even on a nonzero harbor exit: a partial run still has trials worth
+# reading, and the report's own disclosure block records what was missing.
+echo "ab-run: analyzing ${jobs_out}"
+"$BIN_DIR/akm-bench-analyze" "$jobs_out" \
+  --corpus harbor/tasks \
+  --md "${report_base}.md" \
+  --json "${report_base}.json"
+
+trials="$(find "$jobs_out" -mindepth 2 -maxdepth 2 -name result.json | wc -l)"
+echo
+echo "ab-run: ${trials} trials -> ${report_base}.md"
+echo "ab-run: record the pins above in that report; a delta vs an older report"
+echo "        spans every pin that moved between them, not just akm-cli."
+exit "$harbor_status"

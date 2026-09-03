@@ -26,3 +26,7 @@ results/**/*.json
 /swebench*/
 # Local-only job config variants (filled-in model/paths for one machine).
 harbor/jobs/.*-local.yaml
+
+# Raw harbor run logs from bin/ab-run: multi-MB, regenerated per run.
+# The analyzed .md report next to them is what gets committed.
+results/**/*.log
