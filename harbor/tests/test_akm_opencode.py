@@ -2885,3 +2885,50 @@ def test_self_check_is_valid_bash_on_both_arms(
         ["bash", "-n", str(script)], capture_output=True, text=True, timeout=30
     )
     assert result.returncode == 0, result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Pin cross-check: the pinned CLI must satisfy the pinned plugin's own range.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("version", "caret_range", "expected"),
+    [
+        # The trap this guard exists for: 0.9.3 was the pinned CLI while the
+        # plugin's range was still ^0.9.0; the plugin later moved to ^0.9.8.
+        ("0.9.3", "^0.9.8", False),
+        ("0.9.7", "^0.9.8", False),
+        ("0.9.8", "^0.9.8", True),
+        ("0.9.9", "^0.9.8", True),
+        # Numeric, not lexicographic: "0.9.10" < "0.9.9" as strings.
+        ("0.9.10", "^0.9.8", True),
+        ("0.9.100", "^0.9.8", True),
+        # Caret on a 0.x pins the MINOR, so the next minor is out of range.
+        ("0.10.0", "^0.9.8", False),
+        ("1.0.0", "^0.9.8", False),
+        ("0.9.3", "^0.9.0", True),
+        # A range this cannot parse must not block a run.
+        ("0.9.10", ">=0.9.8 <0.10.0", True),
+        ("not-a-version", "^0.9.8", False),
+    ],
+)
+def test_satisfies_caret(version: str, caret_range: str, expected: bool):
+    assert akm_opencode.satisfies_caret(version, caret_range) is expected
+
+
+def test_shipped_pins_are_compatible():
+    """The pins actually committed here must be runnable together.
+
+    Without this, lowering AKM_CLI_VERSION below the plugin's floor is caught
+    only ~3 hours later, as an A/B where every treatment trial silently scored
+    as a baseline.
+    """
+    akm_opencode.assert_pins_compatible()
+
+
+def test_assert_pins_compatible_rejects_a_cli_below_the_plugin_floor(monkeypatch):
+    monkeypatch.setattr(akm_opencode, "AKM_CLI_VERSION", "0.9.3")
+    monkeypatch.setattr(akm_opencode, "AKM_PLUGIN_REQUIRED_CLI_RANGE", "^0.9.8")
+    with pytest.raises(RuntimeError, match="does not satisfy"):
+        akm_opencode.assert_pins_compatible()
