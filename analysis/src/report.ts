@@ -306,12 +306,12 @@ export function renderJson(report: AnalysisReport): string {
 
 // ── Markdown rendering ─────────────────────────────────────────────────
 
-function fmtNum(value: number | null | undefined, digits = 3): string {
+export function fmtNum(value: number | null | undefined, digits = 3): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
   return value.toFixed(digits);
 }
 
-function fmtPct(value: number | null | undefined, digits = 1): string {
+export function fmtPct(value: number | null | undefined, digits = 1): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
   return `${(value * 100).toFixed(digits)}%`;
 }
@@ -325,7 +325,7 @@ function policyLabel(policy: ErroredPolicy): string {
   return policy === "errored-as-zero" ? "errored=0" : "errored excluded";
 }
 
-function mdTable(header: string[], rows: string[][]): string {
+export function mdTable(header: string[], rows: string[][]): string {
   const lines = [`| ${header.join(" | ")} |`, `| ${header.map(() => "---").join(" | ")} |`];
   for (const row of rows) lines.push(`| ${row.join(" | ")} |`);
   return lines.join("\n");

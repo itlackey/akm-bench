@@ -618,14 +618,9 @@ describe("computeArmToolUseStats", () => {
 });
 
 describe("computeEngagementConditionedDelta", () => {
-  function trial(
-    arm: string,
-    taskName: string,
-    reward: number,
-    akmCalls: number | null,
-  ): TrialRecord {
+  function trial(arm: string, taskName: string, reward: number, akmCalls: number | null): TrialRecord {
     return {
-      jobName: "job",
+      jobId: "job",
       trialName: `${taskName}-${arm}-${reward}-${akmCalls}`,
       trialDir: "/dev/null",
       taskName,
@@ -690,10 +685,7 @@ describe("computeEngagementConditionedDelta", () => {
   test("unreadable trajectories are excluded from both partitions, not read as silence", () => {
     // Counting a crashed trial as "chose not to call akm" would turn a harness
     // failure into a behavioural finding.
-    const records = [
-      trial("treat", "task-a", 1, null),
-      trial("ctrl", "task-a", 0, null),
-    ];
+    const records = [trial("treat", "task-a", 1, null), trial("ctrl", "task-a", 0, null)];
     const d = computeEngagementConditionedDelta(records, "treat", "ctrl");
     expect(d.nTrialsNoTrajectory).toBe(1);
     expect(d.nTrialsCalled).toBe(0);
@@ -704,18 +696,12 @@ describe("computeEngagementConditionedDelta", () => {
   });
 
   test("computeAnalysisStats emits one entry only when exactly one arm engaged", () => {
-    const records = [
-      trial("treat", "task-a", 1, 2),
-      trial("ctrl", "task-a", 0, 0),
-    ];
+    const records = [trial("treat", "task-a", 1, 2), trial("ctrl", "task-a", 0, 0)];
     expect(computeAnalysisStats(records).engagementDeltas).toHaveLength(1);
 
     // Both arms engaging (a three-arm static/accumulating run) has no
     // unambiguous control, so the split is omitted rather than guessed.
-    const bothEngaged = [
-      trial("treat", "task-a", 1, 2),
-      trial("other", "task-a", 1, 2),
-    ];
+    const bothEngaged = [trial("treat", "task-a", 1, 2), trial("other", "task-a", 1, 2)];
     expect(computeAnalysisStats(bothEngaged).engagementDeltas).toHaveLength(0);
   });
 });

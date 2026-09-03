@@ -766,9 +766,7 @@ export function computeEngagementConditionedDelta(
   const deltaFor = (keep: (record: TrialRecord) => boolean): PairedDelta | null => {
     // Keep the control arm whole; partition only the treatment arm. Trials
     // with no readable trajectory are dropped rather than counted as silent.
-    const subset = records.filter((r) =>
-      r.arm === treatmentArm ? r.toolUse.akmCalls !== null && keep(r) : true,
-    );
+    const subset = records.filter((r) => (r.arm === treatmentArm ? r.toolUse.akmCalls !== null && keep(r) : true));
     const summaries = bucketByTaskArm(subset).map(summarizeTaskArmRewards);
     const delta = computePairedDelta(summaries, treatmentArm, controlArm, "errored-as-zero", options);
     return delta.nTasksPaired > 0 ? delta : null;
@@ -845,9 +843,7 @@ export function computeAnalysisStats(records: readonly TrialRecord[], options: B
   const deltas: PairedDelta[] = [];
   const symmetricDeltas: SymmetricPairedDelta[] = [];
   const engagementDeltas: EngagementConditionedDelta[] = [];
-  const engagedArms = new Set(
-    armSummaries.filter((a) => (a.toolUseStats.nWithAkmCall ?? 0) > 0).map((a) => a.arm),
-  );
+  const engagedArms = new Set(armSummaries.filter((a) => (a.toolUseStats.nWithAkmCall ?? 0) > 0).map((a) => a.arm));
   for (let i = 0; i < arms.length; i++) {
     for (let j = i + 1; j < arms.length; j++) {
       const armA = arms[i] as string;
@@ -866,9 +862,7 @@ export function computeAnalysisStats(records: readonly TrialRecord[], options: B
       if (aEngaged !== bEngaged) {
         const treatment = aEngaged ? armA : armB;
         const control = aEngaged ? armB : armA;
-        engagementDeltas.push(
-          computeEngagementConditionedDelta(records, treatment, control, bootstrapOptions),
-        );
+        engagementDeltas.push(computeEngagementConditionedDelta(records, treatment, control, bootstrapOptions));
       }
     }
   }
