@@ -97,6 +97,7 @@ against a real Docker daemon. See ``docs/harbor-p0.md`` for what that means.
 from __future__ import annotations
 
 import json
+import re
 import shlex
 from pathlib import Path
 from typing import Any, override
@@ -119,12 +120,12 @@ from harbor.models.trajectories import Trajectory
 OPENCODE_VERSION = "1.18.21"
 
 #: akm CLI npm version, installed globally so a real ``akm`` is on PATH.
-AKM_CLI_VERSION = "0.9.3"
+AKM_CLI_VERSION = "0.9.10"
 
 #: akm-opencode plugin npm version. Pinned exactly (never a bare package name):
 #: a bare name resolves ``latest`` at every session start, which is both
 #: unpinnable and changes opencode's plugin cache directory name.
-AKM_PLUGIN_VERSION = "0.9.2202608290901"
+AKM_PLUGIN_VERSION = "0.9.9202609021827"
 
 AKM_CLI_SPEC = f"akm-cli@{AKM_CLI_VERSION}"
 AKM_PLUGIN_SPEC = f"akm-opencode@{AKM_PLUGIN_VERSION}"
@@ -146,24 +147,90 @@ AKM_PLUGIN_SPEC = f"akm-opencode@{AKM_PLUGIN_VERSION}"
 AKM_ARM_NAME = "akm-opencode"
 AKM_ACCUMULATING_ARM_NAME = f"{AKM_ARM_NAME}-accumulating"
 
-#: The plugin hard-gates on semver range ``^0.9.0``
-#: (akm-plugins ``claude/shared/akm-version.ts:37``). The install-time
-#: self-check asserts the globally installed CLI matches this prefix.
+#: Coarse install-time sanity check: a shell glob asserting the globally
+#: installed CLI is a 0.9.x at all, i.e. that ``npm i -g`` produced something in
+#: the expected family. It deliberately does NOT try to express the plugin's
+#: compatibility range -- a POSIX glob cannot (``^0.9.8`` admits 0.9.8, 0.9.9,
+#: 0.9.10, ... unbounded), and the musl branch has no reliable ``sort -V`` to
+#: fall back on. That range is asserted by ``assert_pins_compatible()`` below,
+#: which runs at import, before any container is built.
 AKM_CLI_VERSION_PREFIX = "0.9."
 
+#: The semver range the PINNED plugin build gates on -- a mirror of
+#: ``AKM_VERSION_RANGE`` in that build's own ``shared/akm-version.ts``.
+#:
+#: This is the second half of a CROSS-CHECK BETWEEN TWO PINS, which is why it
+#: cannot live in the container: by the time a trial runs, an in-container check
+#: can only see whether the CLI installed, not whether the plugin will accept
+#: it. When it will not, the plugin declines to load and every treatment trial
+#: silently scores as a baseline -- an A/B that measures nothing while looking
+#: completely healthy.
+#:
+#: The range moved from ``^0.9.0`` to ``^0.9.8`` somewhere between plugin
+#: 0.9.2202608290901 and 0.9.9202609021827, which is exactly the kind of change
+#: that goes unnoticed. UPDATE THIS whenever AKM_PLUGIN_VERSION changes;
+#: ``bin/ab-run`` re-reads the real value from the published tarball before
+#: every run and fails if this constant has gone stale.
+AKM_PLUGIN_REQUIRED_CLI_RANGE = "^0.9.8"
+
+
+def satisfies_caret(version: str, caret_range: str) -> bool:
+    """True when ``version`` falls inside a caret range such as ``^0.9.8``.
+
+    Only the caret form is implemented, because it is the only form the plugin
+    has ever published. An unrecognised range returns True rather than
+    guessing: a range this cannot parse is a reason to go look, not a reason to
+    block a run on a check that does not understand its own input.
+    """
+    m = re.fullmatch(r"\^(\d+)\.(\d+)\.(\d+)", caret_range.strip())
+    if not m:
+        return True
+    low = tuple(int(g) for g in m.groups())
+    parsed = re.match(r"(\d+)\.(\d+)\.(\d+)", version.strip())
+    if not parsed:
+        return False
+    got = tuple(int(g) for g in parsed.groups())
+    # Caret on a 0.x version pins the MINOR, not the major: ^0.9.8 admits
+    # 0.9.x >= 0.9.8 and excludes 0.10.0.
+    upper = (low[0], low[1] + 1, 0) if low[0] == 0 else (low[0] + 1, 0, 0)
+    return low <= got < upper
+
+
+def assert_pins_compatible() -> None:
+    """Fail loudly, at import, if the pinned CLI and plugin cannot work together.
+
+    Import time is deliberate: it is before Harbor builds a container, before
+    any token is spent, and it fires however the run was launched --
+    ``bin/ab-run``, a bare ``harbor run``, or a test.
+    """
+    if not satisfies_caret(AKM_CLI_VERSION, AKM_PLUGIN_REQUIRED_CLI_RANGE):
+        raise RuntimeError(
+            f"Incompatible pins: akm-cli {AKM_CLI_VERSION} does not satisfy "
+            f"{AKM_PLUGIN_REQUIRED_CLI_RANGE}, the range akm-opencode "
+            f"{AKM_PLUGIN_VERSION} gates on. The plugin would decline to load "
+            "and every treatment trial would silently score as a baseline. "
+            "Fix AKM_CLI_VERSION / AKM_PLUGIN_VERSION together."
+        )
+
+
+assert_pins_compatible()
+
 #: Minimum Node major. ``akm-cli``'s preinstall script hard-fails below this.
-#: ``akm-cli@0.9.3``'s ``package.json`` raised its ``engines.node`` floor from
-#: ``>=22`` to ``>=24`` (verified against the published tarballs) -- above
-#: what Harbor's glibc path installs by default (nvm installs Node 22; see
-#: ``harbor.agents.installed.node_install.DEFAULT_NODE_MAJOR``, which
-#: ``OpenCode.install()`` calls with no override). ``_build_install_akm_cli_command()``
-#: therefore runs ``nvm install {MIN_NODE_MAJOR}`` itself, immediately before
-#: the akm-cli install, whenever nvm is present. The musl branch of
-#: ``OpenCode.install()`` still takes whatever ``apk`` ships and has no nvm to
-#: re-target -- for that path this constant remains only the self-check
-#: assertion below, which now correctly fails those trials loudly instead of
+#: ``akm-cli@0.9.3`` had briefly raised its ``engines.node`` floor from ``>=22``
+#: to ``>=24``, which forced the treatment arm to ``nvm install 24`` while the
+#: control arm stayed on Harbor's default Node 22 -- a per-arm asymmetry that
+#: existed only to satisfy that floor. ``akm-cli@0.9.8`` lowered it back to
+#: ``>=22`` (verified against the published tarballs: 0.9.3 ``>=24``; 0.9.8,
+#: 0.9.9 and 0.9.10 all ``>=22``), so this constant now matches
+#: ``harbor.agents.installed.node_install.DEFAULT_NODE_MAJOR`` and both arms
+#: resolve the same Node again. ``_build_install_akm_cli_command()`` still runs
+#: ``nvm install {MIN_NODE_MAJOR}`` before the akm-cli install where nvm is
+#: present -- now a no-op re-select of the default rather than a version bump.
+#: The musl branch of ``OpenCode.install()`` takes whatever ``apk`` ships and
+#: has no nvm to re-target; for that path this constant remains only the
+#: self-check assertion below, which fails those trials loudly instead of
 #: silently degrading.
-MIN_NODE_MAJOR = 24
+MIN_NODE_MAJOR = 22
 
 # ---------------------------------------------------------------------------
 # Container paths

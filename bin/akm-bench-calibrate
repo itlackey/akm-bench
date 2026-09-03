@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Thin wrapper so `bin/akm-bench-calibrate` works from any cwd, mirroring
+# `bin/akm-bench-analyze`'s convention of resolving paths relative to this
+# script's own location rather than the caller's cwd.
+#
+# The real CLI lives at analysis/src/calibrate-cli.ts — see that file, and
+# docs/comparability.md B6, for what the gate is and why it exists.
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(dirname "${script_dir}")"
+
+exec bun run "${repo_root}/analysis/src/calibrate-cli.ts" "$@"

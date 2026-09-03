@@ -3,6 +3,17 @@
 `akm-bench` is a benchmark harness for measuring how an agent performs on the
 same task set with AKM enabled.
 
+> **These numbers are not publishable beside a third-party benchmark result.**
+> This corpus is one we wrote, so a favourable result here is partly a
+> statement about our own task authorship. It supports longitudinal claims
+> (akm against itself, across versions) and nothing else; the comparison to
+> other tools has to come from [`akm-eval`](https://github.com/itlackey/akm-eval).
+> The rules, and the calibration gate showing that 19 of 28 train-slice tasks
+> currently do not measure akm at all, are in
+> [`docs/comparability.md`](./docs/comparability.md). Read it before quoting a
+> figure from this repo. Run the gate yourself with
+> `bin/akm-bench-calibrate <jobs-dir> --corpus harbor/tasks`.
+
 It has three workflows:
 
 - `utility`: static benchmark runs over a fixed task set
@@ -19,6 +30,45 @@ Part of the broader akm ecosystem:
 - [itlackey/akm-registry](https://github.com/itlackey/akm-registry) -- the official searchable registry index used for discovery
 - [itlackey/akm-plugins](https://github.com/itlackey/akm-plugins) -- optional editor and agent integrations, including OpenCode support
 - [itlackey/akm-eval](https://github.com/itlackey/akm-eval) -- eval framework for running benchmark packs through authoritative upstream harnesses
+
+## Reproduce the published results
+
+Everything in `results/` comes from these commands. Two credentials, one of
+which `bin/ab-run` will load from `akm env` if you keep it there:
+`OPENCODE_API_KEY` (both arms' model provider) and a running Docker daemon.
+
+```sh
+bin/ab-run train --dry-run       # render + preflight, run nothing
+bin/ab-run train                 # 28-task train slice, 168 trials, ~3h
+bin/ab-run train-v2              # 9-task calibrated slice
+bin/ab-run local-convention      # 8-task candidate slice, 48 trials, ~45m
+```
+
+Each writes `results/harbor/<date>/<slice>-<pin>-<stamp>.{md,json,log}`. The
+report includes the engagement-conditioned split, which is the number to read
+before the aggregate — see `docs/comparability.md` B6.
+
+**Check whether a slice can measure akm at all:**
+
+```sh
+bin/akm-bench-calibrate jobs/.analysis-<job-name>
+```
+
+Reports each task's no-skill control pass rate. A task whose control already
+passes cannot measure akm, however carefully it is run. On the v1 train slice,
+19 of 28 tasks fail this gate — they are disclosed by name in
+`results/calibration/`, not hidden.
+
+**Version pins** live in `harbor/akm_opencode.py` and nowhere else. Changing
+them there is enough; `bin/ab-run` prints what it resolved and refuses to start
+if the pinned `akm-cli` falls outside the pinned plugin's own compatibility
+range, which would otherwise leave the plugin unloaded and score every treatment
+trial as a baseline.
+
+**Do not compare a v2 number to a v1 number** without
+`results/calibration/transition-v1-v2-0910.md`. v2 excludes the tasks that
+contribute ~zero, so its aggregate is arithmetically larger on the same build —
+composition, not improvement.
 
 ## What You Need
 
@@ -347,6 +397,62 @@ Two traps are worth knowing before you read any output:
 See **`docs/harbor-p0.md`** for prerequisites, the exact commands, how to
 confirm the model really called `akm_*` tools, the network-policy and
 CLI-pinning caveats, and the list of things still unverified.
+
+### Running a corpus A/B: `bin/ab-run`
+
+The committed `harbor/jobs/corpus-*-ab.yaml` are templates carrying
+`model_name: PROVIDER/MODEL` placeholders, so they are not directly runnable.
+`bin/ab-run` renders a runnable copy, preflights, executes, and analyzes:
+
+```sh
+bin/ab-run train --dry-run     # render + preflight, run nothing
+bin/ab-run train               # the real thing (~3h for 28 tasks x 2 arms x k=3)
+bin/ab-run eval                # the slice whose number you report
+```
+
+`OPENCODE_API_KEY` does not need to be exported. When it is absent, `ab-run`
+finds the akm env asset that holds it and re-execs itself under
+`akm env run <ref> --only OPENCODE_API_KEY -- ...` — the injection path akm's
+own help prescribes over sourcing the file, with `--only` keeping every other
+credential in that asset out of the run's environment and out of the
+containers harbor hands it to. Export the variable yourself and that path is
+skipped.
+
+It defaults both arms to `opencode/qwen3.5-plus` — the model every committed
+report used — so a fresh run stays comparable by default. Version pins come
+from `harbor/akm_opencode.py` and are printed in the banner; change them there,
+never here.
+
+It will not start without a reachable Docker daemon or a resolvable API key,
+and it will not start on a stale plugin-compatibility mirror (below). Where a
+run *can* safely proceed it does: a second run of the same slice and pin lands
+in `jobs/<job_name>-r2/` rather than stopping to ask, because a fresh directory
+per run is what keeps `akm-bench-analyze` — which walks the whole tree — from
+pooling two runs into one meaningless statistic.
+
+Each run writes `results/harbor/<date>/<slice>-<pin>-<stamp>.{md,json,log}`.
+
+#### The plugin-compatibility cross-check
+
+The pinned `akm-cli` must satisfy the pinned plugin's own `AKM_VERSION_RANGE`.
+When it does not, the plugin quietly declines to load and **every treatment
+trial scores as a baseline** — an A/B that measures nothing while looking
+perfectly healthy for three hours. This cannot be caught in the container: by
+then, the only observable fact is whether the CLI installed, not whether the
+plugin will accept it. It is a cross-check between two pins, so it lives where
+both are known:
+
+- `harbor/akm_opencode.py` mirrors the range as
+  `AKM_PLUGIN_REQUIRED_CLI_RANGE` and calls `assert_pins_compatible()` **at
+  import**, so a bare `harbor run` is covered too, before any container is
+  built. `harbor/tests/` covers it.
+- `bin/ab-run` additionally reads the range out of the published plugin tarball
+  before every run and fails if the mirrored copy has gone stale — the failure
+  mode that actually happened, when the range moved `^0.9.0` → `^0.9.8` between
+  plugin builds and nothing noticed.
+
+The in-container shell guard remains a coarse "is this a 0.9.x at all" install
+check; a POSIX glob cannot express `^0.9.8`, and it is no longer asked to.
 
 ### Three-arm A/B job configs (P2)
 

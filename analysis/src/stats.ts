@@ -708,6 +708,82 @@ export function computeArmToolUseStats(records: readonly TrialRecord[], arm: str
   };
 }
 
+// ── Engagement-conditioned delta ─────────────────────────────────────────────
+
+export interface EngagementConditionedDelta {
+  /** The arm partitioned by whether the model called an `akm_*` tool. */
+  treatmentArm: string;
+  /** The arm each partition is paired against — unpartitioned, identical in both rows. */
+  controlArm: string;
+  /** Treatment trials that called at least one `akm_*` tool. */
+  nTrialsCalled: number;
+  /** Treatment trials with a readable trajectory that called none. */
+  nTrialsNotCalled: number;
+  /** Treatment trials whose trajectory was unreadable — excluded from BOTH partitions rather than assumed silent. */
+  nTrialsNoTrajectory: number;
+  engagementRate: number | null;
+  /** Delta over tasks where the treatment arm called akm. Null when no task qualifies. */
+  called: PairedDelta | null;
+  /** Delta over tasks where it did not. Null when no task qualifies. */
+  notCalled: PairedDelta | null;
+}
+
+/**
+ * Split the treatment arm by whether the model actually invoked akm, and pair
+ * each half by task against the SAME control arm.
+ *
+ * Why this is a first-class statistic and not a footnote: across four rounds
+ * the aggregate delta has been almost entirely carried by the minority of
+ * trials that called an `akm_*` tool, while the trials that did not have sat
+ * on zero. An aggregate number alone therefore describes a blend of "akm
+ * works" and "akm was never consulted", and moves when engagement moves even
+ * if neither underlying effect changed. Reporting the two separately is what
+ * makes the aggregate interpretable.
+ *
+ * READ THE `n` BEFORE THE MAGNITUDE. A task lands in the `called` partition
+ * when ANY of its treatment trials invoked akm, so at realistic engagement
+ * rates that partition is a handful of tasks and its interval is wide.
+ *
+ * A task appearing in one partition is not excluded from the other: with
+ * `n_attempts > 1` a task whose trials disagree contributes to both, scored
+ * over only the trials belonging to that partition. This is a descriptive
+ * split of observed behaviour, NOT a randomised comparison — the model chose
+ * which trials engaged, so the partitions differ by whatever made it choose
+ * (task shape, difficulty, phrasing) and not by akm alone. It cannot support
+ * a causal claim on its own; it is evidence about where the aggregate comes
+ * from.
+ */
+export function computeEngagementConditionedDelta(
+  records: readonly TrialRecord[],
+  treatmentArm: string,
+  controlArm: string,
+  options: BootstrapOptions = {},
+): EngagementConditionedDelta {
+  const treatmentTrials = records.filter((r) => r.arm === treatmentArm);
+  const withTrajectory = treatmentTrials.filter((r) => r.toolUse.akmCalls !== null);
+  const called = withTrajectory.filter((r) => (r.toolUse.akmCalls ?? 0) > 0);
+
+  const deltaFor = (keep: (record: TrialRecord) => boolean): PairedDelta | null => {
+    // Keep the control arm whole; partition only the treatment arm. Trials
+    // with no readable trajectory are dropped rather than counted as silent.
+    const subset = records.filter((r) => (r.arm === treatmentArm ? r.toolUse.akmCalls !== null && keep(r) : true));
+    const summaries = bucketByTaskArm(subset).map(summarizeTaskArmRewards);
+    const delta = computePairedDelta(summaries, treatmentArm, controlArm, "errored-as-zero", options);
+    return delta.nTasksPaired > 0 ? delta : null;
+  };
+
+  return {
+    treatmentArm,
+    controlArm,
+    nTrialsCalled: called.length,
+    nTrialsNotCalled: withTrajectory.length - called.length,
+    nTrialsNoTrajectory: treatmentTrials.length - withTrajectory.length,
+    engagementRate: withTrajectory.length > 0 ? called.length / withTrajectory.length : null,
+    called: deltaFor((r) => (r.toolUse.akmCalls ?? 0) > 0),
+    notCalled: deltaFor((r) => (r.toolUse.akmCalls ?? 0) === 0),
+  };
+}
+
 // ── Top-level orchestration ──────────────────────────────────────────────────
 
 export interface ArmSummary {
@@ -728,6 +804,8 @@ export interface AnalysisStats {
   deltas: PairedDelta[];
   /** One entry per unordered arm pair — the symmetric-exclusion comparison (see `computeSymmetricPairedDelta`), which drops a task from BOTH arms whenever either one errored on it. */
   symmetricDeltas: SymmetricPairedDelta[];
+  /** One entry per arm pair in which exactly one arm engaged akm — see `computeEngagementConditionedDelta`. Empty when no pair qualifies. */
+  engagementDeltas: EngagementConditionedDelta[];
   bootstrap: { seed: number; resamples: number; alpha: number };
 }
 
@@ -764,6 +842,8 @@ export function computeAnalysisStats(records: readonly TrialRecord[], options: B
 
   const deltas: PairedDelta[] = [];
   const symmetricDeltas: SymmetricPairedDelta[] = [];
+  const engagementDeltas: EngagementConditionedDelta[] = [];
+  const engagedArms = new Set(armSummaries.filter((a) => (a.toolUseStats.nWithAkmCall ?? 0) > 0).map((a) => a.arm));
   for (let i = 0; i < arms.length; i++) {
     for (let j = i + 1; j < arms.length; j++) {
       const armA = arms[i] as string;
@@ -772,8 +852,27 @@ export function computeAnalysisStats(records: readonly TrialRecord[], options: B
         deltas.push(computePairedDelta(taskArmSummaries, armA, armB, policy, bootstrapOptions));
       }
       symmetricDeltas.push(computeSymmetricPairedDelta(taskArmSummaries, armA, armB, bootstrapOptions));
+
+      // Only meaningful when exactly one arm engaged akm: that arm is the one
+      // worth partitioning, and the other is its control. Two engaging arms
+      // (a three-arm static/accumulating run) have no unambiguous control
+      // here, and neither engaging means there is nothing to condition on.
+      const aEngaged = engagedArms.has(armA);
+      const bEngaged = engagedArms.has(armB);
+      if (aEngaged !== bEngaged) {
+        const treatment = aEngaged ? armA : armB;
+        const control = aEngaged ? armB : armA;
+        engagementDeltas.push(computeEngagementConditionedDelta(records, treatment, control, bootstrapOptions));
+      }
     }
   }
 
-  return { arms: armSummaries, taskArmSummaries, deltas, symmetricDeltas, bootstrap: { seed, resamples, alpha } };
+  return {
+    arms: armSummaries,
+    taskArmSummaries,
+    deltas,
+    symmetricDeltas,
+    engagementDeltas,
+    bootstrap: { seed, resamples, alpha },
+  };
 }

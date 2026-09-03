@@ -1,0 +1,327 @@
+# Corpus A/B: the CALIBRATED train slice (v2), baseline vs akm-static.
+#
+# Built from corpus-train-ab.yaml and IDENTICAL to it in every field except
+# `job_name` and the task list below. The arms, their pins, their permission
+# blocks and their budgets are byte-identical on purpose, so a v1 result and a
+# v2 result differ only in which tasks ran.
+#
+# WHAT v2 IS. The 9 of 29 v1 train tasks whose no-skill CONTROL failed every
+# attempt -- the only tasks in the slice that can measure akm at all
+# (docs/comparability.md B6). Measured in
+# results/calibration/train-v1-0910-2026-09-03.md; regenerate with:
+#
+#   bin/akm-bench-calibrate <jobs-dir> --corpus harbor/tasks
+#
+# WHAT v2 IS NOT. Not an edit of v1. Every task here is the same directory
+# akm-tasks-train points at, unmodified; akm-tasks-train remains present and
+# runnable and its published results remain valid. B3 forbids rewording,
+# retiring or re-verifying a task in a slice that has results, so membership
+# changes are a NEW SLICE, never an edit in place.
+#
+# THE 19 EXCLUDED TASKS ARE NOT HIDDEN. They are listed by name with their
+# control pass rates in the calibration report, and they still run under
+# akm-tasks-train. 18 have a control that passes every attempt; one
+# (docker-homelab--compose-version-upgrade) is guessable at 2/3.
+#
+# >>> READ BEFORE COMPARING A v2 NUMBER TO A v1 NUMBER <<<
+# v2 drops exactly the tasks that contributed ~zero delta, so on the SAME akm
+# build its aggregate is arithmetically expected to be larger than v1's. That
+# gap is corpus composition, not improvement. Run BOTH slices in one
+# transition round; the overlap is what ties the two scales together, and
+# without it every later v2-vs-v1 statement is unfounded.
+#
+# This slice is expected to grow: docs/task-class-local-convention.md specs
+# the task class meant to fill it out (a real tool whose LOCAL convention
+# differs from the public default). None of those tasks are authored yet, so
+# v2 is currently v1's discriminating subset and nothing more.
+#
+#   PYTHONPATH="$(pwd)" harbor run -c harbor/jobs/corpus-train-v2-ab.yaml
+#   bin/ab-run train-v2
+#
+# >>> EDIT ME <<< both model_name values (they MUST match) before running.
+#   (bin/ab-run fills these in for you.)
+#
+job_name: akm-corpus-train-v2-ab
+
+# Where trial directories are written, relative to the working directory.
+# Results land in <jobs_dir>/<job_name>/<trial>/ -- trial dirs are DIRECT
+# children of the job dir, with NO intervening per-task directory level.
+# VERIFIED against Harbor v0.22.0 source (see tb2-ab.yaml's jobs_dir comment
+# for the exact citation); bin/check-harbor-contract re-asserts it on every
+# Harbor bump. analysis/src/loader.ts walks exactly this two-level shape.
+jobs_dir: jobs
+
+# One attempt per (task x agent). P0 only asks "did akm_* tools get called",
+# which is a binary observation, not a rate -- raise this only once you start
+# comparing scores.
+n_attempts: 3
+
+# Run trials sequentially. Both arms npm-install into their own container and
+# the treatment arm pulls ~432MB; concurrency here mostly buys registry
+# throttling and noisy timing.
+n_concurrent_trials: 4
+
+# Show trial progress. Set true for CI.
+quiet: false
+
+# No timeout scaling. The AGENT phase budget comes from each task's own
+# [agent] timeout_sec (the benchmark-defined value); only the SETUP budget is
+# pinned per agent (override_setup_timeout_sec below), identically on both
+# arms. A multiplier here would scale whatever base each arm resolves, so
+# leaving it at 1.0 is what keeps the agent budget equal to the official one.
+timeout_multiplier: 1.0
+
+environment:
+  # Local Docker. Requires a running Docker daemon -- `docker ps` must work.
+  type: docker
+  # Reuse a cached task image when one exists. Set true to force a rebuild
+  # after editing a task's Dockerfile.
+  force_build: false
+  # Remove containers after each trial. MUST stay true: the akm bundle is
+  # seeded per container and akm_remember / auto-feedback write into it during
+  # a trial, so a reused container would let trials contaminate each other.
+  delete: true
+
+agents:
+  # ------------------------------------------------------------------ CONTROL
+  # Stock opencode. Every field below is chosen so the ONLY differences from
+  # the treatment arm are (a) the `plugin` array, (b) the top-level `tools` map
+  # that enables the five akm_* tools and (c) the AKM_* environment. Anything
+  # else that differs is a confound.
+  - name: opencode
+
+    # >>> EDIT ME <<< must be byte-identical to the treatment arm's model_name.
+    # NOTE: `-m/--model` on the command line does NOT override this. Harbor only
+    # applies -m when --agent is also passed, and --agent REPLACES the entire
+    # agents list from this file. Edit the value here.
+    model_name: PROVIDER/MODEL
+
+    kwargs:
+      # opencode-ai npm pin. Repeated verbatim from OPENCODE_VERSION in
+      # harbor/akm_opencode.py -- the control arm cannot import that constant,
+      # so harbor/tests/test_akm_opencode.py asserts the two stay in sync.
+      # Both arms must run the same opencode binary.
+      version: "1.18.21"
+
+      opencode_config:
+        # Mirrors AkmOpenCode._DEFAULT_CONFIG so the two arms write the same
+        # base config.
+        "$schema": https://opencode.ai/config.json
+        autoupdate: false
+
+        # Mirrors SHARED_PERMISSIONS in harbor/akm_opencode.py: the COMPLETE
+        # set of keys opencode 1.18.21's Config.permission declares
+        # (@opencode-ai/sdk dist/gen/types.gen.d.ts:1161-1169), and nothing
+        # else. There is no read/write/grep/glob/list/patch key in that schema,
+        # and the akm_* tools are not permission keys at all -- they live in the
+        # separate top-level `tools` map that only the treatment arm carries.
+        #
+        # Honest rationale: Harbor's OpenCode.run() already passes
+        # --dangerously-skip-permissions, so this block gates nothing today. It
+        # is belt-and-braces against a Harbor upgrade that drops that flag --
+        # and it is repeated here because belt-and-braces on ONE arm is a
+        # confound: it would entangle "plugin present" with "permissions
+        # granted". harbor/tests/test_akm_opencode.py asserts this block equals
+        # SHARED_PERMISSIONS exactly.
+        #
+        # Side benefit of a non-empty config here: OpenCode.model_connection
+        # applies without_inferred_base_url() whenever opencode_config is
+        # truthy. The treatment arm always has a truthy config, so giving the
+        # control arm one too keeps both arms on the same base-URL branch.
+        permission:
+          edit: allow
+          bash: allow
+          webfetch: allow
+          doom_loop: allow
+          external_directory: allow
+
+    # Same allowlist entry as the treatment arm. The control arm has no plugin
+    # to fetch at session start, so it will not use this -- it is here to keep
+    # the two arms' network policy identical.
+    extra_allowed_hosts:
+      - registry.npmjs.org
+      # Local OpenAI-compatible inference endpoint (LM Studio on the LAN).
+      # Identical on both arms -- a host allowed on one arm only is a confound.
+
+    # Belt-and-braces with `opencode_config.autoupdate: false` above, and
+    # deliberately symmetric with the treatment arm: AkmOpenCode.AKM_ENV sets
+    # OPENCODE_DISABLE_AUTOUPDATE=true in the treatment process env (a SECOND,
+    # independent mechanism for the same intent), which this arm has no
+    # equivalent of without this. Two different mechanisms enforcing the same
+    # thing are not provably equivalent in opencode 1.18.21 -- if the config
+    # key were ever weaker than the env var, only this arm would attempt an
+    # autoupdate network call, which is a confound (a network call and a
+    # latency difference on the control arm only), not a convenience.
+    env:
+      OPENCODE_DISABLE_AUTOUPDATE: "true"
+
+    # Harbor's default agent-setup timeout is 360s, which the treatment arm
+    # will blow through. Set on both arms so the phase budgets match; the
+    # control arm simply finishes early.
+    override_setup_timeout_sec: 2700
+
+    # No AGENT-phase override. The task's own [agent] timeout_sec governs, on
+    # both arms -- it is the benchmark-defined budget, and honoring it is what
+    # keeps these numbers comparable to published leaderboard numbers. A flat
+    # override_timeout_sec used to sit here because the treatment arm pays
+    # plugin session-start work inside the agent phase that this arm never
+    # pays, so an asymmetric effective budget could make a treatment-only
+    # AgentTimeoutError read as "akm failed the task". That residual cost is
+    # mitigated, not proven to be zero: install() pre-warms opencode's two
+    # plugin caches and the npm cache, and the install self-check ASSERTS the
+    # warm cache, so the agent phase should not pay a cold plugin fetch.
+
+    # NO exclude_logs, and the two arms must collect logs identically or the
+    # evidence base is asymmetric. opencode's XDG_DATA_HOME is
+    # /logs/agent/opencode/xdg-data, and its session log --
+    # /logs/agent/opencode/xdg-data/opencode/log/*.log -- is where the plugin's
+    # client.app.log() lines land: the "AKM CLI resolved" marker that
+    # AkmOpenCode._assert_plugin_ran() requires before it will let a treatment
+    # trial score, plus the akm.<surface>.<outcome> lines. On this arm the same
+    # log is the negative control -- it should contain no akm lines at all.
+    # Excluding "opencode/xdg-data/**" is inert on Docker (a mounted
+    # environment short-circuits log filtering) but deletes exactly that
+    # evidence on any non-mounted/cloud environment, and it cannot be paired
+    # with an include: Harbor applies exclude AFTER include
+    # (harbor/utils/path_filter.py), so exclude always wins. Trial-dir size is
+    # not worth an arm that cannot be verified.
+
+  # ---------------------------------------------------------------- TREATMENT
+  # opencode + akm-opencode. Deliberately terse: the agent class force-injects
+  # the plugin array, the `tools` map, the permission block and the AKM_*
+  # environment, so this arm CANNOT silently degrade into a no-plugin run if
+  # this file is wrong -- and if the plugin fails to load at run time anyway,
+  # populate_context_post_run() errors the trial instead of scoring it.
+  - import_path: harbor.akm_opencode:AkmOpenCode
+
+    # >>> EDIT ME <<< must equal the control arm's model_name exactly.
+    model_name: PROVIDER/MODEL
+
+    kwargs:
+      # Same opencode pin as the control arm. AkmOpenCode defaults to
+      # OPENCODE_VERSION when this is omitted; stated explicitly so the two
+      # arms are visibly pinned together in one file.
+      version: "1.18.21"
+      #
+      # NOT set here, on purpose:
+      #   opencode_config -- the class force-merges `plugin` and `permission`
+      #     into the highest-precedence layer. Anything set here is merged
+      #     UNDER those two keys, so use it only for genuinely extra config.
+      #   akm_plugin_spec / akm_cli_spec -- pinned by AKM_PLUGIN_SPEC and
+      #     AKM_CLI_SPEC in harbor/akm_opencode.py. Override only to test a
+      #     different plugin build.
+      #   akm_plugin_spec / akm_cli_spec -- see p0-smoke.yaml.
+      #
+      # The D6 treatment library, not the smoke fixture: this task is an
+      # akm-relevant corpus task, so the arm must carry the library the corpus
+      # was authored against. Relative to the process working directory, same
+      # as tb2-ab.yaml.
+      seed_library_dir: harbor/treatment-library
+
+    # Required. opencode installs npm plugins at SESSION START, i.e. during
+    # agent.run(), where the task's agent-phase network policy applies. If the
+    # task uses an allowlist network mode, the plugin fetch fails there even
+    # though setup had network. install() also pre-warms the cache, so this is
+    # the second of two independent mitigations.
+    extra_allowed_hosts:
+      - registry.npmjs.org
+      # Local OpenAI-compatible inference endpoint (LM Studio on the LAN).
+      # Identical on both arms -- a host allowed on one arm only is a confound.
+
+    # This arm's install() does: node + opencode-ai, then `npm i -g akm-cli`
+    # (~432MB), then bundle seed + index, then a full opencode boot (with this
+    # arm's real config and model name) to warm both plugin caches, then the
+    # self-check. 360s is not enough.
+    override_setup_timeout_sec: 2700
+
+    # No AGENT-phase override, same as the control arm -- the task's own
+    # [agent] timeout_sec governs. This arm's session-start cost is mitigated
+    # by install()'s cache pre-warm plus the self-check that asserts it; that
+    # is a mitigation, not a proof of zero cost.
+
+    # NO exclude_logs, for the same reason as the control arm -- and here it is
+    # load-bearing rather than merely tidy: opencode's log under XDG_DATA_HOME
+    # carries the "AKM CLI resolved" line that this arm's
+    # populate_context_post_run() requires. Excluding "opencode/xdg-data/**"
+    # would turn every treatment trial into an error on a non-mounted
+    # environment. See docs/harbor-p0.md section 4.
+
+    # Operator escape hatch. Values here reach the container as a Trial scoped
+    # exec-env overlay, which BaseEnvironment._merge_env applies LAST -- so
+    # anything set here overrides the class's AKM_ENV defaults. Left empty
+    # because the defaults are already the benchmark-correct ones; uncomment to
+    # flip a kill switch without editing Python.
+    env: {}
+      # AKM_AUTO_CURATE: "0"
+      # AKM_AUTO_HINTS: "0"
+
+# >>> EDIT ME <<<
+# The train slice, listed by name so this file -- not a directory scan and not
+# a registry lookup -- is the source of truth for what a train A/B runs.
+# `path` is relative to the working directory you run harbor from.
+datasets:
+  - path: harbor/tasks
+    task_names:
+      - drillbit--backup-policy-train
+      - drillbit--fix-runbook-train
+      - drillbit--scale-replicas-train
+      - inkwell--add-healthcheck-train
+      - inkwell--new-service-scaled-train
+      - inkwell--new-service-train
+      - workflow-compliance--feedback-trap-az-tag-list
+      - workflow-compliance--feedback-trap-docker-compose-render
+      - workflow-compliance--repeated-fail-opencode-provider-token-train
+    # ------------------------------------------------- MEASUREMENT EXCLUSION
+    # workflow-compliance--repeated-fail-opencode-disable-provider
+    # is in the `akm-tasks-train` registry slice (29 tasks) but is barred from
+    # every A/B arm comparison, here and in corpus-eval-ab.yaml.
+    #
+    # THE LEAK. akm-opencode ships a format-declaration write gate: on the
+    # first edit to a file whose format the stash documents, it blocks the
+    # edit and names the exact stash ref to akm_show. This task's
+    # environment/workspace/config/opencode.json carries
+    #     "$schema": "https://opencode.ai/config.json"
+    # so the gate's extractor yields the token `opencode`; the task declares
+    # stash = "noisy" and gold_ref = "skills/opencode", and
+    # harbor/stashes/noisy/skills/opencode exists -- so the ref resolves and
+    # the gate hands the model `skills/opencode` unasked.
+    #
+    # WHY THAT MATTERS HERE AND NOWHERE ELSE. This task exists specifically to
+    # measure whether the model CHOOSES to look the asset up: instruction.md
+    # requires it to write `akm-show-ref: skill:opencode`, and task.toml sets
+    # expected_workflows = ["akm-lookup-before-edit", ...]. The gate makes that
+    # choice for it, so the observation stops being an observation of the
+    # model. A sweep of all 74 files under harbor/tasks/*/environment/workspace
+    # found exactly 8 that declare a schema authority ($schema, apiVersion/kind
+    # or a yaml-language-server comment): the seven inkwell service.yaml
+    # (apiVersion: inkwell/v2) and this one. The inkwell tasks are scored on
+    # whether the edit is correct, not on akm-lookup-before-edit, so the gate
+    # firing there IS the mechanism under test doing its job. This is the only
+    # task in the corpus whose declared schema token resolves to its own
+    # gold_ref while its score also counts akm-lookup-before-edit.
+    #
+    # IT IS TREATMENT-ONLY. The gate exists only on the akm arm; the control
+    # arm has no plugin and gets nothing. So the adherence pass would accrue to
+    # one arm from the harness rather than from the model -- an arm-asymmetric
+    # confound, not a result.
+    #
+    # THIS IS A MEASUREMENT DECISION, NOT A BROKEN TASK. The task, its verifier
+    # and its stash are correct and were not modified. It still runs and scores
+    # normally under the oracle and nop agents, and under any single-arm run
+    # (`harbor run -p harbor/tasks ...`, or `--registry-path
+    # harbor/registry.json -d akm-tasks-train@1.0`, which still resolves all 29
+    # -- the published slice was deliberately left intact, see
+    # harbor/registry.json). Firing on a real user's opencode.json is correct
+    # product behaviour, so this is fixed benchmark-side rather than by making
+    # the plugin benchmark-aware.
+    #
+    # Belt-and-braces with the omission from the list above: Harbor applies
+    # exclude_task_names AFTER task_names
+    # (harbor/models/job/config.py:_filter_task_ids), so the bar holds even if
+    # that list is ever regenerated from the registry slice.
+    # NOTE FOR v2: the barred task is not a member of this slice at all
+    # (it fails the calibration gate and was not carried over), so this
+    # block is inert here. Kept anyway -- it costs nothing, and it keeps
+    # this file diffable against corpus-train-ab.yaml.
+    exclude_task_names:
+      - workflow-compliance--repeated-fail-opencode-disable-provider

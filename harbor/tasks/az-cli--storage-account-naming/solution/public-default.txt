@@ -1,0 +1,8 @@
+# LC2 evidence (docs/task-class-local-convention.md).
+#
+# The confident, publicly-correct answer a model produces from pretraining
+# alone. It MUST fail this task's verifier -- if it ever starts passing, the
+# task has stopped discriminating and LC7 requires re-authoring it.
+# Asserted automatically by harbor/tests/test_local_convention_tasks.py.
+# Not agent-visible: the Dockerfile copies only environment/workspace/.
+az storage account create --name payrollarchive --resource-group rg-payroll --location eastus --sku Standard_LRS

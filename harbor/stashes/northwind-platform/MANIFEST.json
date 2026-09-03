@@ -1,0 +1,16 @@
+{
+  "name": "northwind-platform",
+  "description": "Northwind Platform Engineering internal standards: the org-local conventions that override public defaults for az, docker, kubectl, terraform and git.",
+  "purpose": "Sole source of truth for the local-convention task class (docs/task-class-local-convention.md). Every value these docs mandate is deliberately NOT recoverable from the tools' public documentation -- that is what makes the tasks discriminating.",
+  "assets": {
+    "skill": 0,
+    "knowledge": 5,
+    "command": 0,
+    "agent": 0,
+    "script": 0,
+    "memory": 0
+  },
+  "consumers": [
+    "harbor/tasks/*--*-local-convention tasks (slice akm-tasks-local-convention-v1)"
+  ]
+}

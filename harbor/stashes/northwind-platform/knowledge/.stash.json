@@ -1,0 +1,93 @@
+{
+  "entries": [
+    {
+      "name": "azure-resource-standards",
+      "type": "knowledge",
+      "description": "Mandatory Azure naming, tagging and TLS standards",
+      "tags": [
+        "azure",
+        "az",
+        "naming",
+        "tagging",
+        "storage",
+        "keyvault",
+        "aks",
+        "standards",
+        "policy",
+        "cost-center"
+      ],
+      "filename": "azure-resource-standards.md",
+      "quality": "curated",
+      "confidence": 0.9
+    },
+    {
+      "name": "container-standards",
+      "type": "knowledge",
+      "description": "Container runtime, registry and image tag standards",
+      "tags": [
+        "docker",
+        "container",
+        "registry",
+        "restart",
+        "label",
+        "logging",
+        "tags",
+        "calver",
+        "standards"
+      ],
+      "filename": "container-standards.md",
+      "quality": "curated",
+      "confidence": 0.9
+    },
+    {
+      "name": "kubernetes-standards",
+      "type": "knowledge",
+      "description": "Kubernetes namespace naming and production replica floors",
+      "tags": [
+        "kubernetes",
+        "kubectl",
+        "namespace",
+        "scale",
+        "replicas",
+        "production",
+        "standards"
+      ],
+      "filename": "kubernetes-standards.md",
+      "quality": "curated",
+      "confidence": 0.9
+    },
+    {
+      "name": "terraform-standards",
+      "type": "knowledge",
+      "description": "Terraform backend config and lockfile initialisation standards",
+      "tags": [
+        "terraform",
+        "init",
+        "backend",
+        "lockfile",
+        "state",
+        "standards"
+      ],
+      "filename": "terraform-standards.md",
+      "quality": "curated",
+      "confidence": 0.9
+    },
+    {
+      "name": "git-standards",
+      "type": "knowledge",
+      "description": "Git branch naming convention and mandated branch-creation command",
+      "tags": [
+        "git",
+        "branch",
+        "naming",
+        "switch",
+        "checkout",
+        "ticket",
+        "standards"
+      ],
+      "filename": "git-standards.md",
+      "quality": "curated",
+      "confidence": 0.9
+    }
+  ]
+}

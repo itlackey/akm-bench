@@ -1,0 +1,40 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/docker-homelab--run-service-local"
+version = "1.0.0"
+description = "Produce the docker run command for the invoicer service container"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+domain = "docker-homelab"
+slice = "local-convention-v1"
+difficulty = "medium"
+stash = "northwind-platform"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "knowledge/container-standards"
+memory_ability = "local_convention_override"
+task_family = "docker/run-policy"
+akm_keywords = "docker run restart policy label log driver cost center container standards"
+recheck_on = "model-change"
+# The stash-only values this task tests. LC4 requires each to appear in the
+# stash and in NO agent-visible file; asserted by
+# harbor/tests/test_local_convention_tasks.py. Task INPUTS the prompt supplies
+# (resource-group names, the secret name, the container name) are deliberately
+# not listed -- they are given, not looked up.
+convention_tokens = ["on-failure:5", "com.northwind.cost-center=CC-4417"]
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "northwind-platform"
