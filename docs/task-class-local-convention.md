@@ -1,6 +1,26 @@
 # Task class: local convention over public default
 
-**Status: specification. No task of this class is authored yet.**
+**Status: 8 tasks authored, awaiting calibration (LC6).**
+
+They are in the `akm-tasks-local-convention-v1` registry slice and are
+deliberately NOT in `akm-tasks-train-v2`: the admission checklist below
+requires LC6 — every task `discriminating` at k≥3 on a real run — and that run
+has not happened. Run it with `bin/ab-run local-convention`, then
+`bin/akm-bench-calibrate`.
+
+What has been verified without a model, by
+`harbor/tests/test_local_convention_tasks.py`:
+
+| check | how |
+| --- | --- |
+| LC2 | the confident public default is stored per task in `solution/public-default.txt` and asserted to FAIL its verifier |
+| LC4 | every `convention_tokens` value appears in the stash and in no agent-visible file |
+| LC5 | gold passes; near-misses, undocumented extra flags, and empty input are rejected |
+
+What **cannot** be checked without a model is LC2's premise — whether the model
+actually produces the public default. A task it happens to answer correctly
+from pretraining is guessable and must be re-authored, and only the calibration
+run can tell you which.
 
 This class exists to fill a hole the 2026-09-03 calibration measurement made
 visible. It is the only task shape in which akm engagement is both *low* and
@@ -96,9 +116,10 @@ without anyone editing it.
 
 ## Worked example
 
-**Not authored — this is the shape, not a shipped task.** Placement would be
-`harbor/tasks/az-cli--storage-account-naming/`, in the `train-v2` slice, only
-after LC6 passes on a real run.
+**Now authored** as `harbor/tasks/az-cli--storage-account-naming/`, in the
+`akm-tasks-local-convention-v1` candidate slice — not `train-v2`, which LC6
+gates. The stash asset below shipped as
+`harbor/stashes/northwind-platform/knowledge/azure-resource-standards.md`.
 
 The public default: `az storage account create` with any globally-unique name.
 Every model knows this cold — and `az-cli--storage-account-create` currently

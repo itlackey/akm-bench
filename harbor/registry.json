@@ -247,5 +247,44 @@
         "path": "harbor/tasks/workflow-compliance--repeated-fail-opencode-provider-token-train"
       }
     ]
+  },
+  {
+    "name": "akm-tasks-local-convention-v1",
+    "version": "1.0",
+    "description": "CANDIDATE SLICE -- NOT CALIBRATED, NOT A MEASUREMENT SLICE YET. Eight tasks of the local-convention class (docs/task-class-local-convention.md): a REAL tool the model knows well, where the correct answer depends on an org-local convention that exists only in the northwind-platform stash. This is the class the v1 corpus lacks entirely -- v1 contains only fictional tools (the model knows it is ignorant, so consulting akm is forced) and real tools with public answers (the model is right not to look). Here the model is confident and WRONG, so whether it consults akm is a genuine choice with a real cost, which is the only setting in which the plugin's trigger wording could matter. ADMISSION IS NOT COMPLETE. The spec's checklist requires LC6 -- bin/akm-bench-calibrate must report every task 'discriminating' at k>=3 on a real run -- before a task enters a measurement slice. That run has not happened, so these tasks are deliberately NOT in akm-tasks-train-v2. What HAS been verified, without a model, by harbor/tests/test_local_convention_tasks.py: the documented local form passes each verifier, the confident public default FAILS it (LC2), near-miss forms and undocumented extra flags are rejected (LC5), and every declared convention token appears in the stash and in no agent-visible file (LC4). What cannot be checked without a model is whether the model actually produces the public default -- LC2's premise. If a model answers some task correctly from pretraining anyway, that task is guessable and must be re-authored. NO EXISTING TASK WAS TOUCHED: every directory here is new (docs/comparability.md B3).",
+    "tasks": [
+      {
+        "name": "az-cli--storage-account-naming",
+        "path": "harbor/tasks/az-cli--storage-account-naming"
+      },
+      {
+        "name": "az-cli--keyvault-secret-local",
+        "path": "harbor/tasks/az-cli--keyvault-secret-local"
+      },
+      {
+        "name": "az-cli--aks-credentials-local",
+        "path": "harbor/tasks/az-cli--aks-credentials-local"
+      },
+      {
+        "name": "docker-homelab--run-service-local",
+        "path": "harbor/tasks/docker-homelab--run-service-local"
+      },
+      {
+        "name": "docker-homelab--push-image-local",
+        "path": "harbor/tasks/docker-homelab--push-image-local"
+      },
+      {
+        "name": "kubectl--scale-production-local",
+        "path": "harbor/tasks/kubectl--scale-production-local"
+      },
+      {
+        "name": "terraform--init-backend-local",
+        "path": "harbor/tasks/terraform--init-backend-local"
+      },
+      {
+        "name": "git--feature-branch-local",
+        "path": "harbor/tasks/git--feature-branch-local"
+      }
+    ]
   }
 ]
