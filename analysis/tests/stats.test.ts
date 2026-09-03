@@ -23,6 +23,7 @@ import {
   computeArmRewardStats,
   computeArmTokenStats,
   computeArmToolUseStats,
+  computeEngagementConditionedDelta,
   computePairedDelta,
   computePassAt1,
   computeSymmetricPairedDelta,
@@ -613,5 +614,108 @@ describe("computeArmToolUseStats", () => {
     const stats = computeArmToolUseStats([record("t", 2, 3), record("t", 1, 2)], "t");
     expect(stats.byTool.akm_curate).toBe(3);
     expect(stats.byTool.write).toBe(2);
+  });
+});
+
+describe("computeEngagementConditionedDelta", () => {
+  function trial(
+    arm: string,
+    taskName: string,
+    reward: number,
+    akmCalls: number | null,
+  ): TrialRecord {
+    return {
+      jobName: "job",
+      trialName: `${taskName}-${arm}-${reward}-${akmCalls}`,
+      trialDir: "/dev/null",
+      taskName,
+      arm,
+      agentName: "a",
+      agentVersion: "1",
+      modelName: "m",
+      modelProvider: "p",
+      source: null,
+      rewards: { reward },
+      reward,
+      otherRewards: {},
+      tokens: { inputTokens: null, cacheTokens: null, outputTokens: null, costUsd: null },
+      toolUse: {
+        akmCalls,
+        totalCalls: akmCalls === null ? null : akmCalls + 1,
+        byTool: akmCalls && akmCalls > 0 ? { akm_curate: akmCalls } : {},
+      },
+      errored: false,
+      exceptionType: null,
+      startedAt: null,
+      finishedAt: null,
+      timing: { environmentSetup: null, agentSetup: null, agentExecution: null, verifier: null },
+      provenance: { taskChecksum: "", agentKwargs: {}, agentImportPath: null, agentEnv: {} },
+    };
+  }
+
+  test("separates the delta carried by engaged trials from the delta without them", () => {
+    // task-a: treatment engaged and won. task-b: treatment never called akm
+    // and matched control. Pooled this reads as a modest +0.5; split, it is
+    // the whole story -- all of the lift sits in the engaged task.
+    const records = [
+      trial("treat", "task-a", 1, 2),
+      trial("ctrl", "task-a", 0, null),
+      trial("treat", "task-b", 1, 0),
+      trial("ctrl", "task-b", 1, null),
+    ];
+    const d = computeEngagementConditionedDelta(records, "treat", "ctrl");
+    expect(d.nTrialsCalled).toBe(1);
+    expect(d.nTrialsNotCalled).toBe(1);
+    expect(d.engagementRate).toBe(0.5);
+    expect(d.called?.nTasksPaired).toBe(1);
+    expect(d.called?.delta).toBe(1);
+    expect(d.notCalled?.nTasksPaired).toBe(1);
+    expect(d.notCalled?.delta).toBe(0);
+  });
+
+  test("the control arm is never partitioned -- both rows pair against all of it", () => {
+    // Control has no akm calls by construction; partitioning it too would
+    // leave the `called` row with no control to pair against at all.
+    const records = [
+      trial("treat", "task-a", 1, 1),
+      trial("ctrl", "task-a", 0, null),
+      trial("ctrl", "task-a", 0, null),
+    ];
+    const d = computeEngagementConditionedDelta(records, "treat", "ctrl");
+    expect(d.called?.nTasksPaired).toBe(1);
+    expect(d.called?.meanB).toBe(0);
+    expect(d.notCalled).toBeNull();
+  });
+
+  test("unreadable trajectories are excluded from both partitions, not read as silence", () => {
+    // Counting a crashed trial as "chose not to call akm" would turn a harness
+    // failure into a behavioural finding.
+    const records = [
+      trial("treat", "task-a", 1, null),
+      trial("ctrl", "task-a", 0, null),
+    ];
+    const d = computeEngagementConditionedDelta(records, "treat", "ctrl");
+    expect(d.nTrialsNoTrajectory).toBe(1);
+    expect(d.nTrialsCalled).toBe(0);
+    expect(d.nTrialsNotCalled).toBe(0);
+    expect(d.engagementRate).toBeNull();
+    expect(d.called).toBeNull();
+    expect(d.notCalled).toBeNull();
+  });
+
+  test("computeAnalysisStats emits one entry only when exactly one arm engaged", () => {
+    const records = [
+      trial("treat", "task-a", 1, 2),
+      trial("ctrl", "task-a", 0, 0),
+    ];
+    expect(computeAnalysisStats(records).engagementDeltas).toHaveLength(1);
+
+    // Both arms engaging (a three-arm static/accumulating run) has no
+    // unambiguous control, so the split is omitted rather than guessed.
+    const bothEngaged = [
+      trial("treat", "task-a", 1, 2),
+      trial("other", "task-a", 1, 2),
+    ];
+    expect(computeAnalysisStats(bothEngaged).engagementDeltas).toHaveLength(0);
   });
 });

@@ -27,6 +27,7 @@ import {
   type BootstrapCI,
   type BootstrapOptions,
   computeAnalysisStats,
+  type EngagementConditionedDelta,
   ERRORED_POLICIES,
   type ErroredPolicy,
   type PairedDelta,
@@ -450,6 +451,26 @@ function renderSymmetricDeltaTable(deltas: SymmetricPairedDelta[]): string {
   );
 }
 
+function renderEngagementDeltaTable(deltas: EngagementConditionedDelta[]): string {
+  const rows: string[][] = [];
+  for (const d of deltas) {
+    const partitions: [string, typeof d.called][] = [
+      ["akm WAS called", d.called],
+      ["akm NOT called", d.notCalled],
+    ];
+    for (const [label, delta] of partitions) {
+      rows.push([
+        `${d.treatmentArm} vs ${d.controlArm}`,
+        label,
+        delta ? String(delta.nTasksPaired) : "0",
+        delta ? fmtNum(delta.delta) : "-",
+        delta ? fmtCI(delta.ci) : "-",
+      ]);
+    }
+  }
+  return mdTable(["arms (treatment vs control)", "partition", "tasks paired", "delta", "95% CI"], rows);
+}
+
 function metadataGroupKey(
   row: PerTaskBreakdownRow,
   field: "domain" | "slice" | "difficulty" | "memoryAbility",
@@ -616,6 +637,27 @@ export function renderMarkdown(report: AnalysisReport): string {
         "_Neither `errored-as-zero` nor `errored-excluded` above is symmetric across arms: a harness/infrastructure failure that can only occur on ONE arm (e.g. a treatment-only run-phase proof) either scores that arm's task as 0 (errored-as-zero) or leaves the other arm's mean computed over all its trials while this arm's is computed over a non-random survivor subset (errored-excluded). This table drops the task from the comparison entirely instead — see `computeSymmetricPairedDelta` in `analysis/src/stats.ts`._",
         "",
         renderSymmetricDeltaTable(stats.symmetricDeltas),
+      ].join("\n"),
+    );
+  }
+
+  if (stats.engagementDeltas.length > 0) {
+    const counts = stats.engagementDeltas
+      .map(
+        (d) =>
+          `${d.nTrialsCalled} called / ${d.nTrialsNotCalled} did not` +
+          (d.nTrialsNoTrajectory > 0 ? ` / ${d.nTrialsNoTrajectory} no trajectory (excluded)` : ""),
+      )
+      .join("; ");
+    sections.push(
+      [
+        "## Engagement-conditioned delta (treatment split by whether the model called akm)",
+        "",
+        `Treatment trials: ${counts}.`,
+        "",
+        renderEngagementDeltaTable(stats.engagementDeltas),
+        "",
+        "_The aggregate delta above blends two different things: trials where the model consulted akm and trials where it was merely offered. This table separates them, pairing each partition by task against the same, unpartitioned control arm. READ THE `tasks paired` COLUMN BEFORE THE MAGNITUDE — a task joins the `called` partition when ANY of its treatment trials invoked akm, so at realistic engagement rates that partition is a handful of tasks with a wide interval. This is a descriptive split of behaviour the model chose, NOT a randomised comparison: the partitions differ by whatever drove that choice (task shape, difficulty, phrasing) as well as by akm, so it cannot carry a causal claim on its own. Trials whose trajectory was unreadable are excluded from both partitions rather than assumed silent. See `computeEngagementConditionedDelta` in `analysis/src/stats.ts`._",
       ].join("\n"),
     );
   }
