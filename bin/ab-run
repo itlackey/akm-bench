@@ -5,10 +5,17 @@ set -euo pipefail
 # template, preflight the things that silently ruin a 3-hour run, execute it,
 # and analyze the output into a dated report.
 #
-#   bin/ab-run train              # 28-task train slice (tuning)
+#   bin/ab-run train              # 28-task train slice v1 (tuning)
+#   bin/ab-run train-v2           # 9-task CALIBRATED train slice (see below)
 #   bin/ab-run eval               # eval slice (the number you report)
 #   bin/ab-run train --dry-run    # render + preflight only, run nothing
 #   bin/ab-run train --model opencode/qwen3.5-plus
+#
+# train-v2 is v1's discriminating subset -- the tasks whose no-skill control
+# actually fails (docs/comparability.md B6). It drops exactly the tasks that
+# contributed ~zero delta, so its aggregate is EXPECTED to be larger than v1's
+# on the same akm build. That is composition, not improvement: run both in one
+# transition round before comparing them.
 #
 # The model defaults to the one the committed baselines used, so a fresh run
 # stays comparable to results/harbor/ by default. Version pins come from
@@ -28,7 +35,7 @@ model="${AKM_BENCH_MODEL:-$DEFAULT_MODEL}"
 dry_run=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    train|eval) slice="$1"; shift ;;
+    train|eval|train-v2) slice="$1"; shift ;;
     --model) model="${2:?--model requires a value}"; shift 2 ;;
     --dry-run) dry_run=1; shift ;;
     -h|--help) sed -n '3,16p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
@@ -37,7 +44,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$slice" ]; then
-  echo "ab-run: which slice? 'train' (tuning) or 'eval' (the reported number)" >&2
+  echo "ab-run: which slice? 'train' (v1, tuning), 'train-v2' (calibrated subset), or 'eval' (the reported number)" >&2
   exit 2
 fi
 

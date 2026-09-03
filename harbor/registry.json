@@ -204,5 +204,48 @@
         "path": "harbor/tasks/workflow-compliance--repeated-fail-storage-lifecycle-eval"
       }
     ]
+  },
+  {
+    "name": "akm-tasks-train-v2",
+    "version": "2.0",
+    "description": "akm-bench train slice, v2: the CALIBRATED subset. Membership is the 9 of 29 v1 train tasks whose no-skill control failed every attempt in the 2026-09-03 run (results/calibration/train-v1-0910-2026-09-03.md), plus whatever local-convention tasks are added later (docs/task-class-local-convention.md). EVERY MEMBER IS THE SAME TASK DIRECTORY v1 POINTS AT, BYTE-IDENTICAL AND UNMODIFIED -- this slice re-references v1's tasks, it does not copy, edit, reword or re-verify them. v1 (akm-tasks-train) remains present and runnable and its results remain valid; docs/comparability.md B3 forbids editing a slice that has published results, so a change of membership is a NEW SLICE, never an edit. THE 19 EXCLUDED TASKS ARE NOT HIDDEN: they are enumerated by name, with their control pass rates and verdicts, in results/calibration/train-v1-0910-2026-09-03.md, and they still run as part of akm-tasks-train. Exclusion here means 'cannot measure akm', per docs/comparability.md B6 -- 18 have a control that passes every attempt and 1 (docker-homelab--compose-version-upgrade) is guessable at 2/3. BEFORE REPORTING A v2 NUMBER AGAINST A v1 ONE: run both slices in a single transition round. v2 excludes exactly the tasks that contributed ~zero delta, so its aggregate is arithmetically expected to be LARGER than v1's on the same akm build. That difference is composition, not improvement, and the overlap round is what ties the two scales together.",
+    "tasks": [
+      {
+        "name": "drillbit--backup-policy-train",
+        "path": "harbor/tasks/drillbit--backup-policy-train"
+      },
+      {
+        "name": "drillbit--fix-runbook-train",
+        "path": "harbor/tasks/drillbit--fix-runbook-train"
+      },
+      {
+        "name": "drillbit--scale-replicas-train",
+        "path": "harbor/tasks/drillbit--scale-replicas-train"
+      },
+      {
+        "name": "inkwell--add-healthcheck-train",
+        "path": "harbor/tasks/inkwell--add-healthcheck-train"
+      },
+      {
+        "name": "inkwell--new-service-scaled-train",
+        "path": "harbor/tasks/inkwell--new-service-scaled-train"
+      },
+      {
+        "name": "inkwell--new-service-train",
+        "path": "harbor/tasks/inkwell--new-service-train"
+      },
+      {
+        "name": "workflow-compliance--feedback-trap-az-tag-list",
+        "path": "harbor/tasks/workflow-compliance--feedback-trap-az-tag-list"
+      },
+      {
+        "name": "workflow-compliance--feedback-trap-docker-compose-render",
+        "path": "harbor/tasks/workflow-compliance--feedback-trap-docker-compose-render"
+      },
+      {
+        "name": "workflow-compliance--repeated-fail-opencode-provider-token-train",
+        "path": "harbor/tasks/workflow-compliance--repeated-fail-opencode-provider-token-train"
+      }
+    ]
   }
 ]
