@@ -8,10 +8,11 @@ same task set with AKM enabled.
 > statement about our own task authorship. It supports longitudinal claims
 > (akm against itself, across versions) and nothing else; the comparison to
 > other tools has to come from [`akm-eval`](https://github.com/itlackey/akm-eval).
-> The rules, and the calibration gate showing that 22 of 28 train-slice tasks
+> The rules, and the calibration gate showing that 19 of 28 train-slice tasks
 > currently do not measure akm at all, are in
 > [`docs/comparability.md`](./docs/comparability.md). Read it before quoting a
-> figure from this repo.
+> figure from this repo. Run the gate yourself with
+> `bin/akm-bench-calibrate <jobs-dir> --corpus harbor/tasks`.
 
 It has three workflows:
 
