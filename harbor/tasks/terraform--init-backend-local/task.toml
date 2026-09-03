@@ -1,0 +1,40 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/terraform--init-backend-local"
+version = "1.0.0"
+description = "Produce the terraform init command for the prod environment"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+domain = "terraform"
+slice = "local-convention-v1"
+difficulty = "easy"
+stash = "northwind-platform"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "knowledge/terraform-standards"
+memory_ability = "local_convention_override"
+task_family = "terraform/init-policy"
+akm_keywords = "terraform init backend config lockfile readonly provider drift standards"
+recheck_on = "model-change"
+# The stash-only values this task tests. LC4 requires each to appear in the
+# stash and in NO agent-visible file; asserted by
+# harbor/tests/test_local_convention_tasks.py. Task INPUTS the prompt supplies
+# (resource-group names, the secret name, the container name) are deliberately
+# not listed -- they are given, not looked up.
+convention_tokens = ["-backend-config=backend/prod.hcl", "-lockfile=readonly"]
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "northwind-platform"

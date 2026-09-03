@@ -1,0 +1,40 @@
+schema_version = "1.4"
+
+[task]
+name = "akm-bench/az-cli--storage-account-naming"
+version = "1.0.0"
+description = "Produce the az command that creates the payroll archive storage account"
+authors = []
+keywords = []
+
+# --- akm-bench provenance (free-form; not read by Harbor itself) ---
+[metadata]
+domain = "az-cli"
+slice = "local-convention-v1"
+difficulty = "medium"
+stash = "northwind-platform"
+budget_tokens = 25000
+budget_wall_ms = 90000
+gold_ref = "knowledge/azure-standards"
+memory_ability = "local_convention_override"
+task_family = "az-cli/storage-naming"
+akm_keywords = "azure storage account create naming tag cost center tls policy"
+recheck_on = "model-change"
+# The stash-only values this task tests. LC4 requires each to appear in the
+# stash and in NO agent-visible file; asserted by
+# harbor/tests/test_local_convention_tasks.py. Task INPUTS the prompt supplies
+# (resource-group names, the secret name, the container name) are deliberately
+# not listed -- they are given, not looked up.
+convention_tokens = ["stpayrollarchive01", "cost-center=CC-4417", "TLS1_2"]
+
+[verifier]
+timeout_sec = 270.0
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+workdir = "/app"
+
+[environment.env]
+AKM_TASK_STASH = "northwind-platform"
