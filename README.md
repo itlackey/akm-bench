@@ -3,6 +3,16 @@
 `akm-bench` is a benchmark harness for measuring how an agent performs on the
 same task set with AKM enabled.
 
+> **These numbers are not publishable beside a third-party benchmark result.**
+> This corpus is one we wrote, so a favourable result here is partly a
+> statement about our own task authorship. It supports longitudinal claims
+> (akm against itself, across versions) and nothing else; the comparison to
+> other tools has to come from [`akm-eval`](https://github.com/itlackey/akm-eval).
+> The rules, and the calibration gate showing that 22 of 28 train-slice tasks
+> currently do not measure akm at all, are in
+> [`docs/comparability.md`](./docs/comparability.md). Read it before quoting a
+> figure from this repo.
+
 It has three workflows:
 
 - `utility`: static benchmark runs over a fixed task set
