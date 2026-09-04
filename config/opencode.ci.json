@@ -1,0 +1,9 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode/gpt-4.1-mini",
+  "provider": {
+    "opencode": {
+      "apiKey": "{env:OPENCODE_API_KEY}"
+    }
+  }
+}
