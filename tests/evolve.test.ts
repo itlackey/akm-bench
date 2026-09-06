@@ -155,7 +155,7 @@ function fakeTask(taskDir: string, overrides: Partial<TaskMetadata> = {}): TaskM
     budget: { tokens: 1000, wallMs: 5000 },
     taskDir,
     slice: "train",
-    goldRef: "skill:fake-a",
+    goldRef: "skills/fake-a",
     ...overrides,
   };
 }
@@ -177,9 +177,9 @@ describe("runEvolve — Phase 1 feedback", () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     // Two train tasks: one passes (expectedMatch=ok matches "ok" stdout), one fails.
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/pass", goldRef: "skill:passing", slice: "train", expectedMatch: "ok" }),
-      fakeTask(taskDir, { id: "fake-d/fail", goldRef: "skill:failing", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-target", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/pass", goldRef: "skills/passing", slice: "train", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/fail", goldRef: "skills/failing", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-target", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({ observed });
@@ -207,12 +207,12 @@ describe("runEvolve — Phase 1 feedback", () => {
     // The feedback log should match.
     const positiveLog = report.feedbackLog.filter((e: FeedbackLogEntry) => e.signal === "positive");
     expect(positiveLog.length).toBe(2);
-    expect(positiveLog[0].goldRef).toBe("skill:passing");
-    const passing = report.phase1Diagnostics.perRefFeedback.find((r) => r.ref === "skill:passing");
-    const failing = report.phase1Diagnostics.perRefFeedback.find((r) => r.ref === "skill:failing");
-    expect(passing).toEqual({ ref: "skill:passing", positive: 2, negative: 0 });
-    expect(failing).toEqual({ ref: "skill:failing", positive: 0, negative: 2 });
-    expect(report.phase1Diagnostics.refsToEvolve).toEqual(["skill:failing"]);
+    expect(positiveLog[0].goldRef).toBe("skills/passing");
+    const passing = report.phase1Diagnostics.perRefFeedback.find((r) => r.ref === "skills/passing");
+    const failing = report.phase1Diagnostics.perRefFeedback.find((r) => r.ref === "skills/failing");
+    expect(passing).toEqual({ ref: "skills/passing", positive: 2, negative: 0 });
+    expect(failing).toEqual({ ref: "skills/failing", positive: 0, negative: 2 });
+    expect(report.phase1Diagnostics.refsToEvolve).toEqual(["skills/failing"]);
   });
 });
 
@@ -231,9 +231,9 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
   test("threshold gates distill and defaults to skip reflect for all-negative refs", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/winner", goldRef: "skill:winner", slice: "train", expectedMatch: "ok" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/winner", goldRef: "skills/winner", slice: "train", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({ observed, proposalQueue: [] });
@@ -249,12 +249,12 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     const distillCalls = observed.calls.filter((c) => c[0] === "distill");
     const reflectCalls = observed.calls.filter((c) => c[0] === "reflect");
     // Loser crosses threshold; winner does not.
-    expect(distillCalls.map((c) => c[1])).toEqual(["skill:loser"]);
+    expect(distillCalls.map((c) => c[1])).toEqual(["skills/loser"]);
     expect(reflectCalls.length).toBe(0);
-    expect(report.phase1Diagnostics.refsToEvolve).toEqual(["skill:loser"]);
+    expect(report.phase1Diagnostics.refsToEvolve).toEqual(["skills/loser"]);
     expect(report.phase1Diagnostics.perRefFeedback).toEqual([
-      { ref: "skill:loser", positive: 0, negative: 3 },
-      { ref: "skill:winner", positive: 3, negative: 0 },
+      { ref: "skills/loser", positive: 0, negative: 3 },
+      { ref: "skills/winner", positive: 3, negative: 0 },
     ]);
     expect(report.warnings.some((w) => w.includes("phase2.reflect_skipped_all_negative"))).toBe(true);
   });
@@ -262,8 +262,8 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
   test("can disable all-negative reflect skip and run constrained reflect", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({ observed, proposalQueue: [] });
@@ -280,7 +280,7 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     expect(reflectCalls.length).toBe(1);
     expect(reflectCalls[0]).toEqual([
       "reflect",
-      "skill:loser",
+      "skills/loser",
       "--task",
       EXPECTED_REFLECT_CONSTRAINED_TASK,
       "--timeout-ms",
@@ -291,8 +291,8 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
   test("phase2ReflectTimeoutMs overrides the default reflect timeout", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({ observed, proposalQueue: [] });
@@ -314,14 +314,14 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
   test("reflect timeout triggers a one-time retry with narrowed task", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const inner = buildFakeAkmCli({ observed, proposalQueue: [] });
     let firstReflect = true;
     const akmCli: AkmCliFn = async (args, cwd, env) => {
-      if (args[0] === "reflect" && args[1] === "skill:loser" && firstReflect) {
+      if (args[0] === "reflect" && args[1] === "skills/loser" && firstReflect) {
         firstReflect = false;
         observed.calls.push(args);
         observed.envSeen.push({ ...env });
@@ -344,7 +344,7 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
       phase2SkipReflectOnAllNegative: false,
     });
 
-    const reflectCalls = observed.calls.filter((c) => c[0] === "reflect" && c[1] === "skill:loser");
+    const reflectCalls = observed.calls.filter((c) => c[0] === "reflect" && c[1] === "skills/loser");
     expect(reflectCalls.length).toBe(2);
     expect(reflectCalls[0]?.[3]).toBe(EXPECTED_REFLECT_CONSTRAINED_TASK);
     expect(reflectCalls[1]?.[3]).toContain("Apply a minimal targeted fix");
@@ -355,15 +355,15 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
   test("lint_pass=true → accept, lint_pass=false → reject", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({
       observed,
       proposalQueue: [
-        { id: "p-good", targetRef: "skill:loser", kind: "lesson" },
-        { id: "p-bad", targetRef: "skill:loser", kind: "revision" },
+        { id: "p-good", targetRef: "skills/loser", kind: "lesson" },
+        { id: "p-bad", targetRef: "skills/loser", kind: "revision" },
       ],
       lintByProposal: {
         "p-good": { lintPass: true },
@@ -392,16 +392,16 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
   test("proposal show validation.ok=true is treated as lint-pass", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({
       observed,
-      proposalQueue: [{ id: "p-validation-ok", targetRef: "skill:loser", kind: "revision" }],
+      proposalQueue: [{ id: "p-validation-ok", targetRef: "skills/loser", kind: "revision" }],
       showStdoutByProposal: {
         "p-validation-ok": JSON.stringify({
-          proposal: { id: "p-validation-ok", ref: "skill:loser" },
+          proposal: { id: "p-validation-ok", ref: "skills/loser" },
           validation: { ok: true, findings: [] },
         }),
       },
@@ -424,15 +424,15 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
 
   test("proposal show validation findings are propagated into reject reason", async () => {
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({
-      proposalQueue: [{ id: "p-validation-bad", targetRef: "skill:loser", kind: "revision" }],
+      proposalQueue: [{ id: "p-validation-bad", targetRef: "skills/loser", kind: "revision" }],
       showStdoutByProposal: {
         "p-validation-bad": JSON.stringify({
-          proposal: { id: "p-validation-bad", ref: "skill:loser" },
+          proposal: { id: "p-validation-bad", ref: "skills/loser" },
           validation: {
             ok: false,
             findings: [{ severity: "error", path: "skills/docker/SKILL.md", line: 2, message: "missing description" }],
@@ -468,13 +468,13 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
   test("proposal show non-zero exit rejects with show failure reason (not lint failed)", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({
       observed,
-      proposalQueue: [{ id: "p-show-exit", targetRef: "skill:loser", kind: "lesson" }],
+      proposalQueue: [{ id: "p-show-exit", targetRef: "skills/loser", kind: "lesson" }],
       showExitByProposal: {
         "p-show-exit": { exitCode: 7, stderr: "boom" },
       },
@@ -501,13 +501,13 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
   test("proposal show AKM error envelope {ok:false} takes show_error path", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({
       observed,
-      proposalQueue: [{ id: "p-envelope", targetRef: "skill:loser", kind: "revision" }],
+      proposalQueue: [{ id: "p-envelope", targetRef: "skills/loser", kind: "revision" }],
       showEnvelopeByProposal: {
         "p-envelope": { ok: false, code: "E_BAD_PROPOSAL", error: "proposal missing target" },
       },
@@ -532,12 +532,12 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
 
   test("lint-fail captures rich diagnostics and propagates to report JSON", async () => {
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({
-      proposalQueue: [{ id: "p-lint-rich", targetRef: "skill:loser", kind: "lesson" }],
+      proposalQueue: [{ id: "p-lint-rich", targetRef: "skills/loser", kind: "lesson" }],
       showStdoutByProposal: {
         "p-lint-rich": JSON.stringify({
           id: "p-lint-rich",
@@ -608,12 +608,12 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
 
   test("proposal show parse_error carries structured raw preview in reason and warning", async () => {
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({
-      proposalQueue: [{ id: "p-bad-json", targetRef: "skill:loser", kind: "revision" }],
+      proposalQueue: [{ id: "p-bad-json", targetRef: "skills/loser", kind: "revision" }],
       showStdoutByProposal: {
         "p-bad-json": '{\n  "ok": true,\n  "lint": [this is invalid json]\n}',
       },
@@ -638,8 +638,8 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
 
   test("proposal list non-zero exit adds warning and continues safely", async () => {
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({
@@ -669,17 +669,17 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
   test("lint fail triggers one-shot reflect repair; new proposal then passes and is accepted", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({
       observed,
       proposalQueueSequence: [
-        [{ id: "p-initial", targetRef: "skill:loser", kind: "lesson" }],
+        [{ id: "p-initial", targetRef: "skills/loser", kind: "lesson" }],
         [
-          { id: "p-initial", targetRef: "skill:loser", kind: "lesson" },
-          { id: "p-repaired", targetRef: "skill:loser", kind: "lesson" },
+          { id: "p-initial", targetRef: "skills/loser", kind: "lesson" },
+          { id: "p-repaired", targetRef: "skills/loser", kind: "lesson" },
         ],
       ],
       lintByProposal: {
@@ -698,7 +698,7 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     });
 
     const reflectRepairCalls = observed.calls.filter(
-      (c) => c[0] === "reflect" && c[1] === "skill:loser" && c[3] === EXPECTED_REFLECT_LINT_REPAIR_TASK,
+      (c) => c[0] === "reflect" && c[1] === "skills/loser" && c[3] === EXPECTED_REFLECT_LINT_REPAIR_TASK,
     );
     expect(reflectRepairCalls.length).toBe(1);
     const repairedAccept = observed.calls.find(
@@ -714,15 +714,15 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
   test("lint fail with no new proposal after repair keeps original rejected", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-only", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-only", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({
       observed,
       proposalQueueSequence: [
-        [{ id: "p-initial", targetRef: "skill:loser", kind: "lesson" }],
-        [{ id: "p-initial", targetRef: "skill:loser", kind: "lesson" }],
+        [{ id: "p-initial", targetRef: "skills/loser", kind: "lesson" }],
+        [{ id: "p-initial", targetRef: "skills/loser", kind: "lesson" }],
       ],
       lintByProposal: {
         "p-initial": { lintPass: false, message: "still failing" },
@@ -739,7 +739,7 @@ describe("runEvolve — Phase 2 threshold + proposal lifecycle", () => {
     });
 
     const reflectRepairCalls = observed.calls.filter(
-      (c) => c[0] === "reflect" && c[1] === "skill:loser" && c[3] === EXPECTED_REFLECT_LINT_REPAIR_TASK,
+      (c) => c[0] === "reflect" && c[1] === "skills/loser" && c[3] === EXPECTED_REFLECT_LINT_REPAIR_TASK,
     );
     expect(reflectRepairCalls.length).toBe(1);
     expect(observed.calls.some((c) => c[0] === "proposal" && c[1] === "accept")).toBe(false);
@@ -765,9 +765,9 @@ describe("runEvolve — preflight warnings", () => {
 
   test("warns when unique train gold refs are below 2", async () => {
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/train-a", goldRef: "skill:shared", slice: "train", expectedMatch: "ok" }),
-      fakeTask(taskDir, { id: "fake-d/train-b", goldRef: "skill:shared", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/train-a", goldRef: "skills/shared", slice: "train", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/train-b", goldRef: "skills/shared", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({});
@@ -798,8 +798,8 @@ describe("runEvolve — Phase 3 three-arm execution", () => {
 
   test("produces pre / post / synthetic arm reports", async () => {
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/eval-task", slice: "eval", goldRef: "skill:t", expectedMatch: "ok" }),
-      fakeTask(taskDir, { id: "fake-d/train-task", slice: "train", goldRef: "skill:tr", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/eval-task", slice: "eval", goldRef: "skills/t", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/train-task", slice: "train", goldRef: "skills/tr", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({});
@@ -818,7 +818,7 @@ describe("runEvolve — Phase 3 three-arm execution", () => {
 
   test("synthetic arm receives no AKM_STASH_DIR via spawn wrapper", async () => {
     const observed: { arms: string[]; cwd: (string | undefined)[] } = { arms: [], cwd: [] };
-    const tasks = [fakeTask(taskDir, { id: "fake-d/eval-x", slice: "eval", goldRef: "skill:x", expectedMatch: "ok" })];
+    const tasks = [fakeTask(taskDir, { id: "fake-d/eval-x", slice: "eval", goldRef: "skills/x", expectedMatch: "ok" })];
     const spawn = buildFakeSpawn({ observed });
     const akmCli = buildFakeAkmCli({});
     await runEvolve({
@@ -860,8 +860,8 @@ describe("runEvolve — Phase 3 three-arm execution", () => {
       };
     };
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/eval-a", slice: "eval", goldRef: "skill:a", expectedMatch: "ok" }),
-      fakeTask(taskDir, { id: "fake-d/eval-b", slice: "eval", goldRef: "skill:b", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/eval-a", slice: "eval", goldRef: "skills/a", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/eval-b", slice: "eval", goldRef: "skills/b", expectedMatch: "ok" }),
     ];
     const akmCli = buildFakeAkmCli({});
     await runEvolve({
@@ -897,12 +897,12 @@ describe("runEvolve — leakage prevention (§7.4)", () => {
 
   test("invokes distill with --exclude-tags slice:eval to prevent eval leakage (#267)", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
-    // The same `skill:shared` is the gold ref for BOTH a failing train task
+    // The same `skills/shared` is the gold ref for BOTH a failing train task
     // AND an eval task. Distill now uses tag-based filtering — train feedback
     // is tagged `slice:train`, distill excludes `slice:eval` tags.
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/train-shared", goldRef: "skill:shared", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval-shared", goldRef: "skill:shared", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/train-shared", goldRef: "skills/shared", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval-shared", goldRef: "skills/shared", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({ observed });
@@ -930,10 +930,10 @@ describe("runEvolve — leakage prevention (§7.4)", () => {
     // would emit a generic "distill ignores the env hint" warning once;
     // with #267 the filter is real, so that line MUST NOT appear.
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/loser-a", goldRef: "skill:loser-a", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/loser-b", goldRef: "skill:loser-b", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/loser-c", goldRef: "skill:loser-c", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-target", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/loser-a", goldRef: "skills/loser-a", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/loser-b", goldRef: "skills/loser-b", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/loser-c", goldRef: "skills/loser-c", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-target", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const akmCli = buildFakeAkmCli({ observed });
@@ -974,18 +974,18 @@ describe("runEvolve — Phase 1 fault tolerance", () => {
 
   test("a throwing akmCli on one feedback ref does not halt Phase 2", async () => {
     const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
-    // Two failing train tasks. The akmCli throws on `feedback skill:bomb`
+    // Two failing train tasks. The akmCli throws on `feedback skills/bomb`
     // but otherwise behaves normally. Phase 2 should still proceed and
     // distill the surviving refs.
     const tasks = [
-      fakeTask(taskDir, { id: "fake-d/bomb", goldRef: "skill:bomb", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-target", slice: "eval", expectedMatch: "ok" }),
+      fakeTask(taskDir, { id: "fake-d/bomb", goldRef: "skills/bomb", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+      fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-target", slice: "eval", expectedMatch: "ok" }),
     ];
     const spawn = buildFakeSpawn({});
     const inner = buildFakeAkmCli({ observed });
     const akmCli: AkmCliFn = async (args, cwd, env) => {
-      if (args[0] === "feedback" && args[1] === "skill:bomb") {
+      if (args[0] === "feedback" && args[1] === "skills/bomb") {
         throw new Error("subprocess crashed");
       }
       return inner(args, cwd, env);
@@ -1000,12 +1000,12 @@ describe("runEvolve — Phase 1 fault tolerance", () => {
       negativeThreshold: { absoluteCount: 2, ratio: 0.5 },
     });
     // The throwing ref produced a warning of the documented shape.
-    expect(report.warnings.some((w) => w.includes("phase1.feedback_dispatch_failed: skill:bomb"))).toBe(true);
-    // Phase 2 still ran for the surviving ref (skill:loser crosses threshold).
+    expect(report.warnings.some((w) => w.includes("phase1.feedback_dispatch_failed: skills/bomb"))).toBe(true);
+    // Phase 2 still ran for the surviving ref (skills/loser crosses threshold).
     const distillCalls = observed.calls.filter((c) => c[0] === "distill");
-    expect(distillCalls.map((c) => c[1])).toContain("skill:loser");
+    expect(distillCalls.map((c) => c[1])).toContain("skills/loser");
     // The throwing entries are still in feedbackLog (with ok:false).
-    const bombEntries = report.feedbackLog.filter((e) => e.goldRef === "skill:bomb");
+    const bombEntries = report.feedbackLog.filter((e) => e.goldRef === "skills/bomb");
     expect(bombEntries.length).toBe(2);
     expect(bombEntries.every((e) => e.ok === false)).toBe(true);
   });
@@ -1029,8 +1029,8 @@ describe("runEvolve — operator stash sandboxing", () => {
     process.env.AKM_STASH_DIR = sentinel;
     try {
       const tasks = [
-        fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-        fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-target", slice: "eval", expectedMatch: "ok" }),
+        fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+        fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-target", slice: "eval", expectedMatch: "ok" }),
       ];
       const spawn = buildFakeSpawn({});
       const akmCli = buildFakeAkmCli({});
@@ -1056,8 +1056,8 @@ describe("runEvolve — operator stash sandboxing", () => {
     try {
       const observed = { calls: [] as string[][], envSeen: [] as Record<string, string>[] };
       const tasks = [
-        fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skill:loser", slice: "train", expectedMatch: "WONT" }),
-        fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skill:eval-target", slice: "eval", expectedMatch: "ok" }),
+        fakeTask(taskDir, { id: "fake-d/loser", goldRef: "skills/loser", slice: "train", expectedMatch: "WONT" }),
+        fakeTask(taskDir, { id: "fake-d/eval", goldRef: "skills/eval-target", slice: "eval", expectedMatch: "ok" }),
       ];
       const spawn = buildFakeSpawn({});
       const akmCli = buildFakeAkmCli({ observed });
@@ -1193,16 +1193,16 @@ describe("computeLongitudinalMetrics", () => {
 describe("computeProposalQualityMetrics", () => {
   test("aggregates accepted / lint_pass / total per asset", () => {
     const log: ProposalLogEntry[] = [
-      { proposalId: "p1", assetRef: "skill:a", kind: "lesson", lintPass: true, decision: "accept" },
-      { proposalId: "p2", assetRef: "skill:a", kind: "revision", lintPass: false, decision: "reject" },
-      { proposalId: "p3", assetRef: "skill:b", kind: "lesson", lintPass: true, decision: "accept" },
+      { proposalId: "p1", assetRef: "skills/a", kind: "lesson", lintPass: true, decision: "accept" },
+      { proposalId: "p2", assetRef: "skills/a", kind: "revision", lintPass: false, decision: "reject" },
+      { proposalId: "p3", assetRef: "skills/b", kind: "lesson", lintPass: true, decision: "accept" },
     ];
     const m = computeProposalQualityMetrics(log);
     expect(m.totalProposals).toBe(3);
     expect(m.totalAccepted).toBe(2);
     expect(m.acceptanceRate).toBeCloseTo(2 / 3, 2);
     expect(m.lintPassRate).toBeCloseTo(2 / 3, 2);
-    const a = m.rows.find((r) => r.assetRef === "skill:a");
+    const a = m.rows.find((r) => r.assetRef === "skills/a");
     expect(a?.proposalCount).toBe(2);
     expect(a?.acceptedCount).toBe(1);
     expect(a?.lintPassCount).toBe(1);

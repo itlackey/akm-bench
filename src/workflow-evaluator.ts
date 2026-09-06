@@ -123,7 +123,7 @@ export interface WorkflowEvalRunContext {
  * `missing_required_event`.
  */
 export interface WorkflowEvalTaskMetadata {
-  /** Asset ref the agent should have loaded, e.g. `skill:deploy`. */
+  /** Asset ref the agent should have loaded, e.g. `skills/deploy`. */
   goldRef?: string;
   /** Boolean flags consulted by `required_if`. */
   flags?: Record<string, boolean>;
@@ -550,7 +550,7 @@ function firstId(events: WorkflowTraceEvent[]): number | undefined {
  * Recover an event's feedback polarity. The trace contract does NOT carry a
  * top-level `polarity` field, so we probe known shapes:
  *   - args contain a token like `+1` / `-1` / `positive` / `negative`.
- *   - command-style: `akm feedback +1 skill:foo`.
+ *   - command-style: `akm feedback skills/foo --positive`.
  * Returns `undefined` when polarity cannot be determined.
  */
 function eventPolarity(ev: WorkflowTraceEvent): "positive" | "negative" | undefined {

@@ -3,7 +3,7 @@ title: "Produce the az command to list resources tagged env=prod"
 domain: az-cli
 difficulty: easy
 slice: train
-gold_ref: skill:az-cli
+gold_ref: skills/az-cli
 stash: az-cli
 verifier: script
 budget:

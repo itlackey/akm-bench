@@ -3,7 +3,7 @@ title: "Add a healthcheck to an inkwell service definition"
 domain: inkwell
 difficulty: easy
 slice: eval
-gold_ref: skill:inkwell
+gold_ref: skills/inkwell
 stash: inkwell
 verifier: pytest
 budget:

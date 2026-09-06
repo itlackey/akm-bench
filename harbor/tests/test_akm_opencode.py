@@ -52,8 +52,8 @@ from harbor.akm_opencode import (  # noqa: E402
     AKM_TOOLS,
     DEFAULT_SEED_LIBRARY_DIR,
     OPENCODE_VERSION,
-    PLUGIN_FAILED_MARKER,
-    PLUGIN_RESOLVED_MARKER,
+    PLUGIN_ACTIVE_MARKER,
+    PLUGIN_FAILURE_MARKERS,
     RUN_LOG_RELDIR,
     RUN_XDG_DATA_HOME,
     SEED_DIR_FOR_TYPE,
@@ -64,8 +64,8 @@ from harbor.akm_opencode import (  # noqa: E402
     derive_seed_expectations,
 )
 
-#: The complete `permission` key set opencode 1.18.21 declares, transcribed
-#: from @opencode-ai/sdk@1.18.21 dist/gen/types.gen.d.ts:1161-1169. Anything
+#: The complete `permission` key set accepted by pinned OpenCode 1.18.29.
+#: Anything
 #: outside this set is a key opencode does not implement, so writing it grants
 #: nothing and only looks like a grant.
 OPENCODE_DECLARED_PERMISSION_KEYS = frozenset(
@@ -430,7 +430,7 @@ def test_no_akm_tool_appears_under_permission(agent: AkmOpenCode):
 def test_forced_config_enables_the_akm_tools_through_the_tools_map(agent: AkmOpenCode):
     """`tools` is the schema-supported lever for per-tool enablement.
 
-    @opencode-ai/sdk@1.18.21 types.gen.d.ts:1170-1173 -- a separate top-level
+    the pinned OpenCode schema -- a separate top-level
     `tools?: {[key: string]: boolean}` map, not part of `permission`.
     """
     tools = agent._opencode_config["tools"]
@@ -825,18 +825,15 @@ def test_warm_boot_refuses_a_model_name_opencode_would_reject(tmp_path: Path):
 
 
 # --------------------------------------------------------------------------
-# npm-overrides pin fix (closes the in-process akm-cli hole)
+# Cross-path CLI pin integrity
 #
 # Two independent mechanisms, tested separately below:
 #   * _build_write_npm_overrides_command() -- writes an npm `overrides` pin
-#     into ~/.config/opencode/package.json before the warm boot. VERIFIED
-#     (see that method's docstring) inert against opencode 1.18.21's actual
-#     plugin-install root; kept as harmless forward-looking insurance for the
-#     plugin's exec-path candidate 2.
-#   * _build_align_hoisted_akm_cli_command() -- the mechanism VERIFIED to
-#     actually close the hole: force-realigns the akm-cli copy hoisted
-#     beside the plugin (the root the in-process akm_search/show/curate
-#     tools import from) after the warm boot creates it.
+#     into ~/.config/opencode before the warm boot. It is inert for the current
+#     package-adjacent dependency and prevents a future config-root copy from
+#     drifting.
+#   * _build_align_hoisted_akm_cli_command() -- verifies and repairs every
+#     package-adjacent copy after the warm boot creates the plugin cache.
 # --------------------------------------------------------------------------
 
 
@@ -915,7 +912,7 @@ def test_install_writes_overrides_before_warm_boot_and_aligns_after(installed):
 
 
 def test_align_hoisted_akm_cli_runs_for_the_accumulating_arm_too(tmp_path: Path):
-    """The pin-bypass hole is about opencode's own plugin cache, not the akm
+    """The pin-conflict hole is about opencode's own plugin cache, not the akm
     bundle -- both arms share the same exposure, so both must get the fix,
     and (since it never touches the shared bundle mount) neither needs the
     accumulating arm's flock wrapping.
@@ -992,10 +989,7 @@ def test_align_hoisted_akm_cli_exits_cleanly_when_nothing_is_hoisted_yet(
 
 
 def test_align_hoisted_akm_cli_realigns_a_drifted_copy(tmp_path: Path):
-    """Real bash + a FAKE npm stub (no network): simulate the exact threat
-    this method exists for -- the plugin's own `^0.9.0` range naturally
-    resolving to something newer than our pin -- and prove the on-disk
-    package.json is rewritten to the pin.
+    """Real bash + a fake npm stub: prove a poisoned cache is repaired.
     """
     agent = make_agent(tmp_path)
     fake_home = tmp_path / "fake-home"
@@ -1031,10 +1025,11 @@ def test_align_hoisted_akm_cli_realigns_a_drifted_copy(tmp_path: Path):
         "  esac\n"
         "done\n"
         'PIN="${PINSPEC#akm-cli@}"\n'
-        'node -e \'const fs=require("fs");const p=process.argv[1];const v=process.argv[2];'
-        'const j=JSON.parse(fs.readFileSync(p));j.version=v;'
-        'fs.writeFileSync(p,JSON.stringify(j));\' '
-        '"$PREFIX/node_modules/akm-cli/package.json" "$PIN"\n'
+            'AKM_TEST_PACKAGE_JSON="$PREFIX/node_modules/akm-cli/package.json" '
+            'AKM_TEST_PIN="$PIN" node -e \'const fs=require("fs");'
+            'const p=process.env.AKM_TEST_PACKAGE_JSON;'
+            'const j=JSON.parse(fs.readFileSync(p));j.version=process.env.AKM_TEST_PIN;'
+            'fs.writeFileSync(p,JSON.stringify(j));\'\n'
     )
     fake_npm.chmod(0o755)
 
@@ -1134,10 +1129,11 @@ def test_align_hoisted_akm_cli_realigns_every_hoisted_copy_found(tmp_path: Path)
         "  esac\n"
         "done\n"
         'PIN="${PINSPEC#akm-cli@}"\n'
-        'node -e \'const fs=require("fs");const p=process.argv[1];const v=process.argv[2];'
-        'const j=JSON.parse(fs.readFileSync(p));j.version=v;'
-        'fs.writeFileSync(p,JSON.stringify(j));\' '
-        '"$PREFIX/node_modules/akm-cli/package.json" "$PIN"\n'
+            'AKM_TEST_PACKAGE_JSON="$PREFIX/node_modules/akm-cli/package.json" '
+            'AKM_TEST_PIN="$PIN" node -e \'const fs=require("fs");'
+            'const p=process.env.AKM_TEST_PACKAGE_JSON;'
+            'const j=JSON.parse(fs.readFileSync(p));j.version=process.env.AKM_TEST_PIN;'
+            'fs.writeFileSync(p,JSON.stringify(j));\'\n'
     )
     fake_npm.chmod(0o755)
 
@@ -1159,14 +1155,12 @@ def test_align_hoisted_akm_cli_realigns_every_hoisted_copy_found(tmp_path: Path)
 def test_self_check_probes_the_config_dir_akm_cli_package_json(tmp_path: Path):
     """Probe 7c: complements 7b (which shells out to the .bin shim) by
     reading node_modules/akm-cli/package.json directly, catching a package
-    present with no working bin shim. Same directory as 7b -- the plugin's
-    exec-path candidate 2 -- not the in-process-import root (that one is
-    covered by _build_align_hoisted_akm_cli_command(), run one install step
-    earlier).
+    present with no working bin shim. The current plugin ignores this
+    config-root path; its package-adjacent dependency is checked separately.
     """
     command = make_agent(tmp_path)._build_self_check_command()
     assert "$HOME/.config/opencode/node_modules/akm-cli/package.json" in command
-    assert "pin bypass (package.json)" in command
+    assert "pin conflict (package.json)" in command
     assert f'[ "$CFG_PKG_VER" = "{AKM_CLI_VERSION}" ] || fail' in command
     # Absent must fall through, not abort: the guard is -f, not a hard
     # existence assertion.
@@ -1196,7 +1190,7 @@ def test_self_check_probe_7c_passes_through_when_the_config_dir_is_absent(
 ):
     """Real bash + real node: nothing lives at
     $HOME/.config/opencode/node_modules/akm-cli today (see the module's own
-    docstring on where opencode 1.18.21 actually installs plugins), and
+    docstring on where opencode 1.18.29 actually installs plugins), and
     absence must fall through to a healthy exit, not abort setup.
     """
     agent = make_agent(tmp_path)
@@ -1254,7 +1248,7 @@ def test_self_check_probe_7c_aborts_on_a_version_mismatch(tmp_path: Path):
     assert result.returncode != 0
     assert "probe 7c: passed" not in result.stdout
     assert "AKM-BOOTSTRAP FATAL" in result.stderr
-    assert "pin bypass (package.json)" in result.stderr
+    assert "pin conflict (package.json)" in result.stderr
     assert "9.9.9-bypass" in result.stderr
 
 
@@ -1267,8 +1261,8 @@ def test_install_runs_the_self_check_last(installed):
         "akm info --format json",
         "akm curate",
         "akm feedback",
-        PLUGIN_RESOLVED_MARKER,
-        PLUGIN_FAILED_MARKER,
+        PLUGIN_ACTIVE_MARKER,
+        PLUGIN_FAILURE_MARKERS[0],
     ):
         assert probe in self_check
     # FTS does not stem, so the read-path probe must be prefix enumeration.
@@ -1648,9 +1642,9 @@ def test_shared_bundle_path_self_check_keeps_every_plugin_and_pin_probe(
         "akm feedback",  # 5
         "akm-opencode is not in the opencode",  # 6
         "akm-cli version skew",  # 7
-        "pin bypass",  # 7b
-        PLUGIN_RESOLVED_MARKER,  # 8
-        PLUGIN_FAILED_MARKER,  # 8
+        "pin conflict",  # 7b
+        PLUGIN_ACTIVE_MARKER,  # 8
+        PLUGIN_FAILURE_MARKERS[0],  # 8
     ):
         assert probe in self_check
 
@@ -1694,9 +1688,9 @@ def test_run_log_path_matches_the_xdg_home_harbor_actually_exports():
     assert RUN_LOG_RELDIR == "opencode/xdg-data/opencode/log"
 
 
-def test_proof_passes_when_the_plugin_resolved(agent: AkmOpenCode):
+def test_proof_passes_when_the_plugin_was_active(agent: AkmOpenCode):
     write_run_log(
-        agent, f"INFO service=akm {PLUGIN_RESOLVED_MARKER} path=/usr/local/bin/akm\n"
+        agent, f"INFO service=akm {PLUGIN_ACTIVE_MARKER} sessionID=example\n"
     )
     agent.populate_context_post_run(AgentContext())
     assert agent._proof_checked is True
@@ -1712,7 +1706,7 @@ def test_proof_errors_when_the_plugin_never_loaded(agent: AkmOpenCode):
     with pytest.raises(AkmPluginNotLoadedError) as excinfo:
         agent.populate_context_post_run(AgentContext())
     message = str(excinfo.value)
-    assert PLUGIN_RESOLVED_MARKER in message
+    assert PLUGIN_ACTIVE_MARKER in message
     assert str(agent.logs_dir / RUN_LOG_RELDIR) in message
     assert AKM_PLUGIN_SPEC in message
 
@@ -1721,19 +1715,19 @@ def test_proof_errors_when_the_plugin_degraded(agent: AkmOpenCode):
     # The plugin logs this at WARN and keeps going: tools stay registered,
     # every call fails, exit code 0.
     log = write_run_log(
-        agent, f"WARN service=akm {PLUGIN_FAILED_MARKER} tried=/usr/local/bin/akm\n"
+        agent, f"WARN service=akm {PLUGIN_FAILURE_MARKERS[0]} operation=session-curate\n"
     )
     with pytest.raises(AkmPluginNotLoadedError) as excinfo:
         agent.populate_context_post_run(AgentContext())
     message = str(excinfo.value)
-    assert PLUGIN_FAILED_MARKER in message
+    assert PLUGIN_FAILURE_MARKERS[0] in message
     assert str(log) in message
 
 
-def test_proof_errors_when_a_resolved_line_is_followed_by_a_failure(agent: AkmOpenCode):
+def test_proof_errors_when_an_active_line_is_followed_by_a_failure(agent: AkmOpenCode):
     write_run_log(
         agent,
-        f"INFO {PLUGIN_RESOLVED_MARKER}\nWARN {PLUGIN_FAILED_MARKER}\n",
+        f"INFO {PLUGIN_ACTIVE_MARKER}\nWARN {PLUGIN_FAILURE_MARKERS[0]}\n",
     )
     with pytest.raises(AkmPluginNotLoadedError):
         agent.populate_context_post_run(AgentContext())
@@ -1750,7 +1744,7 @@ def test_proof_errors_when_the_log_was_never_synced(agent: AkmOpenCode):
 
 def test_proof_scans_every_log_file(agent: AkmOpenCode):
     write_run_log(agent, "INFO service=default started\n", name="a.log")
-    write_run_log(agent, f"INFO {PLUGIN_RESOLVED_MARKER}\n", name="b.log")
+    write_run_log(agent, f"INFO {PLUGIN_ACTIVE_MARKER}\n", name="b.log")
     agent.populate_context_post_run(AgentContext())
 
 
@@ -1985,8 +1979,8 @@ def test_job_config_keeps_the_run_phase_opencode_log(arms):
     """The evidence AkmOpenCode._assert_plugin_ran() reads.
 
     Excluding "opencode/xdg-data/**" is inert on Docker (mounted environments
-    short-circuit log filtering) but deletes the run-phase log -- the
-    "AKM CLI resolved" marker and the akm.<surface>.<outcome> lines -- on any
+    short-circuit log filtering) but deletes the run-phase log -- the plugin
+    activity marker and the akm.<surface>.<outcome> lines -- on any
     non-mounted/cloud environment. It cannot be rescued with an include:
     harbor/utils/path_filter.py applies exclude AFTER include, so exclude wins.
     """
@@ -2017,19 +2011,16 @@ def test_job_config_deletes_containers_between_trials(job_config: dict):
     assert job_config["environment"]["delete"] is True
 
 
-def test_self_check_probes_the_akm_cli_pin_bypass(tmp_path: Path) -> None:
-    """The plugin resolves ~/.config/opencode/node_modules/.bin/akm BEFORE the
-    pinned ``akm`` on PATH (plugin index.ts:1313-1326), and npm resolves that
-    copy from ``akm-cli: ^0.9.0`` independently of our pin. Probe 7 compares a
-    different pair of paths (the ~/.cache hoist vs the global), so without this
-    probe a newer 0.9.x would silently drive the mutating call path while
-    result.json still reported the pin -- a green trial measured against the
-    wrong binary. Absent is fine; present-and-different must abort setup.
+def test_self_check_probes_for_a_conflicting_config_root_cli(tmp_path: Path) -> None:
+    """A third CLI copy is contamination even when current plugins ignore it.
+
+    Absent is healthy; present-and-different must abort setup so future OpenCode
+    dependency changes cannot silently add an unpinned path.
     """
     command = make_agent(tmp_path)._build_self_check_command()
 
     assert "$HOME/.config/opencode/node_modules/.bin/akm" in command
-    assert "pin bypass" in command
+    assert "pin conflict" in command
     # The comparison must be against the pin, and must fail loudly.
     assert f'[ "$CFG_VER" = "{AKM_CLI_VERSION}" ] || fail' in command
     # Absent must fall through rather than abort: the guard is -x, not a hard
@@ -2888,15 +2879,19 @@ def test_self_check_is_valid_bash_on_both_arms(
 
 
 # ---------------------------------------------------------------------------
-# Pin cross-check: the pinned CLI must satisfy the pinned plugin's own range.
+# Pin cross-check: the global CLI must satisfy the plugin dependency spec.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    ("version", "caret_range", "expected"),
+    ("version", "version_spec", "expected"),
     [
-        # The trap this guard exists for: 0.9.3 was the pinned CLI while the
-        # plugin's range was still ^0.9.0; the plugin later moved to ^0.9.8.
+        # Current plugins pin the dependency exactly.
+        ("0.9.14", "0.9.14", True),
+        ("0.9.13", "0.9.14", False),
+        ("0.9.14-beta.1", "0.9.14-beta.1", True),
+        ("0.9.14-beta.2", "0.9.14-beta.1", False),
+        # Historical plugins used caret ranges.
         ("0.9.3", "^0.9.8", False),
         ("0.9.7", "^0.9.8", False),
         ("0.9.8", "^0.9.8", True),
@@ -2908,13 +2903,13 @@ def test_self_check_is_valid_bash_on_both_arms(
         ("0.10.0", "^0.9.8", False),
         ("1.0.0", "^0.9.8", False),
         ("0.9.3", "^0.9.0", True),
-        # A range this cannot parse must not block a run.
-        ("0.9.10", ">=0.9.8 <0.10.0", True),
+        # Unsupported syntax must fail closed.
+        ("0.9.10", ">=0.9.8 <0.10.0", False),
         ("not-a-version", "^0.9.8", False),
     ],
 )
-def test_satisfies_caret(version: str, caret_range: str, expected: bool):
-    assert akm_opencode.satisfies_caret(version, caret_range) is expected
+def test_satisfies_version_spec(version: str, version_spec: str, expected: bool):
+    assert akm_opencode.satisfies_version_spec(version, version_spec) is expected
 
 
 def test_shipped_pins_are_compatible():
@@ -2929,6 +2924,6 @@ def test_shipped_pins_are_compatible():
 
 def test_assert_pins_compatible_rejects_a_cli_below_the_plugin_floor(monkeypatch):
     monkeypatch.setattr(akm_opencode, "AKM_CLI_VERSION", "0.9.3")
-    monkeypatch.setattr(akm_opencode, "AKM_PLUGIN_REQUIRED_CLI_RANGE", "^0.9.8")
+    monkeypatch.setattr(akm_opencode, "AKM_PLUGIN_REQUIRED_CLI_SPEC", "^0.9.8")
     with pytest.raises(RuntimeError, match="does not satisfy"):
         akm_opencode.assert_pins_compatible()

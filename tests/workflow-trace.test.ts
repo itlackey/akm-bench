@@ -48,9 +48,9 @@ describe("normalizeRunToTrace — AKM event input", () => {
   test("maps search/show/feedback events to typed trace events with stable order", () => {
     const run = makeRun({
       events: [
-        ev("show", "2026-04-27T10:00:01.000Z", { ref: "skill:deploy" }),
+        ev("show", "2026-04-27T10:00:01.000Z", { ref: "skills/deploy" }),
         ev("search", "2026-04-27T10:00:00.000Z", { metadata: { query: "deploy docker" } }),
-        ev("feedback", "2026-04-27T10:00:02.000Z", { ref: "skill:deploy", metadata: { signal: "positive" } }),
+        ev("feedback", "2026-04-27T10:00:02.000Z", { ref: "skills/deploy", metadata: { signal: "positive" } }),
       ],
     });
 
@@ -69,8 +69,8 @@ describe("normalizeRunToTrace — AKM event input", () => {
 
     expect(trace.events[0].source).toBe("akm_events");
     expect(trace.events[0].query).toBe("deploy docker");
-    expect(trace.events[1].assetRef).toBe("skill:deploy");
-    expect(trace.events[2].assetRef).toBe("skill:deploy");
+    expect(trace.events[1].assetRef).toBe("skills/deploy");
+    expect(trace.events[2].assetRef).toBe("skills/deploy");
     expect(trace.events[2].args).toEqual(["--positive"]);
     expect(trace.events[3].source).toBe("verifier");
     expect(trace.events[3].exitCode).toBe(0);
@@ -83,7 +83,7 @@ describe("normalizeRunToTrace — AKM event input", () => {
 
   test("maps feedback metadata.signal=negative to args polarity", () => {
     const run = makeRun({
-      events: [ev("feedback", "2026-04-27T10:00:02.000Z", { ref: "skill:deploy", metadata: { signal: "negative" } })],
+      events: [ev("feedback", "2026-04-27T10:00:02.000Z", { ref: "skills/deploy", metadata: { signal: "negative" } })],
     });
     const trace = normalizeRunToTrace(run);
     const feedback = trace.events.find((e) => e.type === "akm_feedback");
@@ -94,8 +94,8 @@ describe("normalizeRunToTrace — AKM event input", () => {
   test("ignores unrelated AKM event types (add/remove/update)", () => {
     const run = makeRun({
       events: [
-        ev("add", "2026-04-27T10:00:00.000Z", { ref: "skill:foo" }),
-        ev("remove", "2026-04-27T10:00:01.000Z", { ref: "skill:bar" }),
+        ev("add", "2026-04-27T10:00:00.000Z", { ref: "skills/foo" }),
+        ev("remove", "2026-04-27T10:00:01.000Z", { ref: "skills/bar" }),
         ev("search", "2026-04-27T10:00:02.000Z", { metadata: { query: "x" } }),
       ],
     });
@@ -118,25 +118,25 @@ describe("normalizeRunToTrace — stdout / tool-call input", () => {
   test("detects akm CLI invocations from agent stdout", () => {
     const stdout = [
       'tool: akm search "deploy docker"',
-      "tool: akm show skill:deploy",
-      "tool: akm feedback +1 skill:deploy",
+      "tool: akm show skills/deploy",
+      "tool: akm feedback +1 skills/deploy",
     ].join("\n");
     const run = makeRun();
     const trace = normalizeRunToTrace(run, { agentStdout: stdout });
     const cliEvents = trace.events.filter((e) => e.source === "agent_stdout");
     expect(cliEvents.map((e) => e.type)).toEqual(["akm_search", "akm_show", "akm_feedback"]);
     expect(cliEvents[0].query).toBe("deploy docker");
-    expect(cliEvents[1].assetRef).toBe("skill:deploy");
-    expect(cliEvents[2].assetRef).toBe("skill:deploy");
+    expect(cliEvents[1].assetRef).toBe("skills/deploy");
+    expect(cliEvents[2].assetRef).toBe("skills/deploy");
   });
 
   test("detects JSON tool-call shape", () => {
-    const stdout = '{"command":"akm","args":["show","skill:foo"]}';
+    const stdout = '{"command":"akm","args":["show","skills/foo"]}';
     const run = makeRun();
     const trace = normalizeRunToTrace(run, { agentStdout: stdout });
     const showEv = trace.events.find((e) => e.type === "akm_show");
     expect(showEv).toBeDefined();
-    expect(showEv?.assetRef).toBe("skill:foo");
+    expect(showEv?.assetRef).toBe("skills/foo");
     expect(showEv?.source).toBe("agent_stdout");
   });
 
@@ -152,7 +152,7 @@ describe("normalizeRunToTrace — stdout / tool-call input", () => {
   });
 
   test("uses run.agentStdout when options.agentStdout is omitted", () => {
-    const run = makeRun({ agentStdout: 'akm search "from-run"\nref: skill:foo' });
+    const run = makeRun({ agentStdout: 'akm search "from-run"\nref: skills/foo' });
     const trace = normalizeRunToTrace(run);
     const search = trace.events.find((e) => e.type === "akm_search");
     expect(search).toBeDefined();
@@ -311,12 +311,12 @@ describe("normalizeRunToTrace — malformed/noisy input", () => {
   test("identical inputs produce identical traces (deterministic)", () => {
     const run = makeRun({
       events: [
-        ev("show", "2026-04-27T10:00:01.000Z", { ref: "skill:a" }),
+        ev("show", "2026-04-27T10:00:01.000Z", { ref: "skills/a" }),
         ev("search", "2026-04-27T10:00:00.000Z", { metadata: { query: "q" } }),
       ],
     });
-    const a = normalizeRunToTrace(run, { agentStdout: "akm show skill:b" });
-    const b = normalizeRunToTrace(run, { agentStdout: "akm show skill:b" });
+    const a = normalizeRunToTrace(run, { agentStdout: "akm show skills/b" });
+    const b = normalizeRunToTrace(run, { agentStdout: "akm show skills/b" });
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });

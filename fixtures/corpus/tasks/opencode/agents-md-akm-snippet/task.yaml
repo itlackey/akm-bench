@@ -3,7 +3,7 @@ title: "Write agent-guidance.md telling the agent to akm search before coding"
 domain: opencode
 difficulty: easy
 slice: eval
-gold_ref: skill:opencode
+gold_ref: skills/opencode
 stash: multi-domain
 verifier: script
 budget:

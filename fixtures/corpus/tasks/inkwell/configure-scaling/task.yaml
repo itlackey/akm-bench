@@ -3,7 +3,7 @@ title: "Configure rps-based autoscaling on an inkwell service"
 domain: inkwell
 difficulty: easy
 slice: eval
-gold_ref: skill:inkwell
+gold_ref: skills/inkwell
 stash: inkwell
 verifier: pytest
 budget:

@@ -5,7 +5,7 @@
 You MUST search it before attempting the task:
 
 1. `akm search docker compose homelab` — find relevant skills and knowledge
-2. `akm show <ref>` — read the full asset (e.g. `akm show skill:docker-homelab`)
+2. `akm show <ref>` — read the full asset (e.g. `akm show skills/docker-homelab`)
 3. Apply what you learned, then write your solution
 4. `akm feedback <ref> --positive` or `--negative` when done
 

@@ -24,7 +24,7 @@ function fakeTask(overrides: Partial<TaskMetadata> = {}): TaskMetadata {
     verifier: "regex",
     budget: { tokens: 1000, wallMs: 60000 },
     taskDir: "/tmp/fake",
-    goldRef: "skill:docker-homelab",
+    goldRef: "skills/docker-homelab",
     ...overrides,
   };
 }
@@ -72,7 +72,7 @@ describe("classifyFailureMode — seven labels", () => {
   test("no_search: trace mentions show but never search", () => {
     const out = classifyFailureMode(
       fakeTask(),
-      fakeRun({ verifierStdout: "akm show skill:docker-homelab\nresult: ok" }),
+      fakeRun({ verifierStdout: "akm show skills/docker-homelab\nresult: ok" }),
     );
     expect(out).toBe("no_search");
   });
@@ -80,9 +80,9 @@ describe("classifyFailureMode — seven labels", () => {
   test("search_no_gold: search ran, gold ref absent from results", () => {
     const trace = [
       "$ akm search homelab",
-      "1. skill:foo",
-      "2. skill:bar",
-      "3. skill:baz",
+      "1. skills/foo",
+      "2. skills/bar",
+      "3. skills/baz",
       "verifier: missing required output",
     ].join("\n");
     const out = classifyFailureMode(fakeTask(), fakeRun({ verifierStdout: trace }));
@@ -91,8 +91,8 @@ describe("classifyFailureMode — seven labels", () => {
 
   test("search_low_rank: gold ref appears at rank 7 in numbered list", () => {
     const lines = ["$ akm search homelab"];
-    for (let i = 1; i <= 6; i += 1) lines.push(`${i}. skill:filler-${i}`);
-    lines.push("7. skill:docker-homelab");
+    for (let i = 1; i <= 6; i += 1) lines.push(`${i}. skills/filler-${i}`);
+    lines.push("7. skills/docker-homelab");
     const out = classifyFailureMode(fakeTask(), fakeRun({ verifierStdout: lines.join("\n") }));
     expect(out).toBe("search_low_rank");
   });
@@ -100,9 +100,9 @@ describe("classifyFailureMode — seven labels", () => {
   test("loaded_wrong: agent showed a non-gold ref and never loaded gold", () => {
     const trace = [
       "$ akm search homelab",
-      "1. skill:docker-homelab",
-      "2. skill:az-cli",
-      "$ akm show skill:az-cli",
+      "1. skills/docker-homelab",
+      "2. skills/az-cli",
+      "$ akm show skills/az-cli",
       "(content of az-cli)",
       "verifier: action wrong",
     ].join("\n");
@@ -113,8 +113,8 @@ describe("classifyFailureMode — seven labels", () => {
   test("loaded_ignored: gold loaded but verifier flags ignored guidance", () => {
     const trace = [
       "$ akm search homelab",
-      "1. skill:docker-homelab",
-      "$ akm show skill:docker-homelab",
+      "1. skills/docker-homelab",
+      "$ akm show skills/docker-homelab",
       "(content of docker-homelab)",
       "verifier: agent did not follow loaded asset",
     ].join("\n");
@@ -125,8 +125,8 @@ describe("classifyFailureMode — seven labels", () => {
   test("followed_wrong: gold loaded, no ignored marker, verifier still failed", () => {
     const trace = [
       "$ akm search homelab",
-      "1. skill:docker-homelab",
-      "$ akm show skill:docker-homelab",
+      "1. skills/docker-homelab",
+      "$ akm show skills/docker-homelab",
       "(content of docker-homelab)",
       "verifier: pattern mismatch — expected 'X' got 'Y'",
     ].join("\n");
@@ -138,7 +138,7 @@ describe("classifyFailureMode — seven labels", () => {
     // Search ran (so not no_search), gold present at rank 1 (so not search_no_gold,
     // not search_low_rank), no `akm show` calls at all (so not loaded_wrong,
     // not loaded_ignored, not followed_wrong) → unrelated_bug.
-    const trace = ["$ akm search homelab", "1. skill:docker-homelab", "verifier: missing config"].join("\n");
+    const trace = ["$ akm search homelab", "1. skills/docker-homelab", "verifier: missing config"].join("\n");
     const out = classifyFailureMode(fakeTask(), fakeRun({ verifierStdout: trace }));
     expect(out).toBe("unrelated_bug");
   });
@@ -191,7 +191,7 @@ describe("classifyFailureMode — trajectory-aware classification (REC-07 / REC-
   test("search_no_gold: correctAssetLoaded=false + search ran + gold absent → search_no_gold", () => {
     // When trajectory says gold was NOT loaded and search ran but gold ref absent
     // from results, this is a genuine search failure.
-    const trace = ["$ akm search homelab", "1. skill:foo", "2. skill:bar"].join("\n");
+    const trace = ["$ akm search homelab", "1. skills/foo", "2. skills/bar"].join("\n");
     const out = classifyFailureMode(
       fakeTask(),
       fakeRun({
@@ -224,16 +224,16 @@ describe("classifyFailureMode — tie-breaking and priority", () => {
   });
 
   test("search_no_gold beats search_low_rank when gold absent", () => {
-    const trace = ["$ akm search homelab", "1. skill:foo", "2. skill:bar"].join("\n");
+    const trace = ["$ akm search homelab", "1. skills/foo", "2. skills/bar"].join("\n");
     const out = classifyFailureMode(fakeTask(), fakeRun({ verifierStdout: trace }));
     expect(out).toBe("search_no_gold");
   });
 
   test("search_low_rank beats loaded_wrong when gold is present at rank 7 even after wrong show", () => {
     const lines = ["$ akm search homelab"];
-    for (let i = 1; i <= 6; i += 1) lines.push(`${i}. skill:filler-${i}`);
-    lines.push("7. skill:docker-homelab");
-    lines.push("$ akm show skill:az-cli");
+    for (let i = 1; i <= 6; i += 1) lines.push(`${i}. skills/filler-${i}`);
+    lines.push("7. skills/docker-homelab");
+    lines.push("$ akm show skills/az-cli");
     lines.push("verifier: failed");
     const out = classifyFailureMode(fakeTask(), fakeRun({ verifierStdout: lines.join("\n") }));
     expect(out).toBe("search_low_rank");
@@ -242,8 +242,8 @@ describe("classifyFailureMode — tie-breaking and priority", () => {
   test("loaded_wrong beats followed_wrong when gold never loaded but other ref shown", () => {
     const trace = [
       "$ akm search homelab",
-      "1. skill:docker-homelab",
-      "$ akm show skill:az-cli",
+      "1. skills/docker-homelab",
+      "$ akm show skills/az-cli",
       "verifier: agent did not follow loaded asset",
     ].join("\n");
     // Note `did not follow loaded asset` would otherwise trip loaded_ignored,
@@ -255,8 +255,8 @@ describe("classifyFailureMode — tie-breaking and priority", () => {
   test("loaded_ignored beats followed_wrong when verifier flags ignored", () => {
     const trace = [
       "$ akm search homelab",
-      "1. skill:docker-homelab",
-      "$ akm show skill:docker-homelab",
+      "1. skills/docker-homelab",
+      "$ akm show skills/docker-homelab",
       "verifier: contradicts loaded asset; agent ignored it",
     ].join("\n");
     const out = classifyFailureMode(fakeTask(), fakeRun({ verifierStdout: trace }));
@@ -281,8 +281,8 @@ describe("classifyFailureMode — input variants", () => {
   test("tool-call JSON form for show counts as loading the gold ref", () => {
     const trace = [
       "$ akm search homelab",
-      '{"results":["skill:docker-homelab"]}',
-      '{"command":"akm","args":["show","skill:docker-homelab"]}',
+      '{"results":["skills/docker-homelab"]}',
+      '{"command":"akm","args":["show","skills/docker-homelab"]}',
       "verifier: pattern mismatch",
     ].join("\n");
     const out = classifyFailureMode(fakeTask(), fakeRun({ verifierStdout: trace }));
@@ -290,11 +290,11 @@ describe("classifyFailureMode — input variants", () => {
   });
 
   test("origin-prefixed gold ref also matches", () => {
-    const task = fakeTask({ goldRef: "skill:docker-homelab" });
+    const task = fakeTask({ goldRef: "skills/docker-homelab" });
     const trace = [
       "$ akm search homelab",
-      "1. team//skill:docker-homelab",
-      "$ akm show team//skill:docker-homelab",
+      "1. team//skills/docker-homelab",
+      "$ akm show team//skills/docker-homelab",
       "verifier: pattern mismatch",
     ].join("\n");
     const out = classifyFailureMode(task, fakeRun({ verifierStdout: trace }));
@@ -306,7 +306,7 @@ describe("classifyFailureMode — purity", () => {
   test("same input twice yields the same label", () => {
     const task = fakeTask();
     const run = fakeRun({
-      verifierStdout: ["$ akm search homelab", "1. skill:docker-homelab", "verifier: missing config"].join("\n"),
+      verifierStdout: ["$ akm search homelab", "1. skills/docker-homelab", "verifier: missing config"].join("\n"),
     });
     const a = classifyFailureMode(task, run);
     const b = classifyFailureMode(task, run);
@@ -315,7 +315,7 @@ describe("classifyFailureMode — purity", () => {
 
   test("classifier does not mutate its inputs", () => {
     const task = fakeTask();
-    const run = fakeRun({ verifierStdout: "$ akm search foo\n1. skill:docker-homelab" });
+    const run = fakeRun({ verifierStdout: "$ akm search foo\n1. skills/docker-homelab" });
     const taskJson = JSON.stringify(task);
     const runJson = JSON.stringify(run);
     classifyFailureMode(task, run);

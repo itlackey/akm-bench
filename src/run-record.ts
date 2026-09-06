@@ -11,6 +11,7 @@ import type { PerAssetAttribution } from "./metrics/attribution";
 import type { FailureModeAggregate } from "./metrics/failure-modes";
 import type { CorpusDelta, CorpusMetrics, PerTaskMetrics } from "./metrics/outcome";
 import type { GoldRankRunRecord, SearchBridgeMetrics } from "./metrics/search-bridge";
+import type { BenchRuntimeProvenance } from "./runtime-provenance";
 import type { TrajectoryAggregate } from "./trajectory";
 import type { WorkflowCheckResult } from "./workflow-evaluator";
 
@@ -97,6 +98,8 @@ export interface UtilityRunReport {
   branch: string;
   commit: string;
   model: string;
+  /** Exact executable identity captured by the supported container entrypoint. */
+  runtime?: BenchRuntimeProvenance;
   corpus: {
     domains: number;
     tasks: number;

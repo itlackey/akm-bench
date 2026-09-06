@@ -13,4 +13,4 @@ Requirements:
 - `limits.rps: 200`
 - `limits.burst: 400`
 
-Use `akm show skill:inkwell` for exact field names and value types.
+Use `akm show skills/inkwell` for exact field names and value types.

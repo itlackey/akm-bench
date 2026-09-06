@@ -1,8 +1,8 @@
 FROM node:22-bookworm-slim
 
 ARG BUN_VERSION=1.3.13
-ARG AKM_CLI_VERSION=0.7.1
-ARG OPENCODE_AI_VERSION=1.14.39
+ARG AKM_CLI_VERSION=0.9.14
+ARG OPENCODE_AI_VERSION=1.18.29
 ARG OPENCODE_PROVIDER_PACKAGES="@ai-sdk/openai @ai-sdk/openai-compatible opencode-antigravity-auth"
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -36,13 +36,24 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 RUN npm install --no-save "akm-cli@${AKM_CLI_VERSION}"
 
+ARG BENCH_REPO_BRANCH=unknown
+ARG BENCH_REPO_COMMIT=unknown
+ARG BENCH_REPO_DIRTY=unknown
+ENV AKM_BENCH_IMAGE_AKM_VERSION=${AKM_CLI_VERSION} \
+  AKM_BENCH_IMAGE_OPENCODE_VERSION=${OPENCODE_AI_VERSION} \
+  AKM_BENCH_IMAGE_REPO_BRANCH=${BENCH_REPO_BRANCH} \
+  AKM_BENCH_IMAGE_REPO_COMMIT=${BENCH_REPO_COMMIT} \
+  AKM_BENCH_IMAGE_REPO_DIRTY=${BENCH_REPO_DIRTY}
+
 COPY biome.json tsconfig.json README.md LICENSE ./
 COPY config ./config
+COPY results/qwen9b-2026-05-03.json ./results/qwen9b-2026-05-03.json
 COPY docs ./docs
+COPY analysis ./analysis
 COPY fixtures ./fixtures
 COPY src ./src
 COPY tests ./tests
-COPY bin/docker-entrypoint.sh ./bin/docker-entrypoint.sh
+COPY bin ./bin
 
 RUN chmod +x /opt/akm-bench/bin/docker-entrypoint.sh
 

@@ -92,8 +92,42 @@ configure_akm_runtime() {
   esac
 }
 
+capture_runtime_provenance() {
+  local mode actual_akm actual_opencode
+  mode="${BENCH_DOCKER_AKM_MODE:-installed}"
+
+  if ! actual_akm="$("${AKM_BENCH_AKM_BIN}" --version 2>&1)"; then
+    printf 'docker-entrypoint: failed to resolve AKM runtime version: %s\n' "${actual_akm}" >&2
+    exit 2
+  fi
+  actual_akm="${actual_akm%%$'\n'*}"
+  actual_akm="${actual_akm%$'\r'}"
+
+  if ! actual_opencode="$(opencode --version 2>&1)"; then
+    printf 'docker-entrypoint: failed to resolve OpenCode runtime version: %s\n' "${actual_opencode}" >&2
+    exit 2
+  fi
+  actual_opencode="${actual_opencode%%$'\n'*}"
+  actual_opencode="${actual_opencode%$'\r'}"
+
+  if [[ "${mode}" != "source" && -n "${AKM_BENCH_IMAGE_AKM_VERSION:-}" && "${actual_akm}" != "${AKM_BENCH_IMAGE_AKM_VERSION}" ]]; then
+    printf 'docker-entrypoint: AKM runtime mismatch: image expected %s, resolved %s\n' \
+      "${AKM_BENCH_IMAGE_AKM_VERSION}" "${actual_akm}" >&2
+    exit 2
+  fi
+  if [[ -n "${AKM_BENCH_IMAGE_OPENCODE_VERSION:-}" && "${actual_opencode}" != "${AKM_BENCH_IMAGE_OPENCODE_VERSION}" ]]; then
+    printf 'docker-entrypoint: OpenCode runtime mismatch: image expected %s, resolved %s\n' \
+      "${AKM_BENCH_IMAGE_OPENCODE_VERSION}" "${actual_opencode}" >&2
+    exit 2
+  fi
+
+  export AKM_BENCH_RUNTIME_AKM_VERSION="${actual_akm}"
+  export AKM_BENCH_RUNTIME_OPENCODE_VERSION="${actual_opencode}"
+}
+
 mkdir -p /cache "${HOME}" "${BENCH_RESULTS_DIR:-/outputs}"
 seed_opencode_home
 configure_akm_runtime
+capture_runtime_provenance
 
 exec "$@"

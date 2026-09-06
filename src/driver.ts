@@ -9,9 +9,9 @@
  * Design notes:
  *   • The driver invokes opencode through `runAgent` with the built-in
  *     `opencode` profile. No new harness abstraction.
- *   • Per-run isolation: every run gets fresh tmpdirs for `XDG_CACHE_HOME`,
- *     `XDG_CONFIG_HOME`, `OPENCODE_CONFIG`, and (when `stashDir` is provided)
- *     `AKM_STASH_DIR`. The operator's personal opencode/akm config is NEVER
+ *   • Per-run isolation: every run gets fresh XDG cache/config/data/state
+ *     homes, an `OPENCODE_CONFIG`, and (when `stashDir` is provided) an AKM
+ *     bundle override. The operator's personal opencode/akm state is NEVER
  *     read or written.
  *   • Hard budgets: `budgetWallMs` is enforced via `runAgent`'s timeout. A
  *     timeout produces `outcome: "budget_exceeded"`, which is a distinct
@@ -21,6 +21,7 @@
  *     unit-testable with an injected fake spawn.
  */
 
+import { Database } from "bun:sqlite";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -86,12 +87,12 @@ export interface RunOptions {
    */
   opencodeProviders?: LoadedOpencodeConfig;
   /**
-   * Path to a pre-built index cache home (`<dir>/akm/index.db` exists here).
-   * When supplied, `runOne` copies the index into the per-run `XDG_CACHE_HOME`
+   * Path to a pre-built index data home (`<dir>/akm/index.db` exists here).
+   * When supplied, `runOne` copies the index into the per-run `XDG_DATA_HOME`
    * instead of re-running `akm index --full` on every seed. This avoids the
    * ~300–600ms re-index penalty per (task, arm, seed) triple.
    */
-  indexCacheHome?: string;
+  indexDataHome?: string;
 }
 
 /**
@@ -239,7 +240,19 @@ export interface RunResult {
 }
 
 /** Operator-config env names that MUST NOT leak into per-run children. */
-const ISOLATED_ENV_NAMES = ["OPENCODE_CONFIG", "AKM_STASH_DIR", "XDG_CACHE_HOME", "XDG_CONFIG_HOME"] as const;
+const ISOLATED_ENV_NAMES = [
+  "OPENCODE_CONFIG",
+  "AKM_BUNDLE_DIR",
+  "AKM_STASH_DIR",
+  "XDG_CACHE_HOME",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_STATE_HOME",
+  "AKM_CACHE_DIR",
+  "AKM_CONFIG_DIR",
+  "AKM_DATA_DIR",
+  "AKM_STATE_DIR",
+] as const;
 
 /**
  * Operator-env names that MUST be stripped from `envSource` before the bench
@@ -253,10 +266,9 @@ const ISOLATED_ENV_NAMES = ["OPENCODE_CONFIG", "AKM_STASH_DIR", "XDG_CACHE_HOME"
  *     into every (task × arm × seed) child. Bench is hermetic by design;
  *     credentials must be supplied through the bench's own config surface,
  *     not inherited.
- *   • `AKM_CONFIG_DIR` — points akm at the operator's stash config. Letting
- *     this leak defeats the per-run isolation tmpdirs `createIsolationDirs`
- *     materialises (XDG_CACHE_HOME / XDG_CONFIG_HOME) and would cause
- *     bench runs to read the operator's writable config.
+ *   • `AKM_CONFIG_DIR` — points akm at the operator's config. Letting it leak
+ *     defeats the explicit per-run directory overrides and can make a bench
+ *     read operator configuration.
  *
  * Recurrence guard for #271 (mirrors the #243/#251 fixup pattern of
  * pinning isolation behaviour with regression tests).
@@ -289,6 +301,8 @@ export interface IsolationDirs {
   root: string;
   cacheHome: string;
   configHome: string;
+  dataHome: string;
+  stateHome: string;
   opencodeConfig: string;
   akmStashDir?: string;
 }
@@ -297,9 +311,13 @@ export function createIsolationDirs(stashDir?: string): IsolationDirs {
   const root = benchMkdtemp("akm-bench-run-");
   const cacheHome = path.join(root, "cache");
   const configHome = path.join(root, "config");
+  const dataHome = path.join(root, "data");
+  const stateHome = path.join(root, "state");
   const opencodeConfig = path.join(root, "opencode-config");
   fs.mkdirSync(cacheHome, { recursive: true });
   fs.mkdirSync(configHome, { recursive: true });
+  fs.mkdirSync(dataHome, { recursive: true });
+  fs.mkdirSync(stateHome, { recursive: true });
   fs.mkdirSync(opencodeConfig, { recursive: true });
 
   // Create an isolated opencode config dir. We intentionally do NOT symlink
@@ -319,6 +337,8 @@ export function createIsolationDirs(stashDir?: string): IsolationDirs {
     root,
     cacheHome,
     configHome,
+    dataHome,
+    stateHome,
     opencodeConfig,
     akmStashDir: stashDir,
   };
@@ -331,6 +351,12 @@ export function buildIsolatedEnv(dirs: IsolationDirs, model: string): Record<str
   const env: Record<string, string> = {
     XDG_CACHE_HOME: dirs.cacheHome,
     XDG_CONFIG_HOME: dirs.configHome,
+    XDG_DATA_HOME: dirs.dataHome,
+    XDG_STATE_HOME: dirs.stateHome,
+    AKM_CACHE_DIR: path.join(dirs.cacheHome, "akm"),
+    AKM_CONFIG_DIR: path.join(dirs.configHome, "akm"),
+    AKM_DATA_DIR: path.join(dirs.dataHome, "akm"),
+    AKM_STATE_DIR: path.join(dirs.stateHome, "akm"),
     OPENCODE_CONFIG: path.join(dirs.opencodeConfig, "opencode.json"),
     BENCH_OPENCODE_MODEL: model,
     AKM_BENCH_AKM_BIN: shimBinPath ?? akmRuntime.binPath,
@@ -343,7 +369,13 @@ export function buildIsolatedEnv(dirs: IsolationDirs, model: string): Record<str
     const existingPath = process.env.PATH?.trim();
     env.PATH = existingPath ? `${akmRuntime.binDir}${path.delimiter}${existingPath}` : akmRuntime.binDir;
   }
-  if (dirs.akmStashDir) env.AKM_STASH_DIR = dirs.akmStashDir;
+  if (dirs.akmStashDir) {
+    // AKM 0.9 renamed the primary bundle override. Keep the legacy variable
+    // during the benchmark's transition so older comparison targets still
+    // receive the same isolated fixture.
+    env.AKM_BUNDLE_DIR = dirs.akmStashDir;
+    env.AKM_STASH_DIR = dirs.akmStashDir;
+  }
   return env;
 }
 
@@ -398,6 +430,7 @@ function extractFirstErrorLine(...sources: Array<string | undefined>): string | 
  * Mutates `env` in place and returns it for ergonomic chaining.
  */
 export function stripAkmStashDir(env: Record<string, string | undefined>): Record<string, string | undefined> {
+  delete env.AKM_BUNDLE_DIR;
   delete env.AKM_STASH_DIR;
   return env;
 }
@@ -530,7 +563,52 @@ export const EVENTS_READ_CAP_BYTES = 16 * 1024 * 1024;
  * `opts.warnings` (when supplied). The trailing partial line after a
  * truncation is dropped, since `JSON.parse` would reject it anyway.
  */
-export function readRunEvents(cacheHome: string, opts?: { warnings?: string[] }): EventEnvelope[] {
+export function readRunEvents(
+  storage: string | Pick<IsolationDirs, "cacheHome" | "dataHome">,
+  opts?: { warnings?: string[] },
+): EventEnvelope[] {
+  const cacheHome = typeof storage === "string" ? storage : storage.cacheHome;
+  const dataHome = typeof storage === "string" ? undefined : storage.dataHome;
+  const stateDbPath = dataHome ? path.join(dataHome, "akm", "state.db") : undefined;
+  if (stateDbPath && fs.existsSync(stateDbPath)) {
+    try {
+      const db = new Database(stateDbPath, { readonly: true, create: false });
+      try {
+        const rows = db
+          .query<{ id: number; event_type: string; ts: string; ref: string | null; metadata_json: string }, []>(
+            "SELECT id, event_type, ts, ref, metadata_json FROM events ORDER BY id ASC",
+          )
+          .all();
+        return rows.map((row) => {
+          let metadata: Record<string, unknown> | undefined;
+          try {
+            const parsed = JSON.parse(row.metadata_json) as unknown;
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              metadata = parsed as Record<string, unknown>;
+            }
+          } catch {
+            // Malformed metadata should not discard the indexed event fields.
+          }
+          return {
+            schemaVersion: 1,
+            id: Number(row.id),
+            ts: row.ts,
+            eventType: row.event_type,
+            ...(row.ref ? { ref: row.ref } : {}),
+            ...(metadata ? { metadata } : {}),
+          };
+        });
+      } finally {
+        db.close();
+      }
+    } catch (err) {
+      opts?.warnings?.push(`state.db event read failed; trying legacy events.jsonl: ${(err as Error).message}`);
+    }
+  }
+
+  // AKM <=0.7 compatibility. Current AKM persists the same envelope in
+  // XDG_DATA_HOME/akm/state.db; keep this reader so historical targets remain
+  // benchmarkable with the same harness.
   const eventsPath = path.join(cacheHome, "akm", "events.jsonl");
   if (!fs.existsSync(eventsPath)) return [];
 
@@ -674,7 +752,7 @@ export async function runOne(options: RunOptions): Promise<RunResult> {
       model: options.model,
       arm: options.arm,
       stashDir: options.stashDir,
-      indexCacheHome: options.indexCacheHome,
+      indexDataHome: options.indexDataHome,
       providers: options.opencodeProviders,
       dryRun: !!options.spawn,
       warnings: options.warnings,
@@ -712,7 +790,7 @@ export async function runOne(options: RunOptions): Promise<RunResult> {
     result.tokenMeasurement = parsed.measurement;
     result.requestMetrics = parsed.requestMetrics;
     result.agentStdout = parsed.text;
-    result.events = readRunEvents(dirs.cacheHome, { warnings: options.warnings });
+    result.events = readRunEvents(dirs, { warnings: options.warnings });
 
     if (!agentResult.ok) {
       if (agentResult.reason === "timeout") {

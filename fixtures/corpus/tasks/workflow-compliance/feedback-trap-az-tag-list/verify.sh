@@ -2,7 +2,7 @@
 # Deterministic verifier for feedback-trap-az-tag-list.
 #
 # This task is intentionally hard to satisfy from the gold ref alone
-# (`skill:az-cli` describes `--query` and `-o tsv` but not the compound
+# (`skills/az-cli` describes `--query` and `-o tsv` but not the compound
 # tag-selector pattern). The verifier checks for the structural shape of
 # the correct command; tasks that only echo the asset's hints will not
 # match all four greps.

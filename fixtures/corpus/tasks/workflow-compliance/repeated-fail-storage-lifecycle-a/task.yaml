@@ -3,7 +3,7 @@ title: "Set lifecycle delete-after-days on an az storage account (variant A)"
 domain: workflow-compliance
 difficulty: hard
 slice: train
-gold_ref: skill:az-cli
+gold_ref: skills/az-cli
 stash: az-cli
 verifier: script
 memory_ability: procedural_lookup
@@ -18,11 +18,11 @@ budget:
 #
 # Companion task: workflow-compliance/repeated-fail-storage-lifecycle-b.
 #
-# Both task variants depend on the same `skill:az-cli` asset, which is
+# Both task variants depend on the same `skills/az-cli` asset, which is
 # silent on storage-account lifecycle policy. Each variant's verifier is
 # strict enough that an agent following only the asset's hints will fail.
 #
-# After two negative outcomes against `skill:az-cli`, the workflow
+# After two negative outcomes against `skills/az-cli`, the workflow
 # `akm-reflect-after-repeated-failure` (min_repeated_failures: 2) should
 # fire — the agent reflects, distills, and proposes an updated asset.
 # Arms that distill after a single failure (premature) or never (never

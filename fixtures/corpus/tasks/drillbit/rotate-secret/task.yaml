@@ -3,7 +3,7 @@ title: "Rotate a drillbit cluster secret using ed25519"
 domain: drillbit
 difficulty: easy
 slice: eval
-gold_ref: skill:drillbit
+gold_ref: skills/drillbit
 stash: drillbit
 verifier: script
 budget:

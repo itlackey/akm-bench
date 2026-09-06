@@ -3,7 +3,7 @@ title: "Write a provider script that emits akm feedback after each task"
 domain: opencode
 difficulty: medium
 slice: eval
-gold_ref: skill:opencode
+gold_ref: skills/opencode
 stash: multi-domain
 verifier: script
 budget:

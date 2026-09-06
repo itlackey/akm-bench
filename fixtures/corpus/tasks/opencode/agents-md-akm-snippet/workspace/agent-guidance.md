@@ -5,7 +5,7 @@
 You MUST search it before attempting the task:
 
 1. `akm search 'opencode agent configuration'` — find relevant skills and knowledge
-2. `akm show <ref>` — read the full asset (e.g. `akm show skill:opencode`)
+2. `akm show <ref>` — read the full asset (e.g. `akm show skills/opencode`)
 3. Apply what you learned, then write your solution
 4. `akm feedback <ref> --positive` or `--negative` when done
 

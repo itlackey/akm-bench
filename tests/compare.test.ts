@@ -482,7 +482,7 @@ describe("runCompareCli", () => {
           wallclock_ms: 100,
           verifier_exit_code: 0,
           trajectory: { correct_asset_loaded: true, feedback_recorded: false },
-          assets_loaded: ["skill:foo"],
+          assets_loaded: ["skills/foo"],
           failure_mode: null,
         },
       ],

@@ -86,16 +86,15 @@ read -r cli_version plugin_version opencode_version < <(
   "$python_bin" -c 'import harbor.akm_opencode as m; print(m.AKM_CLI_VERSION, m.AKM_PLUGIN_VERSION, m.OPENCODE_VERSION)'
 ) || fail "could not import harbor.akm_opencode to read its pins."
 
-# The pinned CLI must satisfy the pinned plugin's own compatibility range, or
-# the plugin declines to load and every treatment trial silently scores as a
-# baseline. harbor.akm_opencode asserts that at import (so a bare `harbor run`
-# is covered too); what it CANNOT know is whether its mirrored copy of the
-# range has gone stale. Read the real value from the published tarball and
-# compare, reusing the module's own matcher rather than a second copy of it.
+# The globally pinned CLI must satisfy the pinned plugin's declared akm-cli
+# dependency, or the benchmark reports one release while the plugin executes
+# another. harbor.akm_opencode checks the mirrored spec at import; this second
+# check reads the published tarball so a stale mirror cannot start a paid run.
 "$python_bin" - <<'PY' || exit 1
-import json, re, sys, tarfile, tempfile, urllib.request
+import json, sys, tarfile, tempfile, urllib.request
 from harbor.akm_opencode import (
-    AKM_CLI_VERSION, AKM_PLUGIN_VERSION, AKM_PLUGIN_REQUIRED_CLI_RANGE, satisfies_caret,
+    AKM_CLI_VERSION, AKM_PLUGIN_VERSION, AKM_PLUGIN_REQUIRED_CLI_SPEC,
+    satisfies_version_spec,
 )
 
 try:
@@ -105,29 +104,28 @@ try:
         tgz = f"{d}/p.tgz"
         urllib.request.urlretrieve(meta["dist"]["tarball"], tgz)
         with tarfile.open(tgz) as t:
-            src = t.extractfile("package/shared/akm-version.ts").read().decode()
-except Exception as exc:  # offline, npm down, module moved -- not fatal
-    print(f"ab-run: WARNING -- could not read the published plugin's range ({exc.__class__.__name__}); "
-          f"trusting the mirrored {AKM_PLUGIN_REQUIRED_CLI_RANGE}.", file=sys.stderr)
-    sys.exit(0)
-
-m = re.search(r'AKM_VERSION_RANGE\s*=\s*"([^"]+)"', src)
-if not m:
-    print("ab-run: WARNING -- no AKM_VERSION_RANGE in the published plugin; skipping the staleness check.",
+            package_file = t.extractfile("package/package.json")
+            if package_file is None:
+                raise RuntimeError("published tarball has no package/package.json")
+            package = json.load(package_file)
+            real = package.get("dependencies", {}).get("akm-cli")
+            if not isinstance(real, str) or not real.strip():
+                raise RuntimeError("published package declares no akm-cli dependency")
+except Exception as exc:
+    print(f"ab-run: could not verify the published plugin's akm-cli dependency: {exc}",
           file=sys.stderr)
-    sys.exit(0)
-
-real = m.group(1)
-if real != AKM_PLUGIN_REQUIRED_CLI_RANGE:
-    print(f"ab-run: akm-opencode {AKM_PLUGIN_VERSION} really gates on {real}, but "
-          f"harbor/akm_opencode.py mirrors {AKM_PLUGIN_REQUIRED_CLI_RANGE}.", file=sys.stderr)
-    print(f"ab-run: update AKM_PLUGIN_REQUIRED_CLI_RANGE to {real} before running.", file=sys.stderr)
     sys.exit(1)
-if not satisfies_caret(AKM_CLI_VERSION, real):
+
+if real != AKM_PLUGIN_REQUIRED_CLI_SPEC:
+    print(f"ab-run: akm-opencode {AKM_PLUGIN_VERSION} declares akm-cli {real}, but "
+          f"harbor/akm_opencode.py mirrors {AKM_PLUGIN_REQUIRED_CLI_SPEC}.", file=sys.stderr)
+    print(f"ab-run: update AKM_PLUGIN_REQUIRED_CLI_SPEC to {real} before running.", file=sys.stderr)
+    sys.exit(1)
+if not satisfies_version_spec(AKM_CLI_VERSION, real):
     print(f"ab-run: akm-cli {AKM_CLI_VERSION} does not satisfy {real}; the plugin would not load.",
           file=sys.stderr)
     sys.exit(1)
-print(f"ab-run: plugin gate {real} accepts akm-cli {AKM_CLI_VERSION} (mirror in akm_opencode.py is current).")
+print(f"ab-run: plugin dependency {real} accepts akm-cli {AKM_CLI_VERSION} (mirror is current).")
 PY
 
 # ------------------------------------------------------------------- render it

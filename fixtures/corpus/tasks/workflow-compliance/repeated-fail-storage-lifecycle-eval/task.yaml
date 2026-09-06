@@ -3,7 +3,7 @@ title: "Set storage account lifecycle policy (eval variant)"
 domain: workflow-compliance
 difficulty: hard
 slice: eval
-gold_ref: skill:az-cli
+gold_ref: skills/az-cli
 stash: az-cli
 verifier: script
 memory_ability: procedural_lookup

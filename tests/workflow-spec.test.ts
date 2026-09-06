@@ -120,7 +120,7 @@ applies_to:
   outcomes: ["pass"]
   requires_gold_ref: true
   min_repeated_failures: 2
-gold_ref: "skill:deploy"
+gold_ref: "skills/deploy"
 required_sequence:
   - event: agent_started
   - event: akm_show
@@ -141,7 +141,7 @@ scoring:
     expect(spec.applies_to?.task_domains).toEqual(["docker-homelab"]);
     expect(spec.applies_to?.requires_gold_ref).toBe(true);
     expect(spec.applies_to?.min_repeated_failures).toBe(2);
-    expect(spec.gold_ref).toBe("skill:deploy");
+    expect(spec.gold_ref).toBe("skills/deploy");
     expect(spec.forbidden?.length).toBe(1);
     expect(spec.required_sequence[1].ref_must_equal).toBe("gold_ref");
   });
@@ -227,7 +227,7 @@ scoring:
       "bad-ref.yaml",
       `id: x
 title: x
-gold_ref: "not-a-ref"
+gold_ref: "skills/../deploy"
 required_sequence:
   - event: agent_started
 scoring:

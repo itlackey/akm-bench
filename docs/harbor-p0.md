@@ -1,11 +1,12 @@
 # Harbor P0: running akm-opencode against stock opencode
 
-**Status: never executed live.** Everything below was derived by reading Harbor
-v0.22.0's source, opencode 1.18.21's published SDK types, and the shipped
-`akm-opencode` tarball, then verified as far as it can be without a Docker
-daemon (see [What has and has not been verified](#not-verified--this-is-the-honest-list)).
-No containerised run has happened yet. Treat the first execution as a debugging
-session, not as a measurement.
+**Status:** the exact OpenCode 1.18.29 +
+`akm-opencode@0.9.14202609050148` plugin-load path passed a disposable
+container smoke on 2026-09-06, and all Harbor 0.22.0 contract/unit checks pass.
+A full Harbor corpus measurement is still pending, so treat that first full run
+as qualification rather than publishable evidence. Historical investigation
+notes below retain the versions they were originally verified against;
+operational pins always come from `harbor/akm_opencode.py`.
 
 This runbook covers the P0 milestone only:
 
@@ -158,7 +159,7 @@ PYTHONPATH="$(pwd)" harbor run \
   -p /path/to/harbor/examples/tasks -i hello-world \
   --agent harbor.akm_opencode:AkmOpenCode \
   -m anthropic/claude-sonnet-4-5 \
-  --ak version=1.18.21 \
+  --ak version=1.18.29 \
   --allow-agent-host registry.npmjs.org \
   --agent-setup-timeout-multiplier 7.5
 
@@ -173,7 +174,7 @@ print(json.dumps(cfg['agents'][0]['kwargs']['opencode_config'], separators=(',',
 harbor run \
   -p /path/to/harbor/examples/tasks -i hello-world \
   --agent opencode -m anthropic/claude-sonnet-4-5 \
-  --ak version=1.18.21 \
+  --ak version=1.18.29 \
   --ak "opencode_config=$CTRL_CONFIG" \
   --allow-agent-host registry.npmjs.org \
   --agent-setup-timeout-multiplier 7.5
@@ -255,8 +256,8 @@ jq -r '"\(input_filename)  \(.agent_info.name)  \(.agent_info.version)"' \
 Expect exactly two distinct names:
 
 ```
-opencode      1.18.21
-akm-opencode  1.18.21+akm-opencode@0.9.1202608250804
+opencode      1.18.29
+akm-opencode  1.18.29+akm-opencode@0.9.14202609050148
 ```
 
 If both say `opencode`, the arms collapsed into one and every downstream
@@ -863,22 +864,13 @@ the plugin") still catches the same layout change loudly at install time —
 so a layout change is not a silent-corruption risk, just an
 install-time failure to re-diagnose from probe 7's message.
 
-**As of 2026-08-22 the hole is latent, not active.** The npm registry was
-queried directly: `akm-cli` has exactly two stable `0.9.x` releases, `0.9.0` and
-`0.9.1`, and `dist-tags.latest` is `0.9.1` — so npm's own resolution of the
-plugin's `^0.9.0` today lands on `0.9.1`, which *is* the pin, and candidate 2
-agrees with candidate 3. `akm-opencode@0.9.1202608250804` and
-`opencode-ai@1.18.21` are likewise published and are both their package's
-`latest`. This is the one caveat on this page that has a shelf life: re-check it
-before every run, because nothing in the agent enforces it.
-
-```sh
-curl -s https://registry.npmjs.org/akm-cli \
-  | jq -r '[.versions | keys[] | select(startswith("0.9.")) | select(contains("-") | not)], .["dist-tags"].latest'
-```
-
-If that prints any stable `0.9.x` newer than `AKM_CLI_VERSION`, the measured run
-may exercise an unpinned CLI while `result.json` still reports the pin.
+**Current contract (2026-09-06):** `akm-opencode` declares an exact
+`akm-cli@0.9.14` dependency. `bin/ab-run` downloads the pinned plugin tarball,
+reads that declaration from `package.json`, and fails closed if it differs from
+the mirrored Harbor spec or the global CLI pin. The install self-check then
+requires every plugin-adjacent package copy to report the same exact version.
+This replaces the old manual “check whether a newer caret-compatible release
+exists” procedure.
 
 ### Session-start curation: inert on the smoke task, live on real tasks
 
@@ -949,19 +941,18 @@ Pick glibc images, or raise Node on the musl branch first.
 
 ## What the agent actually does at install time
 
-For debugging, the eight steps in order — all of them raise on a non-zero exit,
+For debugging, the install steps in order — all of them raise on a non-zero exit,
 so the first failure aborts the trial:
 
-1. `super().install()` — Node (nvm on glibc, apk on musl) + `npm i -g opencode-ai@1.18.21`.
+1. `super().install()` — Node (nvm on glibc, apk on musl) + the exact
+   `opencode-ai` pin (`1.18.29` for this release).
 2. **root:** create and chown `/opt/akm/{bundle,config,data,cache,state,seed}`.
    Not under `/tmp`: akm silently redirects config and cache for `/tmp`-resident
    bundles, and tmpfs can be reaped between phases.
-3. Assert Node ≥ 22, then `npm i -g akm-cli@0.9.1`. The global install is
-   mandatory: opencode's npm hoists the plugin's own `akm-cli` to the cache
-   package root, where the plugin's bundled-CLI lookup does not search. Without
-   a real `akm` on PATH the arm half-works — the in-process tools still import
-   the hoisted copy, but feedback, remember, hints and bundle-dir discovery all
-   fail.
+3. Assert Node ≥ 22, then install the exact global `akm-cli` pin (`0.9.14`).
+   Harbor uses it for deterministic bundle setup and direct health probes; the
+   plugin uses its own exact package-adjacent dependency, and the self-check
+   proves both copies match.
 4. **root:** symlink `akm` and `node` into `/usr/local/bin`. Both are needed —
    `dist/akm` is a `#!/usr/bin/env node` launcher. `/usr/local/bin` is on the
    default PATH of every Harbor base image, which is what lets `AKM_ENV` leave

@@ -3,7 +3,7 @@ title: "Configure drillbit backup for vault-primary: 90-day retention, 7 snapsho
 domain: drillbit
 difficulty: easy
 slice: eval
-gold_ref: skill:drillbit
+gold_ref: skills/drillbit
 stash: drillbit
 verifier: script
 budget:

@@ -12,8 +12,8 @@
  * Event names are validated against `WORKFLOW_TRACE_EVENT_NAMES` imported from
  * `workflow-trace.ts` — single source of truth, no dual-maintenance hazard.
  *
- * Asset refs (e.g. `gold_ref`) are validated via `parseAssetRef` from
- * `src/core/asset-ref.ts` — never reinvent ref validation.
+ * Asset refs (e.g. `gold_ref`) are validated via the local mirror of AKM's
+ * public 0.9 ref parser in `src/support/asset-ref.ts`.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";

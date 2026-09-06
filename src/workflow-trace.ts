@@ -32,6 +32,7 @@
  */
 
 import type { RunResult } from "./driver";
+import { parseAssetRef } from "./support/asset-ref";
 import type { EventEnvelope } from "./support/events";
 
 /* ─── Public API ──────────────────────────────────────────────────────────── */
@@ -104,7 +105,7 @@ export interface WorkflowTraceEvent {
   /** AKM CLI verb (e.g. `search`, `show`, `feedback`) when source is a CLI invocation. */
   command?: string;
   args?: string[];
-  /** Asset ref like `skill:deploy` or `team//skill:deploy`. */
+  /** Asset ref like `skills/deploy` or `team//skills/deploy`. */
   assetRef?: string;
   query?: string;
   resultRefs?: string[];
@@ -462,7 +463,8 @@ function fromAgentStdout(
 
   const out: SeedEvent[] = [];
   let idx = startIndex;
-  // Match invocations like `akm search "query"`, `akm show skill:foo`, `akm feedback +1 skill:foo`.
+  // Match invocations like `akm search "query"`, `akm show skills/foo`,
+  // `akm feedback skills/foo --positive`.
   // We scan line-by-line so position in the stdout becomes a stable order hint.
   const lines = stdout.split("\n");
   for (let lineNo = 0; lineNo < lines.length; lineNo += 1) {
@@ -514,7 +516,7 @@ function fromAgentStdout(
  *
  * Supported shapes:
  *   • Bare CLI:   `akm search "deploy docker"`
- *   • Tool-call:  `tool: akm show skill:foo`
+ *   • Tool-call:  `tool: akm show skills/foo`
  *   • JSON-ish:   `{"command":"akm","args":["search","deploy"]}`
  */
 function parseAkmCli(line: string): StdoutMatch | null {
@@ -553,7 +555,7 @@ function classifyArgs(command: string, argv: string[]): StdoutMatch | null {
     case "show":
       return { type: "akm_show", command, args: argv, assetRef: rest[0] };
     case "feedback":
-      return { type: "akm_feedback", command, args: argv, assetRef: rest.find((a) => a.includes(":")) };
+      return { type: "akm_feedback", command, args: argv, assetRef: findRefArg(rest) };
     case "reflect":
       return { type: "akm_reflect", command, args: argv };
     case "distill":
@@ -570,6 +572,19 @@ function classifyArgs(command: string, argv: string[]): StdoutMatch | null {
     default:
       return null;
   }
+}
+
+function findRefArg(args: string[]): string | undefined {
+  for (const arg of args) {
+    if (arg.startsWith("-") || arg === "+1" || arg === "+" || arg === "positive" || arg === "negative") continue;
+    try {
+      parseAssetRef(arg);
+      return arg;
+    } catch {
+      // Not an AKM item ref; keep looking for one.
+    }
+  }
+  return undefined;
 }
 
 /**

@@ -3,7 +3,7 @@ title: "Scale drillbit cluster prod-core to 8 replicas"
 domain: drillbit
 difficulty: easy
 slice: eval
-gold_ref: skill:drillbit
+gold_ref: skills/drillbit
 stash: drillbit
 verifier: script
 budget:

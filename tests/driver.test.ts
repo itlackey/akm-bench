@@ -4,6 +4,7 @@
  * spawn. Real opencode is never invoked.
  */
 
+import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
@@ -375,7 +376,14 @@ describe("runOne", () => {
       // match (paranoid: confirm the literal sentinel strings are absent
       // even from values like `OPENCODE_CONFIG`).
       for (const name of _SCRUBBED_OPERATOR_ENV_NAMES) {
-        expect(childEnv[name]).toBeUndefined();
+        if (name === "AKM_CONFIG_DIR") {
+          // The operator value is scrubbed, then replaced by the harness's
+          // explicit isolated config directory.
+          expect(childEnv[name]).toBeDefined();
+          expect(childEnv[name]).not.toBe(sentinels[name]);
+        } else {
+          expect(childEnv[name]).toBeUndefined();
+        }
       }
       for (const sentinel of Object.values(sentinels)) {
         for (const value of Object.values(childEnv)) {
@@ -387,6 +395,7 @@ describe("runOne", () => {
       expect(childEnv.XDG_CACHE_HOME).toBeDefined();
       expect(childEnv.XDG_CONFIG_HOME).toBeDefined();
       expect(childEnv.OPENCODE_CONFIG).toBeDefined();
+      expect(childEnv.AKM_BUNDLE_DIR).toBe("/tmp/some-stash");
       expect(childEnv.AKM_STASH_DIR).toBe("/tmp/some-stash");
       expect(childEnv.BENCH_OPENCODE_MODEL).toBe("anthropic/claude-opus-4-7");
     } finally {
@@ -399,7 +408,7 @@ describe("runOne", () => {
 
   // ── #261: synthetic-arm AKM_STASH_DIR isolation ─────────────────────────────
 
-  test("synthetic arm: child env never carries AKM_STASH_DIR (recurrence guard for #243 fixup)", async () => {
+  test("synthetic arm: child env never carries an AKM bundle override (recurrence guard for #243 fixup)", async () => {
     // CRITICAL: synthetic-arm runs MUST NOT carry AKM_STASH_DIR. Without
     // this guard the operator's real AKM_STASH_DIR leaks in via parent-env
     // inheritance — exactly the failure mode the #243 fixup chased. We
@@ -419,6 +428,7 @@ describe("runOne", () => {
         spawn,
       });
       const childEnv1 = invocations[0]?.env ?? {};
+      expect(childEnv1.AKM_BUNDLE_DIR).toBeUndefined();
       expect(childEnv1.AKM_STASH_DIR).toBeUndefined();
       expect(childEnv1.AKM_STASH_DIR).not.toBe(operatorStash);
 
@@ -433,6 +443,7 @@ describe("runOne", () => {
         spawn: spawn2,
       });
       const childEnv2 = invocations2[0]?.env ?? {};
+      expect(childEnv2.AKM_BUNDLE_DIR).toBeUndefined();
       expect(childEnv2.AKM_STASH_DIR).toBeUndefined();
     } finally {
       if (prior === undefined) delete process.env.AKM_STASH_DIR;
@@ -596,13 +607,16 @@ describe("runOne", () => {
 });
 
 describe("driver helpers", () => {
-  test("createIsolationDirs creates four dirs under a single root", () => {
+  test("createIsolationDirs creates all storage dirs under a single root", () => {
     const dirs = createIsolationDirs();
     try {
       expect(fs.existsSync(dirs.cacheHome)).toBe(true);
       expect(fs.existsSync(dirs.configHome)).toBe(true);
+      expect(fs.existsSync(dirs.dataHome)).toBe(true);
+      expect(fs.existsSync(dirs.stateHome)).toBe(true);
       expect(fs.existsSync(dirs.opencodeConfig)).toBe(true);
       expect(dirs.cacheHome.startsWith(dirs.root)).toBe(true);
+      expect(dirs.dataHome.startsWith(dirs.root)).toBe(true);
     } finally {
       fs.rmSync(dirs.root, { recursive: true, force: true });
     }
@@ -620,13 +634,15 @@ describe("driver helpers", () => {
     }
   });
 
-  test("stripAkmStashDir deletes AKM_STASH_DIR in place (#261 synthetic-arm guard)", () => {
+  test("stripAkmStashDir deletes current and legacy bundle overrides in place (#261 synthetic-arm guard)", () => {
     const env: Record<string, string | undefined> = {
+      AKM_BUNDLE_DIR: "/tmp/operator-bundle",
       AKM_STASH_DIR: "/tmp/operator-stash",
       XDG_CACHE_HOME: "/tmp/cache",
     };
     const result = stripAkmStashDir(env);
     expect(result).toBe(env); // mutates in place + returns same ref
+    expect(env.AKM_BUNDLE_DIR).toBeUndefined();
     expect(env.AKM_STASH_DIR).toBeUndefined();
     expect(env.XDG_CACHE_HOME).toBe("/tmp/cache"); // siblings untouched
     // No-op on env without AKM_STASH_DIR.
@@ -673,13 +689,20 @@ describe("driver helpers", () => {
     }
   });
 
-  test("buildIsolatedEnv pins the four isolation keys plus model", () => {
+  test("buildIsolatedEnv pins XDG and AKM storage roots plus model", () => {
     const dirs = createIsolationDirs("/tmp/stash");
     try {
       const env = buildIsolatedEnv(dirs, "model-x");
       expect(env.XDG_CACHE_HOME).toBe(dirs.cacheHome);
       expect(env.XDG_CONFIG_HOME).toBe(dirs.configHome);
+      expect(env.XDG_DATA_HOME).toBe(dirs.dataHome);
+      expect(env.XDG_STATE_HOME).toBe(dirs.stateHome);
+      expect(env.AKM_CACHE_DIR).toBe(path.join(dirs.cacheHome, "akm"));
+      expect(env.AKM_CONFIG_DIR).toBe(path.join(dirs.configHome, "akm"));
+      expect(env.AKM_DATA_DIR).toBe(path.join(dirs.dataHome, "akm"));
+      expect(env.AKM_STATE_DIR).toBe(path.join(dirs.stateHome, "akm"));
       expect(env.OPENCODE_CONFIG).toBe(path.join(dirs.opencodeConfig, "opencode.json"));
+      expect(env.AKM_BUNDLE_DIR).toBe("/tmp/stash");
       expect(env.AKM_STASH_DIR).toBe("/tmp/stash");
       expect(env.BENCH_OPENCODE_MODEL).toBe("model-x");
       expect(env.AKM_BENCH_AKM_BIN).toBeDefined();
@@ -772,6 +795,45 @@ describe("driver helpers", () => {
       expect(events[0]?.eventType).toBe("feedback");
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test("readRunEvents reads current AKM events from XDG data state.db", () => {
+    const root = benchMkdtemp("bench-state-events-");
+    const cacheHome = path.join(root, "cache");
+    const dataHome = path.join(root, "data");
+    const akmData = path.join(dataHome, "akm");
+    fs.mkdirSync(cacheHome, { recursive: true });
+    fs.mkdirSync(akmData, { recursive: true });
+    const db = new Database(path.join(akmData, "state.db"));
+    try {
+      db.exec(
+        "CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL, ts TEXT NOT NULL, ref TEXT, metadata_json TEXT NOT NULL DEFAULT '{}')",
+      );
+      db.query("INSERT INTO events (event_type, ts, ref, metadata_json) VALUES (?, ?, ?, ?)").run(
+        "show",
+        "2026-09-06T00:00:00.000Z",
+        "skills/example",
+        JSON.stringify({ source: "bench" }),
+      );
+    } finally {
+      db.close();
+    }
+
+    try {
+      const events = readRunEvents({ cacheHome, dataHome });
+      expect(events).toEqual([
+        {
+          schemaVersion: 1,
+          id: 1,
+          ts: "2026-09-06T00:00:00.000Z",
+          eventType: "show",
+          ref: "skills/example",
+          metadata: { source: "bench" },
+        },
+      ]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 

@@ -75,7 +75,7 @@ agents:
       # harbor/akm_opencode.py -- the control arm cannot import that constant,
       # so harbor/tests/test_akm_opencode.py asserts the two stay in sync.
       # Both arms must run the same opencode binary.
-      version: "1.18.21"
+      version: "1.18.29"
 
       opencode_config:
         # Mirrors AkmOpenCode._DEFAULT_CONFIG so the two arms write the same
@@ -84,7 +84,7 @@ agents:
         autoupdate: false
 
         # Mirrors SHARED_PERMISSIONS in harbor/akm_opencode.py: the COMPLETE
-        # set of keys opencode 1.18.21's Config.permission declares
+        # set of keys opencode 1.18.29's Config.permission declares
         # (@opencode-ai/sdk dist/gen/types.gen.d.ts:1161-1169), and nothing
         # else. There is no read/write/grep/glob/list/patch key in that schema,
         # and the akm_* tools are not permission keys at all -- they live in the
@@ -122,7 +122,7 @@ agents:
     # OPENCODE_DISABLE_AUTOUPDATE=true in the treatment process env (a SECOND,
     # independent mechanism for the same intent), which this arm has no
     # equivalent of without this. Two different mechanisms enforcing the same
-    # thing are not provably equivalent in opencode 1.18.21 -- if the config
+    # thing are not provably equivalent in opencode 1.18.29 -- if the config
     # key were ever weaker than the env var, only this arm would attempt an
     # autoupdate network call, which is a confound (a network call and a
     # latency difference on the control arm only), not a convenience.
@@ -149,7 +149,7 @@ agents:
     # evidence base is asymmetric. opencode's XDG_DATA_HOME is
     # /logs/agent/opencode/xdg-data, and its session log --
     # /logs/agent/opencode/xdg-data/opencode/log/*.log -- is where the plugin's
-    # client.app.log() lines land: the "AKM CLI resolved" marker that
+    # client.app.log() lines land: the "AKM user feedback recorded" activity marker that
     # AkmOpenCode._assert_plugin_ran() requires before it will let a treatment
     # trial score, plus the akm.<surface>.<outcome> lines. On this arm the same
     # log is the negative control -- it should contain no akm lines at all.
@@ -175,7 +175,7 @@ agents:
       # Same opencode pin as the control arm. AkmOpenCode defaults to
       # OPENCODE_VERSION when this is omitted; stated explicitly so the two
       # arms are visibly pinned together in one file.
-      version: "1.18.21"
+      version: "1.18.29"
       #
       # NOT set here, on purpose:
       #   opencode_config -- the class force-merges `plugin` and `permission`
@@ -215,7 +215,7 @@ agents:
 
     # NO exclude_logs, for the same reason as the control arm -- and here it is
     # load-bearing rather than merely tidy: opencode's log under XDG_DATA_HOME
-    # carries the "AKM CLI resolved" line that this arm's
+    # carries the "AKM user feedback recorded" activity line that this arm's
     # populate_context_post_run() requires. Excluding "opencode/xdg-data/**"
     # would turn every treatment trial into an error on a non-mounted
     # environment. See docs/harbor-p0.md section 4.
@@ -281,7 +281,7 @@ datasets:
     #
     # WHY THAT MATTERS HERE AND NOWHERE ELSE. This task exists specifically to
     # measure whether the model CHOOSES to look the asset up: instruction.md
-    # requires it to write `akm-show-ref: skill:opencode`, and task.toml sets
+    # requires it to write `akm-show-ref: skills/opencode`, and task.toml sets
     # expected_workflows = ["akm-lookup-before-edit", ...]. The gate makes that
     # choice for it, so the observation stops being an observation of the
     # model. A sweep of all 74 files under harbor/tasks/*/environment/workspace

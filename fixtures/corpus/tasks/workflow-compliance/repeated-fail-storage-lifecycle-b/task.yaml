@@ -3,7 +3,7 @@ title: "Set lifecycle tier-to-cool on an az storage account (variant B)"
 domain: workflow-compliance
 difficulty: hard
 slice: train
-gold_ref: skill:az-cli
+gold_ref: skills/az-cli
 stash: az-cli
 verifier: script
 memory_ability: procedural_lookup
@@ -19,7 +19,7 @@ budget:
 # Companion task: workflow-compliance/repeated-fail-storage-lifecycle-a.
 #
 # This is the second of the matched pair. Both variants depend on the
-# same gold ref (`skill:az-cli`). After both fail in a training pass the
+# same gold ref (`skills/az-cli`). After both fail in a training pass the
 # agent has accumulated >=2 negative-feedback events against the asset,
 # satisfying the `min_repeated_failures: 2` gate of the
 # `akm-reflect-after-repeated-failure` workflow spec.

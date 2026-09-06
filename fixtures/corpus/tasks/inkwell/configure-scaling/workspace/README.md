@@ -8,4 +8,4 @@ Requirements:
 - `metric: rps`
 - `target: 100`
 
-Use `akm show skill:inkwell` for the exact field names and value format.
+Use `akm show skills/inkwell` for the exact field names and value format.

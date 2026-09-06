@@ -154,6 +154,32 @@ describe("renderUtilityReport JSON corpus identity (#250)", () => {
 });
 
 describe("renderUtilityReport JSON", () => {
+  test("records exact container runtime provenance when supplied", () => {
+    const withRuntime: UtilityRunReport = {
+      ...utilSample,
+      runtime: {
+        akmVersion: "0.9.14",
+        opencodeVersion: "1.18.29",
+        bunVersion: "1.3.13",
+        akmMode: "version",
+        containerImage: "akm-bench:akm-0.9.14",
+        benchmarkCommit: "deadbee",
+        benchmarkDirty: false,
+      },
+    };
+    const { json, markdown } = renderUtilityReport(withRuntime);
+    expect((json as Record<string, unknown>).runtime).toEqual({
+      akm_version: "0.9.14",
+      opencode_version: "1.18.29",
+      bun_version: "1.3.13",
+      akm_mode: "version",
+      container_image: "akm-bench:akm-0.9.14",
+      benchmark_commit: "deadbee",
+      benchmark_dirty: false,
+    });
+    expect(markdown).toContain("runtime: akm=0.9.14, opencode=1.18.29, bun=1.3.13");
+  });
+
   test("conforms to the §13.3 shape", () => {
     const { json } = renderUtilityReport(utilSample);
     const obj = json as Record<string, unknown>;
@@ -247,7 +273,7 @@ function makeRun(overrides: Partial<RunResult> = {}): RunResult {
     ],
     verifierStdout: "x".repeat(1024 * 1024),
     verifierExitCode: 0,
-    assetsLoaded: ["skill:foo"],
+    assetsLoaded: ["skills/foo"],
     failureMode: null,
   };
   return { ...base, ...overrides };
@@ -266,7 +292,7 @@ describe("serializeRunForReport", () => {
       wallclock_ms: 4200,
       verifier_exit_code: 0,
       trajectory: { correct_asset_loaded: true, feedback_recorded: false },
-      assets_loaded: ["skill:foo"],
+      assets_loaded: ["skills/foo"],
       failure_mode: null,
       termination_cause: null,
       first_error_line: null,
@@ -533,7 +559,7 @@ describe("renderUtilityReport negative-transfer (#260)", () => {
         events: [],
         verifierStdout: "",
         verifierExitCode: 1,
-        assetsLoaded: ["skill:bad-guidance", "knowledge:context"],
+        assetsLoaded: ["skills/bad-guidance", "knowledge/context"],
       },
       {
         schemaVersion: 1,
@@ -548,7 +574,7 @@ describe("renderUtilityReport negative-transfer (#260)", () => {
         events: [],
         verifierStdout: "",
         verifierExitCode: 1,
-        assetsLoaded: ["skill:bad-guidance"],
+        assetsLoaded: ["skills/bad-guidance"],
       },
     ];
     const sample: UtilityRunReport = {
@@ -576,12 +602,12 @@ describe("renderUtilityReport negative-transfer (#260)", () => {
     expect(markdown).toContain("domain-b/task-2");
     expect(markdown).toContain("### Domain-level deltas");
     expect(markdown).toContain("### Asset regression candidates");
-    expect(markdown).toContain("skill:bad-guidance");
+    expect(markdown).toContain("skills/bad-guidance");
 
     const obj = json as Record<string, unknown>;
     const candidates = obj.asset_regression_candidates as Array<Record<string, unknown>>;
     expect(candidates.length).toBeGreaterThan(0);
-    const bad = candidates.find((c) => c.asset_ref === "skill:bad-guidance");
+    const bad = candidates.find((c) => c.asset_ref === "skills/bad-guidance");
     expect(bad?.regressed_task_count).toBe(1);
     expect(bad?.total_load_count).toBe(2);
   });
@@ -1065,7 +1091,7 @@ describe("akm_overhead block (#263)", () => {
             id: 1,
             ts: "2026-04-27T10:00:00.500Z",
             eventType: "show",
-            ref: "skill:gold",
+            ref: "skills/gold",
           },
         ],
       }),
@@ -1080,7 +1106,7 @@ describe("akm_overhead block (#263)", () => {
         verifier: "regex" as const,
         budget: { tokens: 1000, wallMs: 1000 },
         taskDir: "/tmp/ignored",
-        goldRef: "skill:gold",
+        goldRef: "skills/gold",
         expectedTransferFrom: [],
       },
     ];
@@ -1118,7 +1144,7 @@ describe("akm_overhead block (#263)", () => {
         events: [
           { schemaVersion: 1, id: 0, ts: "2026-04-27T10:00:00.000Z", eventType: "search" },
           { schemaVersion: 1, id: 1, ts: "2026-04-27T10:00:00.001Z", eventType: "search" },
-          { schemaVersion: 1, id: 2, ts: "2026-04-27T10:00:00.002Z", eventType: "show", ref: "skill:wrong" },
+          { schemaVersion: 1, id: 2, ts: "2026-04-27T10:00:00.002Z", eventType: "show", ref: "skills/wrong" },
         ],
       }),
       fakeRun({

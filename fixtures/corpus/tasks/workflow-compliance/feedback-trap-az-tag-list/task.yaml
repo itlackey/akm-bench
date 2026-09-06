@@ -3,7 +3,7 @@ title: "List az resources filtered by a compound tag selector"
 domain: workflow-compliance
 difficulty: hard
 slice: train
-gold_ref: skill:az-cli
+gold_ref: skills/az-cli
 stash: az-cli
 verifier: script
 memory_ability: procedural_lookup
@@ -18,7 +18,7 @@ budget:
 #
 # The gold-ref skill describes `--query` and `-o tsv` for the az CLI but
 # does NOT cover the compound-selector form this task requires. An agent
-# that loads `skill:az-cli` and follows it literally will produce output
+# that loads `skills/az-cli` and follows it literally will produce output
 # the verifier rejects. The compliant follow-up is to record NEGATIVE
 # feedback against the asset that was consulted, so utility scoring
 # reflects the asset's incompleteness.

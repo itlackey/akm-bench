@@ -513,21 +513,21 @@ describe("computeAssetRegressionCandidates", () => {
   }
 
   test("returns empty when no regressed tasks were provided", () => {
-    expect(computeAssetRegressionCandidates([], [fakeRun("d/a", ["skill:x"])])).toEqual([]);
+    expect(computeAssetRegressionCandidates([], [fakeRun("d/a", ["skills/x"])])).toEqual([]);
   });
 
   test("counts distinct regressed tasks per asset and totals raw load volume", () => {
     const akmRuns = [
       // task d/r1 across two seeds, same asset.
-      fakeRun("d/r1", ["skill:foo", "skill:bar"]),
-      fakeRun("d/r1", ["skill:foo"]),
-      // task d/r2 loads skill:foo (again) plus skill:baz.
-      fakeRun("d/r2", ["skill:foo", "skill:baz"]),
+      fakeRun("d/r1", ["skills/foo", "skills/bar"]),
+      fakeRun("d/r1", ["skills/foo"]),
+      // task d/r2 loads skills/foo (again) plus skills/baz.
+      fakeRun("d/r2", ["skills/foo", "skills/baz"]),
       // Non-regressed task is ignored entirely.
-      fakeRun("d/clean", ["skill:foo", "skill:bar", "skill:baz"]),
+      fakeRun("d/clean", ["skills/foo", "skills/bar", "skills/baz"]),
     ];
     const rows = computeAssetRegressionCandidates(["d/r1", "d/r2"], akmRuns);
-    expect(rows.map((r) => r.assetRef)).toEqual(["skill:foo", "skill:bar", "skill:baz"]);
+    expect(rows.map((r) => r.assetRef)).toEqual(["skills/foo", "skills/bar", "skills/baz"]);
     const foo = rows[0];
     if (!foo) throw new Error("foo missing");
     expect(foo.regressedTaskCount).toBe(2);
@@ -682,11 +682,11 @@ describe("computeAkmOverhead — successful AKM use", () => {
       tokens: { input: 100, output: 50 },
       events: [
         akmEvent("search", "2026-04-27T10:00:00.000Z", undefined, { query: "deploy" }),
-        akmEvent("show", "2026-04-27T10:00:00.500Z", "skill:deploy"),
-        akmEvent("feedback", "2026-04-27T10:00:01.000Z", "skill:deploy", { signal: "positive" }),
+        akmEvent("show", "2026-04-27T10:00:00.500Z", "skills/deploy"),
+        akmEvent("feedback", "2026-04-27T10:00:01.000Z", "skills/deploy", { signal: "positive" }),
       ],
     });
-    const tasks = metaMap([{ id: "demo/ok", goldRef: "skill:deploy", expectedTransferFrom: [] }]);
+    const tasks = metaMap([{ id: "demo/ok", goldRef: "skills/deploy", expectedTransferFrom: [] }]);
     const rows = computeAkmOverhead([run], { taskMetadata: tasks });
     const r = rows[0];
     expect(r.searchCount).toBe(1);
@@ -709,11 +709,11 @@ describe("computeAkmOverhead — successful AKM use", () => {
     const run = fakeResult({
       taskId: "demo/transfer",
       events: [
-        akmEvent("show", "2026-04-27T10:00:00.000Z", "skill:foo"),
-        akmEvent("show", "2026-04-27T10:00:01.000Z", "skill:helper"),
+        akmEvent("show", "2026-04-27T10:00:00.000Z", "skills/foo"),
+        akmEvent("show", "2026-04-27T10:00:01.000Z", "skills/helper"),
       ],
     });
-    const tasks = metaMap([{ id: "demo/transfer", goldRef: "skill:foo", expectedTransferFrom: ["skill:helper"] }]);
+    const tasks = metaMap([{ id: "demo/transfer", goldRef: "skills/foo", expectedTransferFrom: ["skills/helper"] }]);
     const rows = computeAkmOverhead([run], { taskMetadata: tasks });
     expect(rows[0].assetsLoadedCount).toBe(2);
     expect(rows[0].irrelevantAssetsLoadedCount).toBe(0);
@@ -722,7 +722,7 @@ describe("computeAkmOverhead — successful AKM use", () => {
 
 describe("computeAkmOverhead — excessive AKM calls", () => {
   test("high counts and low calls-per-success are surfaced", () => {
-    const goldRef = "skill:gold";
+    const goldRef = "skills/gold";
     const noisyRun = fakeResult({
       taskId: "demo/noisy",
       outcome: "fail",
@@ -730,9 +730,9 @@ describe("computeAkmOverhead — excessive AKM calls", () => {
         akmEvent("search", "2026-04-27T10:00:00.000Z"),
         akmEvent("search", "2026-04-27T10:00:00.100Z"),
         akmEvent("search", "2026-04-27T10:00:00.200Z"),
-        akmEvent("show", "2026-04-27T10:00:00.300Z", "skill:other"),
-        akmEvent("show", "2026-04-27T10:00:00.400Z", "skill:other2"),
-        akmEvent("show", "2026-04-27T10:00:00.500Z", "skill:other3"),
+        akmEvent("show", "2026-04-27T10:00:00.300Z", "skills/other"),
+        akmEvent("show", "2026-04-27T10:00:00.400Z", "skills/other2"),
+        akmEvent("show", "2026-04-27T10:00:00.500Z", "skills/other3"),
         akmEvent("show", "2026-04-27T10:00:00.600Z", goldRef),
       ],
     });
@@ -778,7 +778,7 @@ describe("computeAkmOverhead — missing timing/byte data", () => {
 
   test("byte sizes are always null for now (NOT zero)", () => {
     const run = fakeResult({
-      events: [akmEvent("show", "2026-04-27T10:00:00.000Z", "skill:foo")],
+      events: [akmEvent("show", "2026-04-27T10:00:00.000Z", "skills/foo")],
     });
     const rows = computeAkmOverhead([run]);
     expect(rows[0].contextBytesLoaded).toBeNull();
@@ -812,7 +812,7 @@ describe("computeAkmOverhead — missing timing/byte data", () => {
   test("missing task metadata -> irrelevantAssetsLoadedCount is null (not 0)", () => {
     const run = fakeResult({
       taskId: "demo/unknown",
-      events: [akmEvent("show", "2026-04-27T10:00:00.000Z", "skill:foo")],
+      events: [akmEvent("show", "2026-04-27T10:00:00.000Z", "skills/foo")],
     });
     // No metadata supplied for this task.
     const rows = computeAkmOverhead([run]);
@@ -1144,7 +1144,7 @@ describe("materialiseMaskedStash stashName containment (#271)", () => {
     const { fixturesRoot, cleanup } = makeFixturesRoot();
     try {
       const sibling = `../sibling-${path.basename(fixturesRoot)}`;
-      const result = materialiseMaskedStash(fixturesRoot, sibling, "skill:foo");
+      const result = materialiseMaskedStash(fixturesRoot, sibling, "skills/foo");
       expect(result).toBeNull();
     } finally {
       cleanup();
@@ -1154,7 +1154,7 @@ describe("materialiseMaskedStash stashName containment (#271)", () => {
   test("rejects absolute stashName", () => {
     const { fixturesRoot, cleanup } = makeFixturesRoot();
     try {
-      const result = materialiseMaskedStash(fixturesRoot, "/etc", "skill:foo");
+      const result = materialiseMaskedStash(fixturesRoot, "/etc", "skills/foo");
       expect(result).toBeNull();
     } finally {
       cleanup();
@@ -1167,7 +1167,7 @@ describe("materialiseMaskedStash stashName containment (#271)", () => {
       // path.resolve(fixturesRoot, "a/../../sibling-xyz") would land on
       // the sibling directory if containment is not enforced.
       const escapePath = `a/../../sibling-${path.basename(fixturesRoot)}`;
-      const result = materialiseMaskedStash(fixturesRoot, escapePath, "skill:foo");
+      const result = materialiseMaskedStash(fixturesRoot, escapePath, "skills/foo");
       expect(result).toBeNull();
     } finally {
       cleanup();
@@ -1181,7 +1181,7 @@ describe("materialiseMaskedStash stashName containment (#271)", () => {
       // passes; the existing MANIFEST gate returns null. Sanity check that
       // the new containment check did not accidentally reject the happy path.
       fs.mkdirSync(path.join(fixturesRoot, "inner"));
-      const result = materialiseMaskedStash(fixturesRoot, "inner", "skill:foo");
+      const result = materialiseMaskedStash(fixturesRoot, "inner", "skills/foo");
       expect(result).toBeNull();
     } finally {
       cleanup();

@@ -3,7 +3,7 @@ title: "Enable canary traffic splitting for drillbit cluster staging-west at 20%
 domain: drillbit
 difficulty: easy
 slice: eval
-gold_ref: skill:drillbit
+gold_ref: skills/drillbit
 stash: drillbit
 verifier: script
 budget:

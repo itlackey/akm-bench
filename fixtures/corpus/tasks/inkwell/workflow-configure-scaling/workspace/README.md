@@ -8,4 +8,4 @@ Requirements:
 - `metric: rps`
 - `target: 100`
 
-Use `akm workflow next 'workflow:configure-inkwell-service'` to follow the step-by-step process.
+Use `akm workflow next 'workflows/configure-inkwell-service'` to follow the step-by-step process.

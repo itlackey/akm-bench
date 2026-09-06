@@ -15,7 +15,7 @@ budget:
 # --- Workflow-compliance metadata (issue #259) ---
 # Category: required-abstention.
 #
-# The `minimal` fixture stash contains only `skill:hello-world` (a
+# The `minimal` fixture stash contains only `skills/hello-world` (a
 # placeholder skill). No asset in this stash is relevant to the task. The
 # compliant agent should:
 #   1. run `akm_search` for relevant context,
@@ -23,7 +23,7 @@ budget:
 #   3. write the answer WITHOUT calling `akm_show` on an irrelevant asset.
 #
 # Failure modes this task exposes:
-#   - The agent calls `akm_show skill:hello-world` and lets the irrelevant
+#   - The agent calls `akm_show skills/hello-world` and lets the irrelevant
 #     guidance pollute its output.
 #   - The agent fabricates a `gold_ref` and shows a non-existent asset.
 #

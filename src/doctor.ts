@@ -360,7 +360,7 @@ async function checkStashFixtureLoadable(verbose: boolean): Promise<DoctorCheck>
   try {
     const result = Bun.spawnSync({
       cmd: [akmBin, "search", "az", "cli"],
-      env: { ...process.env, AKM_STASH_DIR: azCliFixture },
+      env: { ...process.env, AKM_BUNDLE_DIR: azCliFixture, AKM_STASH_DIR: azCliFixture },
       stdout: "pipe",
       stderr: "pipe",
     });

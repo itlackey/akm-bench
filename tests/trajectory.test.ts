@@ -32,21 +32,21 @@ function feedbackEvent(): EventEnvelope {
     id: 0,
     ts: "2026-04-27T00:00:00.000Z",
     eventType: "feedback",
-    ref: "skill:foo",
+    ref: "skills/foo",
   };
 }
 
 describe("computeTrajectory.correctAssetLoaded", () => {
   test("null when goldRef is missing on the task", () => {
-    const traj = computeTrajectory({}, fakeRun({ verifierStdout: "akm show skill:irrelevant" }));
+    const traj = computeTrajectory({}, fakeRun({ verifierStdout: "akm show skills/irrelevant" }));
     expect(traj.correctAssetLoaded).toBeNull();
   });
 
   test("true when verifierStdout contains `akm show <goldRef>`", () => {
     const traj = computeTrajectory(
-      { goldRef: "skill:docker-homelab" },
+      { goldRef: "skills/docker-homelab" },
       fakeRun({
-        verifierStdout: "tool: akm show skill:docker-homelab\nresult: ok\n",
+        verifierStdout: "tool: akm show skills/docker-homelab\nresult: ok\n",
       }),
     );
     expect(traj.correctAssetLoaded).toBe(true);
@@ -54,9 +54,9 @@ describe("computeTrajectory.correctAssetLoaded", () => {
 
   test("true when tool-call JSON form contains the ref", () => {
     const traj = computeTrajectory(
-      { goldRef: "skill:docker-homelab" },
+      { goldRef: "skills/docker-homelab" },
       fakeRun({
-        verifierStdout: '{"command":"akm","args":["show","skill:docker-homelab"]}',
+        verifierStdout: '{"command":"akm","args":["show","skills/docker-homelab"]}',
       }),
     );
     expect(traj.correctAssetLoaded).toBe(true);
@@ -64,14 +64,14 @@ describe("computeTrajectory.correctAssetLoaded", () => {
 
   test("false when verifierStdout shows a different ref", () => {
     const traj = computeTrajectory(
-      { goldRef: "skill:docker-homelab" },
-      fakeRun({ verifierStdout: "akm show skill:az-cli\n" }),
+      { goldRef: "skills/docker-homelab" },
+      fakeRun({ verifierStdout: "akm show skills/az-cli\n" }),
     );
     expect(traj.correctAssetLoaded).toBe(false);
   });
 
   test("false on empty trace", () => {
-    const traj = computeTrajectory({ goldRef: "skill:docker-homelab" }, fakeRun({ verifierStdout: "" }));
+    const traj = computeTrajectory({ goldRef: "skills/docker-homelab" }, fakeRun({ verifierStdout: "" }));
     expect(traj.correctAssetLoaded).toBe(false);
   });
 
@@ -81,15 +81,15 @@ describe("computeTrajectory.correctAssetLoaded", () => {
       id: 1,
       ts: "2026-04-27T00:00:00.000Z",
       eventType: "tool_call",
-      metadata: { ref: "skill:docker-homelab" },
+      metadata: { ref: "skills/docker-homelab" },
     };
-    const traj = computeTrajectory({ goldRef: "skill:docker-homelab" }, fakeRun({ events: [event] }));
+    const traj = computeTrajectory({ goldRef: "skills/docker-homelab" }, fakeRun({ events: [event] }));
     expect(traj.correctAssetLoaded).toBe(true);
   });
 
   test("false when only feedback event carries the gold ref", () => {
     const traj = computeTrajectory(
-      { goldRef: "skill:docker-homelab" },
+      { goldRef: "skills/docker-homelab" },
       fakeRun({
         events: [
           {
@@ -97,7 +97,7 @@ describe("computeTrajectory.correctAssetLoaded", () => {
             id: 2,
             ts: "2026-04-27T00:00:00.000Z",
             eventType: "feedback",
-            ref: "skill:docker-homelab",
+            ref: "skills/docker-homelab",
           },
         ],
       }),
@@ -107,9 +107,9 @@ describe("computeTrajectory.correctAssetLoaded", () => {
 
   test("prefers agentStdout over verifierStdout when present", () => {
     const traj = computeTrajectory(
-      { goldRef: "skill:docker-homelab" },
+      { goldRef: "skills/docker-homelab" },
       fakeRun({
-        agentStdout: "tool: akm show skill:docker-homelab",
+        agentStdout: "tool: akm show skills/docker-homelab",
         verifierStdout: "",
       }),
     );
@@ -119,12 +119,12 @@ describe("computeTrajectory.correctAssetLoaded", () => {
 
 describe("computeTrajectory.feedbackRecorded", () => {
   test("true when events stream contains a `feedback` event", () => {
-    const traj = computeTrajectory({ goldRef: "skill:foo" }, fakeRun({ events: [feedbackEvent()] }));
+    const traj = computeTrajectory({ goldRef: "skills/foo" }, fakeRun({ events: [feedbackEvent()] }));
     expect(traj.feedbackRecorded).toBe(true);
   });
 
   test("false when events stream is empty", () => {
-    const traj = computeTrajectory({ goldRef: "skill:foo" }, fakeRun({ events: [] }));
+    const traj = computeTrajectory({ goldRef: "skills/foo" }, fakeRun({ events: [] }));
     expect(traj.feedbackRecorded).toBe(false);
   });
 
@@ -134,9 +134,9 @@ describe("computeTrajectory.feedbackRecorded", () => {
       id: 0,
       ts: "2026-04-27T00:00:00.000Z",
       eventType: "remember",
-      ref: "memory:alpha",
+      ref: "memories/alpha",
     };
-    const traj = computeTrajectory({ goldRef: "skill:foo" }, fakeRun({ events: [event] }));
+    const traj = computeTrajectory({ goldRef: "skills/foo" }, fakeRun({ events: [event] }));
     expect(traj.feedbackRecorded).toBe(false);
   });
 });
@@ -145,7 +145,7 @@ describe("computeTrajectory verifierStdout cap", () => {
   test("trajectory still computes from the prefix when stdout exceeds the cap, and a warning is recorded", () => {
     // Construct a stdout: prefix has the canonical `akm show` invocation;
     // the rest is GBs-of-junk simulated as a long filler past the cap.
-    const ref = "skill:docker-homelab";
+    const ref = "skills/docker-homelab";
     const prefix = `tool: akm show ${ref}\n`;
     const fillerSize = VERIFIER_STDOUT_SCAN_CAP + 1024;
     // Use repeated 'a' so total length comfortably exceeds the cap.
@@ -163,7 +163,7 @@ describe("computeTrajectory verifierStdout cap", () => {
 
   test("no warning when stdout is within the cap", () => {
     const warnings: string[] = [];
-    computeTrajectory({ goldRef: "skill:foo" }, fakeRun({ verifierStdout: "akm show skill:foo\n" }), { warnings });
+    computeTrajectory({ goldRef: "skills/foo" }, fakeRun({ verifierStdout: "akm show skills/foo\n" }), { warnings });
     expect(warnings).toEqual([]);
   });
 
@@ -171,7 +171,7 @@ describe("computeTrajectory verifierStdout cap", () => {
     // Prefix has only filler; the gold ref appears only AFTER the cap.
     // The scan should miss it (correctly — the agent's effective behaviour
     // within the budgeted prefix did not include the show call).
-    const ref = "skill:never-loaded";
+    const ref = "skills/never-loaded";
     const filler = "x".repeat(VERIFIER_STDOUT_SCAN_CAP);
     const verifierStdout = `${filler}akm show ${ref}\n`;
     const warnings: string[] = [];

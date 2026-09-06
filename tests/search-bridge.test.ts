@@ -40,29 +40,29 @@ function fakeResult(stdout: string, overrides: Partial<RunResult> = {}): RunResu
 
 describe("extractGoldRanks", () => {
   test("returns [] when goldRef is undefined", () => {
-    const r = fakeResult('akm search "foo"\nref: skill:foo');
+    const r = fakeResult('akm search "foo"\nref: skills/foo');
     expect(extractGoldRanks(r, undefined)).toEqual([]);
   });
 
   test("returns [] when verifierStdout is empty", () => {
     const r = fakeResult("");
-    expect(extractGoldRanks(r, "skill:foo")).toEqual([]);
+    expect(extractGoldRanks(r, "skills/foo")).toEqual([]);
   });
 
   test("uses agentStdout when verifierStdout is empty", () => {
     const r = fakeResult("", {
-      agentStdout: 'akm search "q"\nref: skill:gold\nref: skill:other',
+      agentStdout: 'akm search "q"\nref: skills/gold\nref: skills/other',
     });
-    const events = extractGoldRanks(r, "skill:gold");
+    const events = extractGoldRanks(r, "skills/gold");
     expect(events).toHaveLength(1);
     expect(events[0].rankOfGold).toBe(1);
   });
 
   test("falls back to verifierStdout when agentStdout is an empty string", () => {
-    const r = fakeResult('akm search "q"\nref: skill:gold', {
+    const r = fakeResult('akm search "q"\nref: skills/gold', {
       agentStdout: "",
     });
-    const events = extractGoldRanks(r, "skill:gold");
+    const events = extractGoldRanks(r, "skills/gold");
     expect(events).toHaveLength(1);
     expect(events[0].query).toBe("q");
     expect(events[0].rankOfGold).toBe(1);
@@ -72,41 +72,41 @@ describe("extractGoldRanks", () => {
     const stdout = [
       `> akm search "redis healthcheck"`,
       `skill: docker-homelab`,
-      `  ref: skill:docker-homelab`,
+      `  ref: skills/docker-homelab`,
       `  score: 0.92`,
       `skill: nginx-tls`,
-      `  ref: skill:nginx-tls`,
+      `  ref: skills/nginx-tls`,
       `  score: 0.81`,
     ].join("\n");
 
-    const events = extractGoldRanks(fakeResult(stdout), "skill:docker-homelab");
+    const events = extractGoldRanks(fakeResult(stdout), "skills/docker-homelab");
     expect(events).toHaveLength(1);
     expect(events[0].query).toBe("redis healthcheck");
-    expect(events[0].results).toEqual(["skill:docker-homelab", "skill:nginx-tls"]);
+    expect(events[0].results).toEqual(["skills/docker-homelab", "skills/nginx-tls"]);
     expect(events[0].rankOfGold).toBe(1);
   });
 
   test("extracts JSON tool-call form, gold at rank 3", () => {
     const stdout = [
       'tool: akm search "kubernetes pod restart" --output json',
-      '{"hits":[{"ref":"skill:k8s-debug"},{"ref":"skill:k8s-monitoring"},{"ref":"skill:k8s-restart"},{"ref":"skill:k8s-deploy"}]}',
+      '{"hits":[{"ref":"skills/k8s-debug"},{"ref":"skills/k8s-monitoring"},{"ref":"skills/k8s-restart"},{"ref":"skills/k8s-deploy"}]}',
     ].join("\n");
 
-    const events = extractGoldRanks(fakeResult(stdout), "skill:k8s-restart");
+    const events = extractGoldRanks(fakeResult(stdout), "skills/k8s-restart");
     expect(events).toHaveLength(1);
     expect(events[0].results.slice(0, 4)).toEqual([
-      "skill:k8s-debug",
-      "skill:k8s-monitoring",
-      "skill:k8s-restart",
-      "skill:k8s-deploy",
+      "skills/k8s-debug",
+      "skills/k8s-monitoring",
+      "skills/k8s-restart",
+      "skills/k8s-deploy",
     ]);
     expect(events[0].rankOfGold).toBe(3);
   });
 
   test("returns null rank when gold is missing from top 10", () => {
-    const refs = Array.from({ length: 12 }, (_, i) => `  ref: skill:other-${i}`).join("\n");
+    const refs = Array.from({ length: 12 }, (_, i) => `  ref: skills/other-${i}`).join("\n");
     const stdout = `akm search "missing-target"\n${refs}`;
-    const events = extractGoldRanks(fakeResult(stdout), "skill:gold");
+    const events = extractGoldRanks(fakeResult(stdout), "skills/gold");
     expect(events).toHaveLength(1);
     expect(events[0].rankOfGold).toBeNull();
     // Top-10 cap: only 10 results retained.
@@ -116,13 +116,13 @@ describe("extractGoldRanks", () => {
   test("multiple searches per run are each emitted in order", () => {
     const stdout = [
       'akm search "first query"',
-      "  ref: skill:a",
-      "  ref: skill:b",
+      "  ref: skills/a",
+      "  ref: skills/b",
       'akm search "second query"',
-      "  ref: skill:gold",
-      "  ref: skill:c",
+      "  ref: skills/gold",
+      "  ref: skills/c",
     ].join("\n");
-    const events = extractGoldRanks(fakeResult(stdout), "skill:gold");
+    const events = extractGoldRanks(fakeResult(stdout), "skills/gold");
     expect(events).toHaveLength(2);
     expect(events[0].query).toBe("first query");
     expect(events[0].rankOfGold).toBeNull();
@@ -133,22 +133,22 @@ describe("extractGoldRanks", () => {
   test("non-search akm invocation closes the active search block", () => {
     const stdout = [
       'akm search "q"',
-      "  ref: skill:a",
-      "  ref: skill:gold",
-      "akm show skill:gold",
-      "  ref: skill:gold (this should NOT extend the previous search)",
-      "  ref: skill:other",
+      "  ref: skills/a",
+      "  ref: skills/gold",
+      "akm show skills/gold",
+      "  ref: skills/gold (this should NOT extend the previous search)",
+      "  ref: skills/other",
     ].join("\n");
-    const events = extractGoldRanks(fakeResult(stdout), "skill:gold");
+    const events = extractGoldRanks(fakeResult(stdout), "skills/gold");
     // Only the search block contributes to results; the show block is closed.
     expect(events).toHaveLength(1);
-    expect(events[0].results).toEqual(["skill:a", "skill:gold"]);
+    expect(events[0].results).toEqual(["skills/a", "skills/gold"]);
     expect(events[0].rankOfGold).toBe(2);
   });
 
-  test("origin-prefixed ref counts as gold (team//skill:foo matches skill:foo)", () => {
-    const stdout = ['akm search "q"', "  ref: team//skill:foo", "  ref: skill:bar"].join("\n");
-    const events = extractGoldRanks(fakeResult(stdout), "skill:foo");
+  test("origin-prefixed ref counts as gold (team//skills/foo matches skills/foo)", () => {
+    const stdout = ['akm search "q"', "  ref: team//skills/foo", "  ref: skills/bar"].join("\n");
+    const events = extractGoldRanks(fakeResult(stdout), "skills/foo");
     expect(events[0].rankOfGold).toBe(1);
   });
 });
@@ -164,12 +164,12 @@ describe("computeSearchBridge — histogram + percentiles", () => {
       arm: "akm",
       seed,
       outcome,
-      goldRef: "skill:gold",
+      goldRef: "skills/gold",
       searches: rankOrNullPerSearch.map((rank, i) => ({
         query: `q${i}`,
         // Reconstruct a plausible result list: gold at the requested rank,
         // others as fillers. The aggregator only looks at rankOfGold.
-        results: rank === null ? Array.from({ length: 10 }, (_, j) => `skill:other-${j}`) : [],
+        results: rank === null ? Array.from({ length: 10 }, (_, j) => `skills/other-${j}`) : [],
         rankOfGold: rank,
       })),
     };
@@ -231,7 +231,7 @@ describe("computeSearchBridge — pass_rate_by_rank uses the agent's chosen sear
         arm: "akm",
         seed: 0,
         outcome: "pass",
-        goldRef: "skill:gold",
+        goldRef: "skills/gold",
         searches: [
           { query: "first", results: [], rankOfGold: 1 },
           { query: "last", results: [], rankOfGold: 5 },
@@ -242,7 +242,7 @@ describe("computeSearchBridge — pass_rate_by_rank uses the agent's chosen sear
         arm: "akm",
         seed: 0,
         outcome: "fail",
-        goldRef: "skill:gold",
+        goldRef: "skills/gold",
         searches: [{ query: "only", results: [], rankOfGold: 5 }],
       },
       {
@@ -250,7 +250,7 @@ describe("computeSearchBridge — pass_rate_by_rank uses the agent's chosen sear
         arm: "akm",
         seed: 0,
         outcome: "pass",
-        goldRef: "skill:gold",
+        goldRef: "skills/gold",
         searches: [{ query: "only", results: [], rankOfGold: 1 }],
       },
     ];
@@ -273,7 +273,7 @@ describe("computeSearchBridge — pass_rate_by_rank uses the agent's chosen sear
         arm: "akm",
         seed: 0,
         outcome: "pass",
-        goldRef: "skill:gold",
+        goldRef: "skills/gold",
         searches: [{ query: "q", results: [], rankOfGold: null }],
       },
       {
@@ -281,7 +281,7 @@ describe("computeSearchBridge — pass_rate_by_rank uses the agent's chosen sear
         arm: "akm",
         seed: 0,
         outcome: "fail",
-        goldRef: "skill:gold",
+        goldRef: "skills/gold",
         searches: [{ query: "q", results: [], rankOfGold: null }],
       },
     ];
@@ -299,7 +299,7 @@ describe("computeSearchBridge — pass_rate_by_rank uses the agent's chosen sear
         arm: "akm",
         seed: 0,
         outcome: "fail",
-        goldRef: "skill:gold",
+        goldRef: "skills/gold",
         searches: [],
       },
     ];

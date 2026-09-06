@@ -3,7 +3,7 @@ title: "Add the correct akm search snippet to agent-guidance.md without docker g
 domain: opencode
 difficulty: hard
 slice: eval
-gold_ref: skill:opencode
+gold_ref: skills/opencode
 stash: multi-domain
 verifier: pytest
 budget:

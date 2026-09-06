@@ -3,7 +3,7 @@
  *
  * Each fixture lives at `fixtures/stashes/<name>/` with a `MANIFEST.json`
  * and the standard akm stash layout. `loadFixtureStash(name)` copies the
- * fixture into a fresh tmp dir, sets `AKM_STASH_DIR`, runs `akm index`, and
+ * fixture into a fresh tmp dir, selects it as the AKM bundle, runs `akm index`, and
  * returns the materialised path plus a cleanup function.
  *
  * See README.md and docs/operator-guide.md for the contract.
@@ -23,16 +23,16 @@ const TRANSIENT_FIXTURE_DIRS = new Set([".akm", INDEX_DIR_NAME]);
 export interface LoadedFixtureStash {
   /** Absolute path to the materialised stash directory. */
   stashDir: string;
-  /** Restore the prior `AKM_STASH_DIR` env value and remove the tmp dir. */
+  /** Restore the prior AKM bundle overrides and remove the tmp dir. */
   cleanup: () => void;
   /** Deterministic SHA-256 of the fixture's source content (not the tmp copy). */
   contentHash: string;
   /**
-   * Absolute path to the XDG_CACHE_HOME directory that contains the pre-built
-   * FTS5 index (`<cacheHome>/akm/index.db`). Undefined when `skipIndex: true`.
-   * Callers can copy this into their own isolated cache dirs to avoid re-indexing.
+   * Absolute path to the XDG_DATA_HOME directory that contains the pre-built
+   * FTS5 index (`<dataHome>/akm/index.db`). Undefined when `skipIndex: true`.
+   * Callers can copy this into their own isolated data dirs to avoid re-indexing.
    */
-  indexCacheHome?: string;
+  indexDataHome?: string;
 }
 
 /**
@@ -94,8 +94,8 @@ export const computeFixtureContentHash = fixtureContentHash;
 export interface LoadFixtureStashOptions {
   /**
    * If true, skip the `akm index` invocation. The fixture is still copied to
-   * a tmp dir and `AKM_STASH_DIR` is still set, but no SQLite DB is created
-   * in the isolated XDG cache. Useful for callers that build their own index
+   * a tmp dir and the AKM bundle override is still set, but no SQLite DB is
+   * created in isolated XDG data. Useful for callers that build their own index
    * directly via the internal indexer DB API and would otherwise pay ~200-
    * 300ms for a wasted spawn. Defaults to false.
    */
@@ -108,12 +108,12 @@ export interface LoadFixtureStashOptions {
 }
 
 /**
- * Copy the named fixture into a fresh tmp dir, set `AKM_STASH_DIR`, and run
+ * Copy the named fixture into a fresh tmp dir, select it as the AKM bundle, and run
  * `akm index` against it. Returns the tmp path plus a cleanup function that
  * restores the prior env value and recursively removes the tmp dir.
  *
  * When a pre-built index exists in the bench cache, it is copied into the tmp
- * cache dir instead of spawning `akm index`, saving ~0.6-1s per load.
+ * data dir instead of spawning `akm index`, saving ~0.6-1s per load.
  *
  * Transition behavior: as a fallback, this loader still accepts legacy
  * fixture-local caches under `fixtures/stashes/<name>/__akm_index__/`.
@@ -130,19 +130,24 @@ export function loadFixtureStash(name: string, options: LoadFixtureStashOptions 
   const stashDir = path.join(tmpRoot, "stash");
   const cacheHome = path.join(tmpRoot, "cache");
   const configHome = path.join(tmpRoot, "config");
+  const dataHome = path.join(tmpRoot, "data");
+  const stateHome = path.join(tmpRoot, "state");
   copyDirRecursive(sourceDir, stashDir);
   fs.mkdirSync(cacheHome, { recursive: true });
   fs.mkdirSync(configHome, { recursive: true });
+  fs.mkdirSync(dataHome, { recursive: true });
+  fs.mkdirSync(stateHome, { recursive: true });
 
+  const priorAkmBundleDir = process.env.AKM_BUNDLE_DIR;
   const priorAkmStashDir = process.env.AKM_STASH_DIR;
+  process.env.AKM_BUNDLE_DIR = stashDir;
   process.env.AKM_STASH_DIR = stashDir;
 
   if (!options.skipIndex) {
     const preBuiltIndex = preBuiltIndexPath(name, contentHash);
     if (preBuiltIndex && !options.forceReindex) {
       // Copy pre-built index (fast: ~5ms for SQLite files)
-      copyDirRecursive(preBuiltIndex.cacheHome, cacheHome);
-      copyDirRecursive(preBuiltIndex.configHome, configHome);
+      copyDirRecursive(preBuiltIndex.dataHome, dataHome);
     } else {
       // Run akm index (slow: ~600-900ms per fixture)
       const result = Bun.spawnSync({
@@ -150,9 +155,16 @@ export function loadFixtureStash(name: string, options: LoadFixtureStashOptions 
         cwd: stashDir,
         env: {
           ...process.env,
+          AKM_BUNDLE_DIR: stashDir,
           AKM_STASH_DIR: stashDir,
           XDG_CACHE_HOME: cacheHome,
           XDG_CONFIG_HOME: configHome,
+          XDG_DATA_HOME: dataHome,
+          XDG_STATE_HOME: stateHome,
+          AKM_CACHE_DIR: path.join(cacheHome, "akm"),
+          AKM_CONFIG_DIR: path.join(configHome, "akm"),
+          AKM_DATA_DIR: path.join(dataHome, "akm"),
+          AKM_STATE_DIR: path.join(stateHome, "akm"),
         },
         stdout: "pipe",
         stderr: "pipe",
@@ -161,8 +173,8 @@ export function loadFixtureStash(name: string, options: LoadFixtureStashOptions 
       if (result.exitCode !== 0) {
         // Restore env and clean up before throwing so the caller is not left
         // with a leaked tmp dir or mutated process state.
-        if (priorAkmStashDir === undefined) delete process.env.AKM_STASH_DIR;
-        else process.env.AKM_STASH_DIR = priorAkmStashDir;
+        restoreBundleEnv("AKM_BUNDLE_DIR", priorAkmBundleDir);
+        restoreBundleEnv("AKM_STASH_DIR", priorAkmStashDir);
         fs.rmSync(tmpRoot, { recursive: true, force: true });
         const stderr = result.stderr ? new TextDecoder().decode(result.stderr) : "";
         throw new Error(`akm index failed for fixture "${name}" (exit ${result.exitCode}): ${stderr}`);
@@ -171,12 +183,17 @@ export function loadFixtureStash(name: string, options: LoadFixtureStashOptions 
   }
 
   const cleanup = (): void => {
-    if (priorAkmStashDir === undefined) delete process.env.AKM_STASH_DIR;
-    else process.env.AKM_STASH_DIR = priorAkmStashDir;
+    restoreBundleEnv("AKM_BUNDLE_DIR", priorAkmBundleDir);
+    restoreBundleEnv("AKM_STASH_DIR", priorAkmStashDir);
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   };
 
-  return { stashDir, cleanup, contentHash, ...(!options.skipIndex ? { indexCacheHome: cacheHome } : {}) };
+  return { stashDir, cleanup, contentHash, ...(!options.skipIndex ? { indexDataHome: dataHome } : {}) };
+}
+
+function restoreBundleEnv(name: "AKM_BUNDLE_DIR" | "AKM_STASH_DIR", value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
 }
 
 // ── Internals ───────────────────────────────────────────────────────────────
@@ -197,18 +214,26 @@ function fixtureSourceDir(name: string): string {
  *   1. Preferred: bench cache preflight entry keyed by fixture/runtime fingerprint
  *   2. Fallback: legacy fixture-local `__akm_index__/`
  */
-function preBuiltIndexPath(name: string, contentHash: string): { cacheHome: string; configHome: string } | undefined {
+function preBuiltIndexPath(name: string, contentHash: string): { dataHome: string } | undefined {
   const cacheEntry = resolveFixtureIndexCacheEntry(name, contentHash);
   if (cacheEntry) {
-    return { cacheHome: cacheEntry.cacheHome, configHome: cacheEntry.configHome };
+    return { dataHome: cacheEntry.dataHome };
   }
 
   const indexDir = path.join(getStashesRoot(), name, INDEX_DIR_NAME);
+  const currentDataHome = path.join(indexDir, "data");
+  const currentIndexDb = path.join(currentDataHome, "akm", "index.db");
+  if (fs.existsSync(currentIndexDb)) {
+    return { dataHome: currentDataHome };
+  }
+
+  // Fixture-local indexes created by AKM <=0.7 lived under XDG cache. Copy
+  // that self-contained index into the current data location for comparison
+  // targets that still use the legacy layout.
   const cacheHome = path.join(indexDir, "cache");
-  const configHome = path.join(indexDir, "config");
   const indexDb = path.join(cacheHome, "akm", "index.db");
   if (fs.existsSync(indexDb)) {
-    return { cacheHome, configHome };
+    return { dataHome: cacheHome };
   }
   return undefined;
 }

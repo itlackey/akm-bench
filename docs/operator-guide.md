@@ -251,7 +251,8 @@ Override the report destination with `--results-dir <path>` or `BENCH_RESULTS_DI
 Supported AKM modes:
 
 - `installed`: use the AKM version baked into the default image.
-- `version`: build or reuse an image tagged for the requested `akm-cli` version.
+- `version`: refresh an image through Docker's layer cache, tagged for the
+  requested `akm-cli` version.
 - `source`: mount a local AKM checkout read-only, copy it into `/cache`, run `bun install`, and benchmark that local source build.
 
 Examples:

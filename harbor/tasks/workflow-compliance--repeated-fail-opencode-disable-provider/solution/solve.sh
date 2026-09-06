@@ -14,5 +14,5 @@ sed -i 's|"apiKey": "\$OPENAI_API_KEY"|"apiKey": "{env:OPENAI_API_KEY}"|' config
 cat > prep-note.txt <<'DOC'
 prep: disable openai provider train
 akm-search-query: opencode config
-akm-show-ref: skill:opencode
+akm-show-ref: skills/opencode
 DOC

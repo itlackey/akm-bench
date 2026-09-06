@@ -6,7 +6,10 @@ import { getStashesRoot } from "./fixtures-root";
 import { getCacheDir } from "./support/fs";
 import { benchMkdtemp } from "./tmp";
 
-const CACHE_SCHEMA_VERSION = 1;
+// v2 moves AKM's durable index from the retired XDG cache layout to its
+// current XDG data layout. The schema bump prevents a 0.7-era cache entry
+// from ever being reused as if it were a current index.
+const CACHE_SCHEMA_VERSION = 2;
 
 export interface FixtureIndexRuntimeFingerprint {
   akmBinPath: string;
@@ -25,8 +28,7 @@ export interface FixtureIndexCacheEntry {
   fixtureName: string;
   fingerprint: string;
   entryDir: string;
-  cacheHome: string;
-  configHome: string;
+  dataHome: string;
   indexDbPath: string;
 }
 
@@ -108,17 +110,28 @@ export function ensureFixtureIndexCacheEntry(
   const tmpEntry = benchMkdtemp(`akm-fixture-index-${fixtureName}-`);
   const tmpCacheHome = path.join(tmpEntry, "cache");
   const tmpConfigHome = path.join(tmpEntry, "config");
+  const tmpDataHome = path.join(tmpEntry, "data");
+  const tmpStateHome = path.join(tmpEntry, "state");
   fs.mkdirSync(tmpCacheHome, { recursive: true });
   fs.mkdirSync(tmpConfigHome, { recursive: true });
+  fs.mkdirSync(tmpDataHome, { recursive: true });
+  fs.mkdirSync(tmpStateHome, { recursive: true });
 
   const result = Bun.spawnSync({
     cmd: [...resolveAkmCommand(), "index"],
     cwd: fixtureDir,
     env: {
       ...process.env,
+      AKM_BUNDLE_DIR: fixtureDir,
       AKM_STASH_DIR: fixtureDir,
       XDG_CACHE_HOME: tmpCacheHome,
       XDG_CONFIG_HOME: tmpConfigHome,
+      XDG_DATA_HOME: tmpDataHome,
+      XDG_STATE_HOME: tmpStateHome,
+      AKM_CACHE_DIR: path.join(tmpCacheHome, "akm"),
+      AKM_CONFIG_DIR: path.join(tmpConfigHome, "akm"),
+      AKM_DATA_DIR: path.join(tmpDataHome, "akm"),
+      AKM_STATE_DIR: path.join(tmpStateHome, "akm"),
     },
     stdout: "pipe",
     stderr: "pipe",
@@ -134,7 +147,7 @@ export function ensureFixtureIndexCacheEntry(
     };
   }
 
-  const tmpIndexDb = path.join(tmpCacheHome, "akm", "index.db");
+  const tmpIndexDb = path.join(tmpDataHome, "akm", "index.db");
   if (!fs.existsSync(tmpIndexDb)) {
     fs.rmSync(tmpEntry, { recursive: true, force: true });
     return {
@@ -160,6 +173,19 @@ export function ensureFixtureIndexCacheEntry(
     )}\n`,
     "utf8",
   );
+
+  // A cache entry is an immutable search-index snapshot, not durable AKM
+  // history. Never publish state.db, proposal state, or event telemetry from
+  // the warmup invocation for later benchmark runs to inherit.
+  fs.rmSync(tmpCacheHome, { recursive: true, force: true });
+  fs.rmSync(tmpConfigHome, { recursive: true, force: true });
+  fs.rmSync(tmpStateHome, { recursive: true, force: true });
+  const tmpAkmData = path.join(tmpDataHome, "akm");
+  for (const name of fs.readdirSync(tmpAkmData)) {
+    if (name !== "index.db" && !name.startsWith("index.db-")) {
+      fs.rmSync(path.join(tmpAkmData, name), { recursive: true, force: true });
+    }
+  }
 
   fs.mkdirSync(path.dirname(entry.entryDir), { recursive: true });
   try {
@@ -202,9 +228,8 @@ function makeCacheEntry(fixtureName: string, fingerprint: string): FixtureIndexC
     fixtureName,
     fingerprint,
     entryDir: root,
-    cacheHome: path.join(root, "cache"),
-    configHome: path.join(root, "config"),
-    indexDbPath: path.join(root, "cache", "akm", "index.db"),
+    dataHome: path.join(root, "data"),
+    indexDbPath: path.join(root, "data", "akm", "index.db"),
   };
 }
 

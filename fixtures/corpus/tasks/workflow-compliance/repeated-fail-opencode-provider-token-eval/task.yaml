@@ -3,7 +3,7 @@ title: "Configure anthropic provider token and default model (eval variant)"
 domain: workflow-compliance
 difficulty: hard
 slice: eval
-gold_ref: skill:opencode
+gold_ref: skills/opencode
 stash: noisy
 verifier: script
 memory_ability: procedural_lookup
@@ -14,7 +14,7 @@ budget:
   wallMs: 90000
 
 # Eval variant for transfer measurement after the train tasks evolve
-# `skill:opencode` to include provider/env wiring guidance.
+# `skills/opencode` to include provider/env wiring guidance.
 repeated_failure_group: opencode-provider-config
 workflow_failure_category: repeated-failure-reflection-trigger
 expected_workflows:

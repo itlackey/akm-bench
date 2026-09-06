@@ -46,6 +46,7 @@ import {
 } from "./metrics";
 import type { LoadedOpencodeConfig } from "./opencode-config";
 import { resolveGitBranch, resolveGitCommit, type UtilityReportTaskEntry, type UtilityRunReport } from "./report";
+import { readBenchRuntimeProvenance } from "./runtime-provenance";
 import type { SpawnFn } from "./support/agent";
 import { warn } from "./support/warn";
 import { benchMkdtemp, benchTmpRoot } from "./tmp";
@@ -202,10 +203,10 @@ export interface RunUtilityOptions {
   stashDirByFixture?: Map<string, string>;
   /**
    * Optional override map keyed by `task.stash` (fixture name) providing a
-   * pre-built `XDG_CACHE_HOME` for that fixture's AKM index. Used by
+   * pre-built `XDG_DATA_HOME` for that fixture's AKM index. Used by
    * `runEvolve` so Phase 3 pre/post arms can reuse already-built indexes.
    */
-  indexCacheHomeByFixture?: Map<string, string>;
+  indexDataHomeByFixture?: Map<string, string>;
   /**
    * Optional per-arm prompt override (#267). When supplied and the builder
    * returns a non-undefined string, that string is forwarded as
@@ -367,7 +368,7 @@ export async function runUtility(options: RunUtilityOptions): Promise<UtilityRun
     // `stashDirByFixture` provides a directory for this task's fixture, we
     // skip `loadFixtureStash` entirely and forward the override.
     const overrideStashDir = options.stashDirByFixture?.get(task.stash);
-    const overrideIndexCacheHome = options.indexCacheHomeByFixture?.get(task.stash);
+    const overrideIndexDataHome = options.indexDataHomeByFixture?.get(task.stash);
 
     // Materialise the akm-arm stash once per task. We share it across the K
     // seeds because the stash content is identical and re-running `akm
@@ -479,8 +480,8 @@ export async function runUtility(options: RunUtilityOptions): Promise<UtilityRun
         warnings: runWarnings,
         ...(promptOverride !== undefined ? { prompt: promptOverride } : {}),
         ...(options.opencodeProviders ? { opencodeProviders: options.opencodeProviders } : {}),
-        ...((overrideIndexCacheHome ?? stash?.indexCacheHome)
-          ? { indexCacheHome: overrideIndexCacheHome ?? stash?.indexCacheHome }
+        ...((overrideIndexDataHome ?? stash?.indexDataHome)
+          ? { indexDataHome: overrideIndexDataHome ?? stash?.indexDataHome }
           : {}),
       });
 
@@ -615,7 +616,7 @@ async function runOneIsolated(args: {
   warnings: string[];
   prompt?: string;
   opencodeProviders?: LoadedOpencodeConfig;
-  indexCacheHome?: string;
+  indexDataHome?: string;
 }): Promise<RunResult> {
   const workspace = benchMkdtemp(`akm-bench-ws-${args.task.domain}-`);
   // SIGINT trap: register workspace cleanup so external signals don't leak
@@ -652,7 +653,7 @@ async function runOneIsolated(args: {
       ...(args.prompt !== undefined ? { prompt: args.prompt } : {}),
       warnings: args.warnings,
       ...(args.opencodeProviders ? { opencodeProviders: args.opencodeProviders } : {}),
-      ...(args.indexCacheHome ? { indexCacheHome: args.indexCacheHome } : {}),
+      ...(args.indexDataHome ? { indexDataHome: args.indexDataHome } : {}),
     };
 
     const result = await runOne(runOptions);
@@ -966,11 +967,13 @@ function buildReport(args: BuildReportArgs): UtilityRunReport {
   }
   const fixtureContentHash = combinedHash.digest("hex");
 
+  const runtime = readBenchRuntimeProvenance();
   const baseReport: UtilityRunReport = {
     timestamp,
     branch,
     commit,
     model: args.options.model,
+    ...(runtime ? { runtime } : {}),
     corpus: {
       domains,
       tasks: args.options.tasks.length,

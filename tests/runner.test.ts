@@ -64,7 +64,7 @@ function fakeSpawnFactory(
       fs.mkdirSync(akmDir, { recursive: true });
       fs.writeFileSync(
         path.join(akmDir, "events.jsonl"),
-        `${JSON.stringify({ schemaVersion: 1, ts: "2026-04-27T00:00:00Z", eventType: "feedback", ref: "skill:foo" })}\n`,
+        `${JSON.stringify({ schemaVersion: 1, ts: "2026-04-27T00:00:00Z", eventType: "feedback", ref: "skills/foo" })}\n`,
       );
     }
 
@@ -252,10 +252,10 @@ describe("runUtility", () => {
   });
 
   test("trajectory splice: correctAssetLoaded + feedbackRecorded fill from akm-arm runs", async () => {
-    const akmStdout = "tool: akm show skill:foo\nFEEDBACK emitted\n";
+    const akmStdout = "tool: akm show skills/foo\nFEEDBACK emitted\n";
     const { spawn } = fakeSpawnFactory({ noakm: "ok", akm: akmStdout });
     const report = await runUtility({
-      tasks: [fakeTask(taskDir, { goldRef: "skill:foo" })],
+      tasks: [fakeTask(taskDir, { goldRef: "skills/foo" })],
       arms: ["noakm", "akm"],
       model: "test",
       seedsPerArm: 2,
@@ -889,7 +889,7 @@ describe("runUtility workflow compliance (#257)", () => {
               schemaVersion: 1,
               ts: "2026-04-27T00:00:00Z",
               eventType: "search",
-              metadata: { query: "deploy", resultRefs: ["skill:foo"] },
+              metadata: { query: "deploy", resultRefs: ["skills/foo"] },
             }),
             JSON.stringify({
               schemaVersion: 1,
@@ -954,7 +954,7 @@ scoring:
       fs.writeFileSync(path.join(testsDir, "test_sample.py"), "def test_ok():\n    assert True\n");
 
       const report = await runUtility({
-        tasks: [fakeTask(taskDir, { verifier: "pytest", goldRef: "skill:foo" })],
+        tasks: [fakeTask(taskDir, { verifier: "pytest", goldRef: "skills/foo" })],
         arms: ["akm"],
         model: "test",
         seedsPerArm: 1,
@@ -984,7 +984,7 @@ scoring:
             schemaVersion: 1,
             ts: "2026-04-27T00:00:00Z",
             eventType: "search",
-            metadata: { query: "deploy", resultRefs: ["skill:other"] },
+            metadata: { query: "deploy", resultRefs: ["skills/other"] },
           })}\n`,
         );
       }
@@ -1034,7 +1034,7 @@ scoring:
       );
 
       const report = await runUtility({
-        tasks: [fakeTask(taskDir, { verifier: "regex", goldRef: "skill:foo" })],
+        tasks: [fakeTask(taskDir, { verifier: "regex", goldRef: "skills/foo" })],
         arms: ["akm"],
         model: "test",
         seedsPerArm: 1,

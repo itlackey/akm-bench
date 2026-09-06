@@ -42,7 +42,7 @@ export const VERIFIER_STDOUT_SCAN_CAP = 16 * 1024 * 1024;
 
 /** Inputs the trajectory parser cares about — we accept a TaskMetadata-ish duck. */
 export interface TrajectoryTaskInput {
-  /** Asset ref like `skill:docker-homelab`. Optional. */
+  /** Asset ref like `skills/docker-homelab`. Optional. */
   goldRef?: string;
 }
 
@@ -67,8 +67,8 @@ export interface TrajectoryOptions {
  *      opencode logs its tool calls, the literal string `akm show <ref>`
  *      appears verbatim in the trace.
  *
- * We accept a "sufficient prefix": `skill:docker-homelab` matches both the
- * exact ref and `skill:docker-homelab/anything`. The match is conservative
+ * We accept a "sufficient prefix": `skills/docker-homelab` matches both the
+ * exact ref and `skills/docker-homelab/references/compose`. The match is conservative
  * — case-sensitive, exact substring on `akm show <ref>` (whitespace-flexible).
  */
 export function computeTrajectory(
@@ -108,7 +108,7 @@ function computeCorrectAssetLoaded(
   //   - `akm show <ref>` (the canonical form opencode logs when the agent
   //     invokes the akm CLI as a tool), or
   //   - the bare ref appearing on a line that mentions `show` (covers tool-
-  //     call JSON like `{"command":"akm","args":["show","skill:foo"]}`).
+  //     call JSON like `{"command":"akm","args":["show","skills/foo"]}`).
   // Cap the scan at VERIFIER_STDOUT_SCAN_CAP so a runaway agent's GBs of
   // stdout cannot OOM the bench. When we truncate, push a warning so the
   // top-level report aggregates it under `warnings[]`.
@@ -150,8 +150,9 @@ export function aggregateTrajectory(results: RunResult[]): TrajectoryAggregate {
 
 function matchesRef(candidate: string, gold: string): boolean {
   if (candidate === gold) return true;
-  // Allow goldRef to be a prefix of a more-specific ref (e.g. team//skill:foo
-  // when the task says skill:foo). Keep the check anchored to ref segments.
+  // Allow goldRef to be a prefix of a more-specific ref (e.g.
+  // team//skills/foo when the task says skills/foo). Keep the check anchored
+  // to ref segments.
   if (candidate.endsWith(`//${gold}`)) return true;
   if (candidate.startsWith(`${gold}/`)) return true;
   return false;
@@ -159,7 +160,7 @@ function matchesRef(candidate: string, gold: string): boolean {
 
 function containsAkmShow(text: string, ref: string): boolean {
   // Whitespace-flexible match for `akm show <ref>`. We escape regex metas in
-  // the ref because asset refs may contain `:` (always) and `/` (origin form).
+  // the ref because concept ids contain `/` and may carry a bundle prefix.
   const escaped = ref.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = new RegExp(`akm\\s+show\\s+(?:["'])?${escaped}(?:\\b|\\W)`);
   if (pattern.test(text)) return true;

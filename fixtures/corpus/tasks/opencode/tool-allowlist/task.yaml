@@ -3,7 +3,7 @@ title: "Restrict opencode tools to bash, edit, read"
 domain: opencode
 difficulty: medium
 slice: train
-gold_ref: skill:opencode
+gold_ref: skills/opencode
 stash: multi-domain
 verifier: script
 budget:

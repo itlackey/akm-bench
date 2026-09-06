@@ -12,7 +12,9 @@ import { execSync } from "node:child_process";
  * at a tmp non-repo to exercise the fallback.
  */
 export function resolveGitBranch(cwd?: string): string {
-  return tryGit(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+  const resolved = tryGit(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+  if (resolved !== "unknown" || cwd !== undefined) return resolved;
+  return process.env.AKM_BENCH_IMAGE_REPO_BRANCH?.trim() || "unknown";
 }
 
 /**
@@ -20,7 +22,11 @@ export function resolveGitBranch(cwd?: string): string {
  * `resolveGitBranch`.
  */
 export function resolveGitCommit(cwd?: string): string {
-  return tryGit(["rev-parse", "--short", "HEAD"], cwd);
+  const resolved = tryGit(["rev-parse", "--short", "HEAD"], cwd);
+  if (resolved !== "unknown" || cwd !== undefined) return resolved;
+  const commit = process.env.AKM_BENCH_IMAGE_REPO_COMMIT?.trim();
+  if (!commit) return "unknown";
+  return process.env.AKM_BENCH_IMAGE_REPO_DIRTY === "true" ? `${commit}-dirty` : commit;
 }
 
 function tryGit(args: string[], cwd?: string): string {

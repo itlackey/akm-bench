@@ -135,12 +135,12 @@ agents:
       # opencode-ai npm pin. Repeated verbatim from OPENCODE_VERSION in
       # harbor/akm_opencode.py; the control arm cannot import that constant.
       # All three arms in this file must carry the same value.
-      version: "1.18.21"
+      version: "1.18.29"
 
       opencode_config:
         "$schema": https://opencode.ai/config.json
         autoupdate: false
-        # The COMPLETE set of keys opencode 1.18.21's Config.permission
+        # The COMPLETE set of keys opencode 1.18.29's Config.permission
         # declares (@opencode-ai/sdk dist/gen/types.gen.d.ts:1161-1169) --
         # mirrors AkmOpenCode.SHARED_PERMISSIONS. There is no
         # read/write/grep/glob/list/patch key in that schema; an invented key
@@ -167,7 +167,7 @@ agents:
     # sets OPENCODE_DISABLE_AUTOUPDATE=true in their process env, a SECOND
     # mechanism for the same intent that this arm otherwise has no
     # equivalent of. If the config key were ever weaker than the env var in
-    # opencode 1.18.21, only this arm would attempt an autoupdate network
+    # opencode 1.18.29, only this arm would attempt an autoupdate network
     # call at session start -- a confound (network + latency), not a
     # convenience.
     env:
@@ -217,7 +217,7 @@ agents:
       # Same opencode pin as the other two arms. AkmOpenCode defaults to its
       # own OPENCODE_VERSION constant when this is omitted; stated explicitly
       # so all three arms are visibly pinned together in one file.
-      version: "1.18.21"
+      version: "1.18.29"
 
       # The cold-start library, decision D6 of
       # docs/plans/benchmark-harness-decisions.md: a hand-authored generic
@@ -272,9 +272,9 @@ agents:
     # is a mitigation, not a proof of zero cost.
 
     # NO exclude_logs -- here it is load-bearing, not merely tidy:
-    # opencode's log under XDG_DATA_HOME carries the "AKM CLI resolved" /
-    # "AKM CLI resolution failed" lines that AkmOpenCode._assert_plugin_ran()
-    # requires before it will let a treatment trial score at all. Excluding
+    # opencode's log under XDG_DATA_HOME carries the AKM plugin activity and
+    # degradation lines that AkmOpenCode._assert_plugin_ran() requires before
+    # it will let a treatment trial score at all. Excluding
     # "opencode/xdg-data/**" would turn every akm-static AND akm-accumulating
     # trial into a hard error on any non-mounted/cloud environment (it is
     # inert on local Docker only, per docs/harbor-p0.md step 0).
@@ -340,7 +340,7 @@ agents:
     n_concurrent: 1
 
     kwargs:
-      version: "1.18.21"
+      version: "1.18.29"
 
       # This is the entire switch: it moves AkmOpenCode from "seed a
       # pristine per-trial copy" to "point AKM_BUNDLE_DIR at a shared,

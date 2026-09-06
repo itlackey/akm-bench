@@ -3,7 +3,7 @@ title: "Upgrade compose version 2 syntax to 3.8"
 domain: docker-homelab
 difficulty: medium
 slice: train
-gold_ref: skill:docker-homelab
+gold_ref: skills/docker-homelab
 stash: docker-homelab
 verifier: pytest
 budget:

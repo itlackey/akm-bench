@@ -115,7 +115,7 @@ function basePhaseTimings() {
       {
         phase: "phase1" as const,
         command: "feedback",
-        args: ["feedback", "skill:loser", "--negative"],
+        args: ["feedback", "skills/loser", "--negative"],
         elapsedMs: 50,
         exitCode: 0,
         watchdogExceeded: false,
@@ -123,7 +123,7 @@ function basePhaseTimings() {
       {
         phase: "phase2" as const,
         command: "reflect",
-        args: ["reflect", "skill:loser"],
+        args: ["reflect", "skills/loser"],
         elapsedMs: 130000,
         exitCode: 0,
         watchdogExceeded: true,
@@ -200,7 +200,7 @@ describe("renderEvolveReport — learning block (#265)", () => {
           task_id: "eval/task-a",
           lessons: [
             {
-              ref: "lesson:docker-healthchecks",
+              ref: "lessons/docker-healthchecks",
               accepted: true,
               fired_count: 2,
               source_failures: ["train/task-a", "train/task-b"],
@@ -221,7 +221,7 @@ describe("renderEvolveReport — learning block (#265)", () => {
     expect(parsed.lesson_lineage).toEqual(lineage);
     expect(markdown).toContain("Lesson lineage");
     expect(markdown).toContain("eval/task-a");
-    expect(markdown).toContain("lesson:docker-healthchecks");
+    expect(markdown).toContain("lessons/docker-healthchecks");
     expect(markdown).toContain("train/task-a, train/task-b");
   });
 
@@ -231,14 +231,14 @@ describe("renderEvolveReport — learning block (#265)", () => {
         proposalLog: [
           {
             proposalId: "p-1",
-            assetRef: "skill:loser",
+            assetRef: "skills/loser",
             kind: "lesson",
             lintPass: true,
             decision: "accept",
           },
           {
             proposalId: "p-2",
-            assetRef: "skill:loser",
+            assetRef: "skills/loser",
             kind: "revision",
             lintPass: false,
             decision: "reject",
@@ -247,10 +247,10 @@ describe("renderEvolveReport — learning block (#265)", () => {
         ],
         phase1Diagnostics: {
           perRefFeedback: [
-            { ref: "skill:loser", positive: 0, negative: 3 },
-            { ref: "skill:winner", positive: 3, negative: 0 },
+            { ref: "skills/loser", positive: 0, negative: 3 },
+            { ref: "skills/winner", positive: 3, negative: 0 },
           ],
-          refsToEvolve: ["skill:loser"],
+          refsToEvolve: ["skills/loser"],
         },
       }),
     );
@@ -275,7 +275,7 @@ describe("renderEvolveReport — learning block (#265)", () => {
     expect(parsed.proposals.proposal_log).toEqual([
       {
         id: "p-1",
-        asset: "skill:loser",
+        asset: "skills/loser",
         kind: "lesson",
         lint: true,
         decision: "accept",
@@ -283,7 +283,7 @@ describe("renderEvolveReport — learning block (#265)", () => {
       },
       {
         id: "p-2",
-        asset: "skill:loser",
+        asset: "skills/loser",
         kind: "revision",
         lint: false,
         decision: "reject",
@@ -292,17 +292,17 @@ describe("renderEvolveReport — learning block (#265)", () => {
     ]);
     expect(parsed.phase1).toEqual({
       per_ref_feedback: [
-        { ref: "skill:loser", positive: 0, negative: 3 },
-        { ref: "skill:winner", positive: 3, negative: 0 },
+        { ref: "skills/loser", positive: 0, negative: 3 },
+        { ref: "skills/winner", positive: 3, negative: 0 },
       ],
-      refs_to_evolve: ["skill:loser"],
+      refs_to_evolve: ["skills/loser"],
     });
 
     expect(markdown).toContain("Proposal diagnostics");
     expect(markdown).toContain("Phase 1 diagnostics");
     expect(markdown).toContain("promoted_refs=1");
     expect(markdown).toContain("p-1");
-    expect(markdown).toContain("skill:loser");
+    expect(markdown).toContain("skills/loser");
   });
 
   test("emits phase timing diagnostics in JSON and markdown", () => {

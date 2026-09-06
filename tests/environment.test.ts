@@ -203,6 +203,8 @@ describe("setupBenchEnvironment dryRun", () => {
     try {
       expect(fs.existsSync(env.dirs.cacheHome)).toBe(true);
       expect(fs.existsSync(env.dirs.configHome)).toBe(true);
+      expect(fs.existsSync(env.dirs.dataHome)).toBe(true);
+      expect(fs.existsSync(env.dirs.stateHome)).toBe(true);
       expect(fs.existsSync(env.dirs.opencodeConfig)).toBe(true);
 
       const config = JSON.parse(fs.readFileSync(path.join(env.dirs.opencodeConfig, "opencode.json"), "utf8")) as Record<
@@ -226,7 +228,7 @@ describe("setupBenchEnvironment dryRun", () => {
     ).toThrow(/custom provider prefix/);
   });
 
-  test("synthetic arm never sets AKM_STASH_DIR", () => {
+  test("synthetic arm never sets current or legacy AKM bundle overrides", () => {
     const env = setupBenchEnvironment({
       model: "anthropic/claude-opus-4-7",
       arm: "synthetic",
@@ -234,6 +236,7 @@ describe("setupBenchEnvironment dryRun", () => {
       dryRun: true,
     });
     try {
+      expect(env.env.AKM_BUNDLE_DIR).toBeUndefined();
       expect(env.env.AKM_STASH_DIR).toBeUndefined();
     } finally {
       env.teardown();
@@ -281,28 +284,28 @@ describe("setupBenchEnvironment dryRun", () => {
     expect(fs.existsSync(root)).toBe(false);
   });
 
-  test("copies cached index recursively and skips non-file entries", () => {
+  test("copies indexed data recursively and skips non-file entries", () => {
     const stashDir = benchMkdtemp("akm-bench-env-stash-");
-    const indexCacheHome = benchMkdtemp("akm-bench-env-cache-");
-    fs.mkdirSync(path.join(indexCacheHome, "akm", "nested"), { recursive: true });
-    fs.writeFileSync(path.join(indexCacheHome, "akm", "index.db"), "db", "utf8");
-    fs.writeFileSync(path.join(indexCacheHome, "akm", "nested", "meta.json"), "{}", "utf8");
-    fs.symlinkSync(path.join(indexCacheHome, "akm", "index.db"), path.join(indexCacheHome, "akm", "registry-index"));
+    const indexDataHome = benchMkdtemp("akm-bench-env-data-");
+    fs.mkdirSync(path.join(indexDataHome, "akm", "nested"), { recursive: true });
+    fs.writeFileSync(path.join(indexDataHome, "akm", "index.db"), "db", "utf8");
+    fs.writeFileSync(path.join(indexDataHome, "akm", "nested", "meta.json"), "{}", "utf8");
+    fs.symlinkSync(path.join(indexDataHome, "akm", "index.db"), path.join(indexDataHome, "akm", "registry-index"));
 
     const env = setupBenchEnvironment({
       model: "anthropic/claude-opus-4-7",
       arm: "akm",
       stashDir,
-      indexCacheHome,
+      indexDataHome,
     });
     try {
-      expect(fs.existsSync(path.join(env.dirs.cacheHome, "akm", "index.db"))).toBe(true);
-      expect(fs.existsSync(path.join(env.dirs.cacheHome, "akm", "nested", "meta.json"))).toBe(true);
-      expect(fs.existsSync(path.join(env.dirs.cacheHome, "akm", "registry-index"))).toBe(false);
+      expect(fs.existsSync(path.join(env.dirs.dataHome, "akm", "index.db"))).toBe(true);
+      expect(fs.existsSync(path.join(env.dirs.dataHome, "akm", "nested", "meta.json"))).toBe(true);
+      expect(fs.existsSync(path.join(env.dirs.dataHome, "akm", "registry-index"))).toBe(false);
     } finally {
       env.teardown();
       fs.rmSync(stashDir, { recursive: true, force: true });
-      fs.rmSync(indexCacheHome, { recursive: true, force: true });
+      fs.rmSync(indexDataHome, { recursive: true, force: true });
     }
   });
 });

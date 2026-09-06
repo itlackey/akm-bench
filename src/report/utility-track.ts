@@ -73,6 +73,19 @@ function buildUtilityJson(input: UtilityRunReport): UtilityReportJson {
     commit: input.commit,
     timestamp: input.timestamp,
     agent: { harness: "opencode", model: input.model },
+    ...(input.runtime
+      ? {
+          runtime: {
+            akm_version: input.runtime.akmVersion,
+            opencode_version: input.runtime.opencodeVersion,
+            bun_version: input.runtime.bunVersion,
+            ...(input.runtime.akmMode ? { akm_mode: input.runtime.akmMode } : {}),
+            ...(input.runtime.containerImage ? { container_image: input.runtime.containerImage } : {}),
+            ...(input.runtime.benchmarkCommit ? { benchmark_commit: input.runtime.benchmarkCommit } : {}),
+            ...(input.runtime.benchmarkDirty !== undefined ? { benchmark_dirty: input.runtime.benchmarkDirty } : {}),
+          },
+        }
+      : {}),
     corpus: input.corpus,
     aggregate: {
       noakm: serialiseCorpus(input.aggregateNoakm),
@@ -330,6 +343,11 @@ function buildUtilityMarkdown(input: UtilityRunReport): string {
   lines.push(`# akm-bench utility — ${input.model}`);
   lines.push("");
   lines.push(`branch \`${input.branch}\` @ \`${input.commit}\` — ${input.timestamp}`);
+  if (input.runtime) {
+    lines.push(
+      `runtime: akm=${input.runtime.akmVersion}, opencode=${input.runtime.opencodeVersion}, bun=${input.runtime.bunVersion}`,
+    );
+  }
   lines.push(
     `corpus: ${input.corpus.tasks} tasks across ${input.corpus.domains} domains (slice=${input.corpus.slice}, seedsPerArm=${input.corpus.seedsPerArm})`,
   );

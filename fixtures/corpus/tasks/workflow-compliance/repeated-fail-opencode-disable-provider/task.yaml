@@ -3,7 +3,7 @@ title: "Disable openai provider and set shredder default"
 domain: workflow-compliance
 difficulty: hard
 slice: train
-gold_ref: skill:opencode
+gold_ref: skills/opencode
 stash: noisy
 verifier: script
 memory_ability: procedural_lookup
@@ -17,7 +17,7 @@ budget:
 # Category: repeated-failure-reflection-trigger.
 #
 # Companion to `workflow-compliance/repeated-fail-opencode-provider-token-train`.
-# Both tasks hit the same under-specified region of `skill:opencode` (provider
+# Both tasks hit the same under-specified region of `skills/opencode` (provider
 # shaping and env wiring). Running both in one train pass creates repeated
 # negative outcomes against one gold ref, enabling reflect/distill workflows.
 repeated_failure_group: opencode-provider-config

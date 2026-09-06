@@ -3,7 +3,7 @@ title: "Set opencode provider env token and model for anthropic"
 domain: workflow-compliance
 difficulty: hard
 slice: train
-gold_ref: skill:opencode
+gold_ref: skills/opencode
 stash: noisy
 verifier: script
 memory_ability: procedural_lookup
@@ -17,7 +17,7 @@ budget:
 # Category: repeated-failure-reflection-trigger.
 #
 # This task intentionally exercises configuration details that are omitted from
-# `skill:opencode` in the noisy stash (env-var naming and provider token wiring).
+# `skills/opencode` in the noisy stash (env-var naming and provider token wiring).
 # Many agents following only the skill's brief guidance will fail verifier checks.
 #
 # It pairs with `workflow-compliance/repeated-fail-opencode-disable-provider` so

@@ -41,13 +41,13 @@ function fakeRun(overrides: Partial<RunResult>): RunResult {
 describe("computeLessonMetrics", () => {
   test("accepted lesson reused successfully on an eval task", () => {
     const proposalLog: ProposalLogEntry[] = [
-      { proposalId: "p1", assetRef: "lesson:docker-healthchecks", kind: "lesson", lintPass: true, decision: "accept" },
+      { proposalId: "p1", assetRef: "lessons/docker-healthchecks", kind: "lesson", lintPass: true, decision: "accept" },
     ];
     const feedbackLog: FeedbackLogEntry[] = [
       {
         taskId: "docker-homelab/redis-healthcheck",
         seed: 0,
-        goldRef: "lesson:docker-healthchecks",
+        goldRef: "lessons/docker-healthchecks",
         signal: "negative",
         ok: true,
       },
@@ -61,13 +61,13 @@ describe("computeLessonMetrics", () => {
         taskId: "docker-homelab/named-volume",
         seed: 0,
         outcome: "pass",
-        assetsLoaded: ["lesson:docker-healthchecks"],
+        assetsLoaded: ["lessons/docker-healthchecks"],
       }),
       fakeRun({
         taskId: "docker-homelab/named-volume",
         seed: 1,
         outcome: "pass",
-        assetsLoaded: ["lesson:docker-healthchecks"],
+        assetsLoaded: ["lessons/docker-healthchecks"],
       }),
     ];
 
@@ -81,7 +81,7 @@ describe("computeLessonMetrics", () => {
     expect(m.lesson_negative_transfer_count).toBe(0);
 
     const lesson = m.lessons[0];
-    expect(lesson?.ref).toBe("lesson:docker-healthchecks");
+    expect(lesson?.ref).toBe("lessons/docker-healthchecks");
     expect(lesson?.accepted).toBe(true);
     expect(lesson?.source_failures).toEqual(["docker-homelab/redis-healthcheck"]);
     expect(lesson?.first_reused_on).toBe("docker-homelab/named-volume");
@@ -93,9 +93,9 @@ describe("computeLessonMetrics", () => {
 
   test("accepted lesson never reused yields first_reused_on=null and reuse_count=0", () => {
     const proposalLog: ProposalLogEntry[] = [
-      { proposalId: "p1", assetRef: "lesson:lonely", kind: "lesson", lintPass: true, decision: "accept" },
+      { proposalId: "p1", assetRef: "lessons/lonely", kind: "lesson", lintPass: true, decision: "accept" },
     ];
-    const postRuns = [fakeRun({ taskId: "task-a", seed: 0, outcome: "pass", assetsLoaded: ["skill:other"] })];
+    const postRuns = [fakeRun({ taskId: "task-a", seed: 0, outcome: "pass", assetsLoaded: ["skills/other"] })];
 
     const m = computeLessonMetrics({ proposalLog, postRuns });
     expect(m.lessons_accepted_count).toBe(1);
@@ -113,7 +113,7 @@ describe("computeLessonMetrics", () => {
     const proposalLog: ProposalLogEntry[] = [
       {
         proposalId: "p1",
-        assetRef: "lesson:bad",
+        assetRef: "lessons/bad",
         kind: "lesson",
         lintPass: false,
         decision: "reject",
@@ -122,7 +122,7 @@ describe("computeLessonMetrics", () => {
     ];
     // Even if a post run happened to load the same ref, a rejected proposal
     // must NOT be credited with reuse — the lesson never reached the stash.
-    const postRuns = [fakeRun({ taskId: "task-a", seed: 0, outcome: "pass", assetsLoaded: ["lesson:bad"] })];
+    const postRuns = [fakeRun({ taskId: "task-a", seed: 0, outcome: "pass", assetsLoaded: ["lessons/bad"] })];
 
     const m = computeLessonMetrics({ proposalLog, postRuns });
     expect(m.lessons_created_count).toBe(1);
@@ -141,16 +141,16 @@ describe("computeLessonMetrics", () => {
 
   test("accepted lesson causing regression attributes negative_transfer_count=1", () => {
     const proposalLog: ProposalLogEntry[] = [
-      { proposalId: "p1", assetRef: "lesson:overfit", kind: "lesson", lintPass: true, decision: "accept" },
+      { proposalId: "p1", assetRef: "lessons/overfit", kind: "lesson", lintPass: true, decision: "accept" },
     ];
     // Pre-arm: task passed. Post-arm: same (taskId, seed) failed AND loaded
     // the lesson. That counts as one negative transfer attribution.
     const preRuns = [fakeRun({ taskId: "adjacent-task", seed: 0, outcome: "pass" })];
     const postRuns = [
-      fakeRun({ taskId: "adjacent-task", seed: 0, outcome: "fail", assetsLoaded: ["lesson:overfit"] }),
+      fakeRun({ taskId: "adjacent-task", seed: 0, outcome: "fail", assetsLoaded: ["lessons/overfit"] }),
       // Same task, different seed — also failed with the lesson loaded; the
       // attribution dedupes by taskId so the count stays at 1.
-      fakeRun({ taskId: "adjacent-task", seed: 1, outcome: "fail", assetsLoaded: ["lesson:overfit"] }),
+      fakeRun({ taskId: "adjacent-task", seed: 1, outcome: "fail", assetsLoaded: ["lessons/overfit"] }),
     ];
 
     const m = computeLessonMetrics({ proposalLog, preRuns, postRuns });
@@ -176,11 +176,11 @@ describe("computeLessonMetrics", () => {
 
   test("revision-kind proposals are filtered out (lessons[] only)", () => {
     const proposalLog: ProposalLogEntry[] = [
-      { proposalId: "p1", assetRef: "lesson:a", kind: "lesson", lintPass: true, decision: "accept" },
-      { proposalId: "p2", assetRef: "skill:b", kind: "revision", lintPass: true, decision: "accept" },
+      { proposalId: "p1", assetRef: "lessons/a", kind: "lesson", lintPass: true, decision: "accept" },
+      { proposalId: "p2", assetRef: "skills/b", kind: "revision", lintPass: true, decision: "accept" },
     ];
     const m = computeLessonMetrics({ proposalLog });
-    expect(m.lessons.map((l) => l.ref)).toEqual(["lesson:a"]);
+    expect(m.lessons.map((l) => l.ref)).toEqual(["lessons/a"]);
   });
 });
 
@@ -214,22 +214,22 @@ describe("computePostTaskLessonLineage", () => {
   test("groups post-arm lesson fires by task and carries Phase-1 source failures", () => {
     const lessons = computeLessonMetrics({
       proposalLog: [
-        { proposalId: "p1", assetRef: "lesson:a", kind: "lesson", lintPass: true, decision: "accept" },
-        { proposalId: "p2", assetRef: "lesson:b", kind: "lesson", lintPass: true, decision: "accept" },
+        { proposalId: "p1", assetRef: "lessons/a", kind: "lesson", lintPass: true, decision: "accept" },
+        { proposalId: "p2", assetRef: "lessons/b", kind: "lesson", lintPass: true, decision: "accept" },
       ],
       feedbackLog: [
-        { taskId: "train/fail-a", seed: 0, goldRef: "lesson:a", signal: "negative", ok: true },
-        { taskId: "train/fail-b", seed: 0, goldRef: "lesson:b", signal: "negative", ok: true },
-        { taskId: "train/fail-b-2", seed: 1, goldRef: "lesson:b", signal: "negative", ok: true },
+        { taskId: "train/fail-a", seed: 0, goldRef: "lessons/a", signal: "negative", ok: true },
+        { taskId: "train/fail-b", seed: 0, goldRef: "lessons/b", signal: "negative", ok: true },
+        { taskId: "train/fail-b-2", seed: 1, goldRef: "lessons/b", signal: "negative", ok: true },
       ],
     });
 
     const lineage = computePostTaskLessonLineage({
       lessons,
       postRuns: [
-        fakeRun({ taskId: "eval/task-a", seed: 0, assetsLoaded: ["lesson:b", "lesson:a", "lesson:a"] }),
-        fakeRun({ taskId: "eval/task-a", seed: 1, assetsLoaded: ["lesson:a", "skill:ignore"] }),
-        fakeRun({ taskId: "eval/task-b", seed: 0, assetsLoaded: ["lesson:b"] }),
+        fakeRun({ taskId: "eval/task-a", seed: 0, assetsLoaded: ["lessons/b", "lessons/a", "lessons/a"] }),
+        fakeRun({ taskId: "eval/task-a", seed: 1, assetsLoaded: ["lessons/a", "skills/ignore"] }),
+        fakeRun({ taskId: "eval/task-b", seed: 0, assetsLoaded: ["lessons/b"] }),
       ],
     });
 
@@ -238,9 +238,9 @@ describe("computePostTaskLessonLineage", () => {
         {
           task_id: "eval/task-a",
           lessons: [
-            { ref: "lesson:a", accepted: true, source_failures: ["train/fail-a"], fired_count: 2 },
+            { ref: "lessons/a", accepted: true, source_failures: ["train/fail-a"], fired_count: 2 },
             {
-              ref: "lesson:b",
+              ref: "lessons/b",
               accepted: true,
               source_failures: ["train/fail-b", "train/fail-b-2"],
               fired_count: 1,
@@ -251,7 +251,7 @@ describe("computePostTaskLessonLineage", () => {
           task_id: "eval/task-b",
           lessons: [
             {
-              ref: "lesson:b",
+              ref: "lessons/b",
               accepted: true,
               source_failures: ["train/fail-b", "train/fail-b-2"],
               fired_count: 1,
@@ -264,12 +264,12 @@ describe("computePostTaskLessonLineage", () => {
 
   test("emits an empty lineage block when no generated lessons fired", () => {
     const lessons = computeLessonMetrics({
-      proposalLog: [{ proposalId: "p1", assetRef: "lesson:a", kind: "lesson", lintPass: true, decision: "accept" }],
+      proposalLog: [{ proposalId: "p1", assetRef: "lessons/a", kind: "lesson", lintPass: true, decision: "accept" }],
     });
     expect(
       computePostTaskLessonLineage({
         lessons,
-        postRuns: [fakeRun({ taskId: "eval/task-a", assetsLoaded: ["skill:other"] })],
+        postRuns: [fakeRun({ taskId: "eval/task-a", assetsLoaded: ["skills/other"] })],
       }),
     ).toEqual({
       post_tasks: [],

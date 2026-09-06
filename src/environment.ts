@@ -150,8 +150,8 @@ export interface BenchEnvParams {
   model: string;
   arm: "noakm" | "akm" | "post-evolve" | "synthetic";
   stashDir?: string;
-  /** Pre-built FTS5 index cache from `loadFixtureStash().indexCacheHome`. */
-  indexCacheHome?: string;
+  /** Pre-built FTS5 index data home from `loadFixtureStash().indexDataHome`. */
+  indexDataHome?: string;
   providers?: LoadedOpencodeConfig;
   /**
    * When true, skip the akm config write and index copy/build. Used by unit
@@ -172,17 +172,17 @@ export interface BenchEnvironment {
 /**
  * Set up a complete bench run environment.
  *
- * 1. Creates isolation dirs (XDG_CACHE_HOME, XDG_CONFIG_HOME, OPENCODE_CONFIG).
+ * 1. Creates isolated XDG cache/config/data/state homes and OPENCODE_CONFIG.
  * 2. Writes opencode.json with BENCH_OPENCODE_INVARIANTS + optional provider.
  * 3. Writes $XDG_CONFIG_HOME/akm/config.json so the akm CLI and any plugin
  *    find the correct stash via `akm config get stashDir`.
- * 4. Copies the pre-built FTS5 index into XDG_CACHE_HOME, or re-indexes as
+ * 4. Copies the pre-built FTS5 index into XDG_DATA_HOME, or re-indexes as
  *    fallback if no pre-built cache is available.
  *
  * Throws `BenchConfigError` for model prefix / provider mismatches.
  */
 export function setupBenchEnvironment(params: BenchEnvParams): BenchEnvironment {
-  const { model, arm, stashDir: rawStashDir, indexCacheHome, providers, dryRun = false, warnings = [] } = params;
+  const { model, arm, stashDir: rawStashDir, indexDataHome, providers, dryRun = false, warnings = [] } = params;
 
   // Synthetic arm must never carry a stash.
   const stashDir = arm === "synthetic" ? undefined : rawStashDir;
@@ -202,6 +202,7 @@ export function setupBenchEnvironment(params: BenchEnvParams): BenchEnvironment 
   // Synthetic arm must not carry AKM_STASH_DIR even if createIsolationDirs
   // somehow set it (recurrence guard for the #243 fixup pattern).
   if (arm === "synthetic") {
+    delete env.AKM_BUNDLE_DIR;
     delete env.AKM_STASH_DIR;
   }
 
@@ -224,19 +225,27 @@ export function setupBenchEnvironment(params: BenchEnvParams): BenchEnvironment 
   // Wire akm config and index only when a real stash is on disk.
   const stashOnDisk = stashDir ? fs.existsSync(stashDir) : false;
   if (stashDir && stashOnDisk && !dryRun) {
-    // akm config: so `akm config get stashDir` returns the fixture path
-    // and the akm-opencode plugin (if somehow re-enabled) injects the right
-    // AKM_STASH_DIR into the bash-tool env via its shell.env hook.
+    // AKM 0.9 rejects the retired top-level `stashDir` key. Materialize the
+    // current bundle-workspace shape so config-aware commands and plugins see
+    // the same fixture selected by AKM_BUNDLE_DIR.
     const akmConfigDir = path.join(dirs.configHome, "akm");
     fs.mkdirSync(akmConfigDir, { recursive: true });
-    fs.writeFileSync(path.join(akmConfigDir, "config.json"), JSON.stringify({ stashDir }), { mode: 0o600 });
+    fs.writeFileSync(
+      path.join(akmConfigDir, "config.json"),
+      JSON.stringify({
+        configVersion: "0.9.0",
+        bundles: { bench: { path: stashDir, writable: true } },
+        defaultBundle: "bench",
+      }),
+      { mode: 0o600 },
+    );
 
     // FTS5 index: fast-path copy from pre-built cache; slow-path re-index.
-    const destAkmDir = path.join(dirs.cacheHome, "akm");
+    const destAkmDir = path.join(dirs.dataHome, "akm");
     fs.mkdirSync(destAkmDir, { recursive: true });
 
-    if (indexCacheHome) {
-      const srcAkmDir = path.join(indexCacheHome, "akm");
+    if (indexDataHome) {
+      const srcAkmDir = path.join(indexDataHome, "akm");
       try {
         copyIndexCacheEntries(srcAkmDir, destAkmDir);
       } catch (err) {

@@ -30,6 +30,7 @@
  */
 
 import fs from "node:fs";
+import path from "node:path";
 import { resolveAkmCommand } from "./akm-command";
 import { registerCleanup } from "./cleanup";
 import type { TaskMetadata, TaskSlice } from "./corpus";
@@ -294,7 +295,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   // We materialise one tmp stash per unique `task.stash` so Phase 1
   // accumulates feedback into the same on-disk stash that Phase 2 mutates,
   // and that Phase 3's post arm reads back. The operator's real
-  // AKM_STASH_DIR is never touched. The pre arm gets a fresh snapshot of
+  // AKM bundle/data directories are never touched. The pre arm gets a fresh snapshot of
   // the same starting fixture (no Phase 2 mutations applied).
   const fixtureNames = new Set<string>();
   for (const t of options.tasks) fixtureNames.add(t.stash);
@@ -303,9 +304,9 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   const preStashes = new Map<string, LoadedFixtureStash>();
   const evolveDirByFixture = new Map<string, string>();
   const preDirByFixture = new Map<string, string>();
-  const preCacheDirByFixture = new Map<string, string>();
-  /** Per-fixture XDG_CACHE_HOME dirs allocated for evolve-stash indexing. */
-  const evolveCacheDirByFixture = new Map<string, string>();
+  const preDataHomeByFixture = new Map<string, string>();
+  /** Per-fixture XDG_DATA_HOME dirs allocated for evolve-stash state. */
+  const evolveDataHomeByFixture = new Map<string, string>();
   const phase2XdgConfigRoot = benchMkdtemp("akm-evolve-xdg-config-");
   const phase2OpencodeConfigRoot = options.opencodeProviders ? benchMkdtemp("akm-evolve-opencode-") : undefined;
   const phase2OpencodeConfigPath = phase2OpencodeConfigRoot ? `${phase2OpencodeConfigRoot}/opencode.json` : undefined;
@@ -327,7 +328,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         const evolved = loadFixtureStash(name, { skipIndex: false });
         evolveStashes.set(name, evolved);
         evolveDirByFixture.set(name, evolved.stashDir);
-        evolveCacheDirByFixture.set(name, benchMkdtemp(`akm-evolve-cache-${name}-`));
+        evolveDataHomeByFixture.set(name, benchMkdtemp(`akm-evolve-data-${name}-`));
         stashDeregistrations.push(
           registerCleanup(() => {
             try {
@@ -344,7 +345,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         const pre = loadFixtureStash(name, { skipIndex: false });
         preStashes.set(name, pre);
         preDirByFixture.set(name, pre.stashDir);
-        if (pre.indexCacheHome) preCacheDirByFixture.set(name, pre.indexCacheHome);
+        if (pre.indexDataHome) preDataHomeByFixture.set(name, pre.indexDataHome);
         stashDeregistrations.push(
           registerCleanup(() => {
             try {
@@ -370,7 +371,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     if (t.goldRef) refToFixture.set(t.goldRef, t.stash);
   }
   const fallbackEvolveDir = [...evolveDirByFixture.values()][0];
-  const fallbackEvolveCacheDir = [...evolveCacheDirByFixture.values()][0];
+  const fallbackEvolveDataHome = [...evolveDataHomeByFixture.values()][0];
   const opencodeConfigPath = phase2OpencodeConfigPath;
   const phase2AkmConfigTemplate = loadPhase2AkmConfigTemplate();
   function phase2XdgConfigHome(scope: string, stashDir?: string): string {
@@ -379,7 +380,12 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     const akmDir = `${dir}/akm`;
     fs.mkdirSync(akmDir, { recursive: true });
     const config = JSON.parse(JSON.stringify(phase2AkmConfigTemplate)) as Record<string, unknown>;
-    if (stashDir && stashDir.length > 0) config.stashDir = stashDir;
+    delete config.stashDir;
+    if (stashDir && stashDir.length > 0) {
+      config.configVersion = "0.9.0";
+      config.bundles = { bench: { path: stashDir, writable: true } };
+      config.defaultBundle = "bench";
+    }
     if (!config.agent || typeof config.agent !== "object") {
       config.agent = { default: "opencode" };
     } else {
@@ -395,17 +401,35 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     const baseEnv = { ...(process.env as Record<string, string>) };
     if (!materialiseStash) {
       // Tests opt out of fixture materialisation entirely; we still strip
-      // the operator's AKM_STASH_DIR so the fake CLI sees a known sentinel.
+      // operator bundle overrides so the fake CLI sees a known sentinel.
+      delete baseEnv.AKM_BUNDLE_DIR;
       delete baseEnv.AKM_STASH_DIR;
       if (opencodeConfigPath) baseEnv.OPENCODE_CONFIG = opencodeConfigPath;
       return baseEnv;
     }
     const fixture = ref ? refToFixture.get(ref) : undefined;
     const dir = (fixture && evolveDirByFixture.get(fixture)) ?? fallbackEvolveDir;
-    const cacheDir = (fixture && evolveCacheDirByFixture.get(fixture)) ?? fallbackEvolveCacheDir;
-    if (dir) baseEnv.AKM_STASH_DIR = dir;
-    else delete baseEnv.AKM_STASH_DIR;
-    if (cacheDir) baseEnv.XDG_CACHE_HOME = cacheDir;
+    const dataHome = (fixture && evolveDataHomeByFixture.get(fixture)) ?? fallbackEvolveDataHome;
+    if (dir) {
+      baseEnv.AKM_BUNDLE_DIR = dir;
+      baseEnv.AKM_STASH_DIR = dir;
+    } else {
+      delete baseEnv.AKM_BUNDLE_DIR;
+      delete baseEnv.AKM_STASH_DIR;
+    }
+    if (dataHome) {
+      const cacheHome = path.join(dataHome, ".cache");
+      const stateHome = path.join(dataHome, ".state");
+      baseEnv.XDG_DATA_HOME = dataHome;
+      baseEnv.XDG_CACHE_HOME = cacheHome;
+      baseEnv.XDG_STATE_HOME = stateHome;
+      baseEnv.AKM_DATA_DIR = path.join(dataHome, "akm");
+      baseEnv.AKM_CACHE_DIR = path.join(cacheHome, "akm");
+      baseEnv.AKM_STATE_DIR = path.join(stateHome, "akm");
+      const configHome = phase2XdgConfigHome(`runtime-${fixture ?? "default"}`, dir);
+      baseEnv.XDG_CONFIG_HOME = configHome;
+      baseEnv.AKM_CONFIG_DIR = path.join(configHome, "akm");
+    }
     // Forward the opencode config path so `akm reflect` (which spawns
     // `opencode run`) can find the LLM provider configuration.
     if (opencodeConfigPath) baseEnv.OPENCODE_CONFIG = opencodeConfigPath;
@@ -453,18 +477,18 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
   }
 
   // ── Phase 1 pre-flight: copy pre-built index into each evolve cache. ──────
-  // `loadFixtureStash` already populated `stash.indexCacheHome` with the
-  // pre-built FTS5 index (from `__akm_index__/`). We copy it into the
-  // dedicated `evolveCacheDirByFixture` so `akmCli` feedback/distill calls
+  // `loadFixtureStash` already populated `stash.indexDataHome` with the
+  // pre-built FTS5 index. We copy it into the dedicated
+  // `evolveDataHomeByFixture` so `akmCli` feedback/distill calls
   // find the DB in the right place — no `akm index` spawn needed.
   if (materialiseStash) {
     process.stderr.write(`[evolve] copying pre-built indexes for ${evolveDirByFixture.size} fixture(s)\n`);
     for (const [fixtureName, stash] of evolveStashes) {
-      const cacheDir = evolveCacheDirByFixture.get(fixtureName);
-      if (!cacheDir) continue;
-      if (stash.indexCacheHome) {
+      const dataHome = evolveDataHomeByFixture.get(fixtureName);
+      if (!dataHome) continue;
+      if (stash.indexDataHome) {
         try {
-          copyDirRecursiveSync(stash.indexCacheHome, cacheDir);
+          copyDirRecursiveSync(stash.indexDataHome, dataHome);
           process.stderr.write(`[evolve] index copied: ${fixtureName}\n`);
         } catch (err) {
           warnings.push(`evolve: failed to copy index for "${fixtureName}": ${(err as Error).message}`);
@@ -501,6 +525,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       // runner to forward those dirs and skip its own per-task materialise.
       materialiseStash,
       ...(materialiseStash ? { stashDirByFixture: evolveDirByFixture } : {}),
+      ...(materialiseStash ? { indexDataHomeByFixture: evolveDataHomeByFixture } : {}),
       ...(options.timestamp ? { timestamp: options.timestamp } : {}),
       ...(options.branch ? { branch: options.branch } : {}),
       ...(options.commit ? { commit: options.commit } : {}),
@@ -630,11 +655,26 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
         const proposalEnv: Record<string, string> = { ...(process.env as Record<string, string>) };
         if (materialiseStash && fixtureName) {
           const dir = evolveDirByFixture.get(fixtureName);
-          if (dir) proposalEnv.AKM_STASH_DIR = dir;
-          const cacheDir = evolveCacheDirByFixture.get(fixtureName);
-          if (cacheDir) proposalEnv.XDG_CACHE_HOME = cacheDir;
-          proposalEnv.XDG_CONFIG_HOME = phase2XdgConfigHome(`phase2-${fixtureName}`, dir);
+          if (dir) {
+            proposalEnv.AKM_BUNDLE_DIR = dir;
+            proposalEnv.AKM_STASH_DIR = dir;
+          }
+          const dataHome = evolveDataHomeByFixture.get(fixtureName);
+          if (dataHome) {
+            const cacheHome = path.join(dataHome, ".cache");
+            const stateHome = path.join(dataHome, ".state");
+            proposalEnv.XDG_DATA_HOME = dataHome;
+            proposalEnv.XDG_CACHE_HOME = cacheHome;
+            proposalEnv.XDG_STATE_HOME = stateHome;
+            proposalEnv.AKM_DATA_DIR = path.join(dataHome, "akm");
+            proposalEnv.AKM_CACHE_DIR = path.join(cacheHome, "akm");
+            proposalEnv.AKM_STATE_DIR = path.join(stateHome, "akm");
+          }
+          const configHome = phase2XdgConfigHome(`phase2-${fixtureName}`, dir);
+          proposalEnv.XDG_CONFIG_HOME = configHome;
+          proposalEnv.AKM_CONFIG_DIR = path.join(configHome, "akm");
         } else if (!materialiseStash) {
+          delete proposalEnv.AKM_BUNDLE_DIR;
           delete proposalEnv.AKM_STASH_DIR;
           proposalEnv.XDG_CONFIG_HOME = phase2XdgConfigHome("phase2-default");
         }
@@ -810,7 +850,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       ...(options.spawn ? { spawn: options.spawn } : {}),
       materialiseStash,
       ...(materialiseStash ? { stashDirByFixture: preDirByFixture } : {}),
-      ...(materialiseStash ? { indexCacheHomeByFixture: preCacheDirByFixture } : {}),
+      ...(materialiseStash ? { indexDataHomeByFixture: preDataHomeByFixture } : {}),
       ...(options.timestamp ? { timestamp: options.timestamp } : {}),
       ...(options.branch ? { branch: options.branch } : {}),
       ...(options.commit ? { commit: options.commit } : {}),
@@ -832,7 +872,7 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
       // was supplied.
       materialiseStash,
       ...(materialiseStash ? { stashDirByFixture: evolveDirByFixture } : {}),
-      ...(materialiseStash ? { indexCacheHomeByFixture: evolveCacheDirByFixture } : {}),
+      ...(materialiseStash ? { indexDataHomeByFixture: evolveDataHomeByFixture } : {}),
       ...(options.timestamp ? { timestamp: options.timestamp } : {}),
       ...(options.branch ? { branch: options.branch } : {}),
       ...(options.commit ? { commit: options.commit } : {}),
@@ -880,6 +920,13 @@ export async function runEvolve(options: RunEvolveOptions): Promise<EvolveRunRep
     for (const s of preStashes.values()) {
       try {
         s.cleanup();
+      } catch {
+        /* swallow — best-effort tmp cleanup */
+      }
+    }
+    for (const dataHome of evolveDataHomeByFixture.values()) {
+      try {
+        fs.rmSync(dataHome, { recursive: true, force: true });
       } catch {
         /* swallow — best-effort tmp cleanup */
       }
@@ -1036,8 +1083,14 @@ function wrapSpawnWithArm(inner: SpawnFn, arm: "post" | "synthetic", stashDir?: 
     const env: Record<string, string> = { ...(opts.env ?? {}) };
     env.BENCH_EVOLVE_ARM = arm;
     if (scratchpad) env.BENCH_EVOLVE_SCRATCHPAD = "1";
-    if (stashDir) env.AKM_STASH_DIR = stashDir;
-    if (arm === "synthetic") delete env.AKM_STASH_DIR;
+    if (stashDir) {
+      env.AKM_BUNDLE_DIR = stashDir;
+      env.AKM_STASH_DIR = stashDir;
+    }
+    if (arm === "synthetic") {
+      delete env.AKM_BUNDLE_DIR;
+      delete env.AKM_STASH_DIR;
+    }
     return inner(cmd, { ...opts, env });
   };
 }
@@ -1302,11 +1355,11 @@ function isLikelyTimeoutFailure(summary: string): boolean {
 
 /**
  * Run `akm index` on the evolve stash to populate the FTS5 database in the
- * cache directory that Phase 1 `akmCli` calls will use.
+ * data directory that Phase 1 `akmCli` calls will use.
  *
- * `loadFixtureStash` already indexed the stash into an isolated XDG_CACHE_HOME
+ * `loadFixtureStash` already indexed the stash into an isolated XDG_DATA_HOME
  * that is invisible to subsequent `akmCli` calls. Calling this helper with the
- * same `stashDir` + `cacheDir` that `envForRef` will forward ensures `akm
+ * same `stashDir` + `dataHome` that `envForRef` will forward ensures `akm
  * feedback` (and later `akm distill` / `akm reflect`) can look up refs in the
  * FTS5 index.
  *
@@ -1315,16 +1368,25 @@ function isLikelyTimeoutFailure(summary: string): boolean {
  */
 export async function indexEvolveStash(
   stashDir: string,
-  cacheDir: string,
+  dataHome: string,
   akmCli: AkmCliFn,
   cwd: string,
 ): Promise<{ ok: boolean; stderr: string }> {
-  const configDir = cacheDir + "/config";
+  const configHome = path.join(dataHome, ".config");
+  const cacheHome = path.join(dataHome, ".cache");
+  const stateHome = path.join(dataHome, ".state");
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
+    AKM_BUNDLE_DIR: stashDir,
     AKM_STASH_DIR: stashDir,
-    XDG_CACHE_HOME: cacheDir,
-    XDG_CONFIG_HOME: configDir,
+    XDG_CACHE_HOME: cacheHome,
+    XDG_CONFIG_HOME: configHome,
+    XDG_DATA_HOME: dataHome,
+    XDG_STATE_HOME: stateHome,
+    AKM_CACHE_DIR: path.join(cacheHome, "akm"),
+    AKM_CONFIG_DIR: path.join(configHome, "akm"),
+    AKM_DATA_DIR: path.join(dataHome, "akm"),
+    AKM_STATE_DIR: path.join(stateHome, "akm"),
   };
   const result = await akmCli(["index"], cwd, env);
   return { ok: result.exitCode === 0, stderr: result.stderr };

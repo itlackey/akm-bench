@@ -16,6 +16,6 @@ Also add a brief prep note in `prep-note.txt` with this exact line:
 Then add two provenance lines in `prep-note.txt`:
 
 - `akm-search-query: opencode config`
-- `akm-show-ref: skill:opencode`
+- `akm-show-ref: skills/opencode`
 
 Keep existing unrelated keys unchanged. Do not run opencode.

@@ -3,7 +3,7 @@ title: "Produce the az command to create a Standard_LRS storage account"
 domain: az-cli
 difficulty: medium
 slice: train
-gold_ref: skill:az-cli
+gold_ref: skills/az-cli
 stash: az-cli
 verifier: script
 budget:

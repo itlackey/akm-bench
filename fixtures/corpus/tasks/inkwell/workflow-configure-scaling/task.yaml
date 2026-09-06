@@ -3,7 +3,7 @@ title: "Configure rps-based autoscaling using the inkwell workflow"
 domain: inkwell
 difficulty: medium
 slice: eval
-gold_ref: workflow:configure-inkwell-service
+gold_ref: workflows/configure-inkwell-service
 stash: inkwell
 verifier: pytest
 budget:

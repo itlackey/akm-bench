@@ -19,5 +19,5 @@ JSON
 cat > prep-note.txt <<NOTE
 prep: anthropic provider token eval
 akm-search-query: opencode config
-akm-show-ref: skill:opencode
+akm-show-ref: skills/opencode
 NOTE

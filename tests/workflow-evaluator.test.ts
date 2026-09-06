@@ -139,7 +139,7 @@ describe("evaluateRunAgainstSpec — wrong order", () => {
     });
     const trace = makeTrace([
       ev("agent_started"),
-      ev("akm_feedback", { args: ["+1", "skill:foo"] }),
+      ev("akm_feedback", { args: ["+1", "skills/foo"] }),
       ev("verifier_run", { exitCode: 0 }),
       ev("agent_finished"),
     ]);
@@ -170,7 +170,7 @@ describe("evaluateRunAgainstSpec — forbidden event", () => {
     const trace = makeTrace([
       ev("agent_started"),
       ev("akm_reflect"),
-      ev("akm_feedback", { args: ["-1", "skill:foo"] }),
+      ev("akm_feedback", { args: ["-1", "skills/foo"] }),
       ev("agent_finished"),
     ]);
     const result = evaluateRunAgainstSpec(trace, spec, makeRun());
@@ -207,7 +207,7 @@ describe("evaluateRunAgainstSpec — wrong feedback polarity", () => {
     });
     const trace = makeTrace([
       ev("agent_started"),
-      ev("akm_feedback", { args: ["+1", "skill:foo"] }),
+      ev("akm_feedback", { args: ["+1", "skills/foo"] }),
       ev("verifier_run", { exitCode: 1 }),
       ev("agent_finished"),
     ]);
@@ -230,7 +230,7 @@ describe("evaluateRunAgainstSpec — wrong feedback polarity", () => {
     });
     const trace = makeTrace([
       ev("agent_started"),
-      ev("akm_feedback", { args: ["+1", "skill:foo"] }),
+      ev("akm_feedback", { args: ["+1", "skills/foo"] }),
       ev("verifier_run", { exitCode: 0 }),
       ev("agent_finished"),
     ]);
@@ -249,7 +249,7 @@ describe("evaluateRunAgainstSpec — wrong feedback polarity", () => {
     });
     const trace = makeTrace([
       ev("agent_started"),
-      ev("akm_feedback", { args: ["--positive", "skill:foo"] }),
+      ev("akm_feedback", { args: ["--positive", "skills/foo"] }),
       ev("verifier_run", { exitCode: 0 }),
       ev("agent_finished"),
     ]);
@@ -270,13 +270,13 @@ describe("evaluateRunAgainstSpec — irrelevant_asset_loaded", () => {
       ],
       forbidden: [],
     });
-    const trace = makeTrace([ev("agent_started"), ev("akm_show", { assetRef: "skill:wrong" }), ev("agent_finished")]);
-    const task: WorkflowEvalTaskMetadata = { goldRef: "skill:deploy" };
+    const trace = makeTrace([ev("agent_started"), ev("akm_show", { assetRef: "skills/wrong" }), ev("agent_finished")]);
+    const task: WorkflowEvalTaskMetadata = { goldRef: "skills/deploy" };
     const result = evaluateRunAgainstSpec(trace, spec, makeRun(), task);
     const v = result.violations.find((x) => x.code === "irrelevant_asset_loaded");
     expect(v).toBeDefined();
-    expect(v?.expected).toBe("skill:deploy");
-    expect(v?.observed).toBe("skill:wrong");
+    expect(v?.expected).toBe("skills/deploy");
+    expect(v?.observed).toBe("skills/wrong");
   });
 
   test("top-level gold-ref check fires when spec cares but akm_show never loaded gold", () => {
@@ -289,7 +289,7 @@ describe("evaluateRunAgainstSpec — irrelevant_asset_loaded", () => {
       forbidden: [],
     });
     const trace = makeTrace([ev("agent_started"), ev("agent_finished")]);
-    const result = evaluateRunAgainstSpec(trace, spec, makeRun(), { goldRef: "skill:deploy" });
+    const result = evaluateRunAgainstSpec(trace, spec, makeRun(), { goldRef: "skills/deploy" });
     // Either the per-step `irrelevant_asset_loaded` OR the spec-level gold check should fire.
     const codes = result.violations.map((v) => v.code);
     expect(codes.some((c) => c === "irrelevant_asset_loaded" || c === "missing_required_event")).toBe(true);
@@ -304,8 +304,8 @@ describe("evaluateRunAgainstSpec — irrelevant_asset_loaded", () => {
       ],
       forbidden: [],
     });
-    const trace = makeTrace([ev("agent_started"), ev("akm_show", { assetRef: "skill:deploy" }), ev("agent_finished")]);
-    const result = evaluateRunAgainstSpec(trace, spec, makeRun(), { goldRef: "skill:deploy" });
+    const trace = makeTrace([ev("agent_started"), ev("akm_show", { assetRef: "skills/deploy" }), ev("agent_finished")]);
+    const result = evaluateRunAgainstSpec(trace, spec, makeRun(), { goldRef: "skills/deploy" });
     expect(result.status).toBe("pass");
     expect(result.evidence.goldAssetLoaded).toBe(true);
   });
@@ -339,7 +339,7 @@ describe("evaluateRunAgainstAllSpecs — applies_to", () => {
     const r1 = evaluateRunAgainstAllSpecs(trace, [spec], makeRun());
     expect(r1[0].status).toBe("not_applicable");
     // With goldRef → applies.
-    const r2 = evaluateRunAgainstAllSpecs(trace, [spec], makeRun(), { goldRef: "skill:deploy" });
+    const r2 = evaluateRunAgainstAllSpecs(trace, [spec], makeRun(), { goldRef: "skills/deploy" });
     expect(r2[0].status).not.toBe("not_applicable");
   });
 });
@@ -374,7 +374,7 @@ describe("evaluateRunAgainstSpec — harness_error", () => {
     const traceJson = JSON.stringify(trace);
     const spec = makeSpec();
     const specJson = JSON.stringify(spec);
-    const task: WorkflowEvalTaskMetadata = { goldRef: "skill:deploy", flags: { foo: true } };
+    const task: WorkflowEvalTaskMetadata = { goldRef: "skills/deploy", flags: { foo: true } };
     const taskJson = JSON.stringify(task);
     evaluateRunAgainstSpec(trace, spec, makeRun(), task);
     expect(JSON.stringify(trace)).toBe(traceJson);
@@ -434,7 +434,7 @@ describe("evaluateRunAgainstSpec — min_count", () => {
     });
     const traceOne = makeTrace([
       ev("agent_started"),
-      ev("akm_feedback", { args: ["-1", "skill:foo"] }),
+      ev("akm_feedback", { args: ["-1", "skills/foo"] }),
       ev("agent_finished"),
     ]);
     const r1 = evaluateRunAgainstSpec(traceOne, spec, makeRun({ outcome: "fail", verifierFailed: true }));
@@ -442,8 +442,8 @@ describe("evaluateRunAgainstSpec — min_count", () => {
 
     const traceTwo = makeTrace([
       ev("agent_started"),
-      ev("akm_feedback", { args: ["-1", "skill:foo"] }),
-      ev("akm_feedback", { args: ["-1", "skill:bar"] }),
+      ev("akm_feedback", { args: ["-1", "skills/foo"] }),
+      ev("akm_feedback", { args: ["-1", "skills/bar"] }),
       ev("agent_finished"),
     ]);
     const r2 = evaluateRunAgainstSpec(traceTwo, spec, makeRun({ outcome: "fail", verifierFailed: true }));

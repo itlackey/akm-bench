@@ -3,7 +3,7 @@ title: "Scale drillbit cluster dev-edge to 4 replicas"
 domain: drillbit
 difficulty: easy
 slice: train
-gold_ref: skill:drillbit
+gold_ref: skills/drillbit
 stash: drillbit
 verifier: script
 budget:

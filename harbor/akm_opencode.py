@@ -30,15 +30,14 @@ adds exactly five things:
    and re-sync Harbor's ~40-line ``run()`` body.
 
 5. **A run-phase proof.** ``populate_context_post_run()`` greps the opencode
-   log written by the *measured* run for the plugin's ``AKM CLI resolved``
-   line and raises ``AkmPluginNotLoadedError`` when it is missing. The plugin
-   reports a failed CLI resolution as a WARN and then keeps going: the
-   ``akm_*`` tools stay registered, every call degrades, and the process exits
-   0. Such a trial completes green with zero ``akm_*`` calls, which is
-   byte-for-byte indistinguishable from "the model chose not to use akm" —
-   i.e. the treatment arm silently becomes a second control arm. install()'s
-   self-check cannot cover this: it proves the plugin loads in an
-   *install-time* session, and resolution is redone at every session start.
+   log written by the *measured* run for the plugin's per-message activity
+   marker and raises ``AkmPluginNotLoadedError`` when it is missing. It also
+   rejects startup and hook degradation markers that the plugin logs while
+   allowing OpenCode to continue. Such a trial can otherwise complete green
+   with zero ``akm_*`` calls, byte-for-byte indistinguishable from "the model
+   chose not to use akm" — i.e. the treatment arm silently becomes a second
+   control arm. install()'s self-check cannot cover this because the measured
+   session is a separate plugin instantiation.
 
 6. **Per-task stash selection.** ``stash_root`` names a host directory with
    one subdirectory per named stash; when set (or defaulted — see
@@ -68,7 +67,7 @@ file-path support. Run from the repo root::
       -p <local-task-dir> -i <task-name> \
       --agent harbor.akm_opencode:AkmOpenCode \
       -m anthropic/claude-sonnet-4-5 \
-      --ak version=1.18.21 \
+      --ak version=1.18.29 \
       --allow-agent-host registry.npmjs.org \
       --agent-setup-timeout-multiplier 7.5
 
@@ -77,7 +76,7 @@ file-path support. Run from the repo root::
     # "plugin present" with "permissions granted"
     harbor run -p <local-task-dir> -i <task-name> \
       --agent opencode -m anthropic/claude-sonnet-4-5 \
-      --ak version=1.18.21 \
+      --ak version=1.18.29 \
       --ak 'opencode_config={"autoupdate":false,"permission":{...}}'
 
 Both arms in one job: see ``harbor/jobs/p0-smoke.yaml``.
@@ -90,8 +89,9 @@ arm cannot import them, so ``harbor/jobs/p0-smoke.yaml`` repeats
 ``OPENCODE_VERSION`` literally for both arms and
 ``harbor/tests/test_akm_opencode.py`` asserts the two stay in sync.
 
-Status: **never executed live.** The container path below has not been run
-against a real Docker daemon. See ``docs/harbor-p0.md`` for what that means.
+Status: the plugin-load path was smoke-tested in a disposable container against
+the exact OpenCode and plugin pins on 2026-09-06. Full Harbor corpus runs still
+belong in the release qualification matrix; see ``docs/harbor-p0.md``.
 """
 
 from __future__ import annotations
@@ -117,15 +117,15 @@ from harbor.models.trajectories import Trajectory
 #: ``version`` kwarg, which ``OpenCode.install()`` turns into
 #: ``npm i -g opencode-ai@<version>``. Must be repeated verbatim in the control
 #: arm's job config so both arms run the same binary.
-OPENCODE_VERSION = "1.18.21"
+OPENCODE_VERSION = "1.18.29"
 
 #: akm CLI npm version, installed globally so a real ``akm`` is on PATH.
-AKM_CLI_VERSION = "0.9.10"
+AKM_CLI_VERSION = "0.9.14"
 
 #: akm-opencode plugin npm version. Pinned exactly (never a bare package name):
 #: a bare name resolves ``latest`` at every session start, which is both
 #: unpinnable and changes opencode's plugin cache directory name.
-AKM_PLUGIN_VERSION = "0.9.9202609021827"
+AKM_PLUGIN_VERSION = "0.9.14202609050148"
 
 AKM_CLI_SPEC = f"akm-cli@{AKM_CLI_VERSION}"
 AKM_PLUGIN_SPEC = f"akm-opencode@{AKM_PLUGIN_VERSION}"
@@ -147,49 +147,44 @@ AKM_PLUGIN_SPEC = f"akm-opencode@{AKM_PLUGIN_VERSION}"
 AKM_ARM_NAME = "akm-opencode"
 AKM_ACCUMULATING_ARM_NAME = f"{AKM_ARM_NAME}-accumulating"
 
-#: Coarse install-time sanity check: a shell glob asserting the globally
-#: installed CLI is a 0.9.x at all, i.e. that ``npm i -g`` produced something in
-#: the expected family. It deliberately does NOT try to express the plugin's
-#: compatibility range -- a POSIX glob cannot (``^0.9.8`` admits 0.9.8, 0.9.9,
-#: 0.9.10, ... unbounded), and the musl branch has no reliable ``sort -V`` to
-#: fall back on. That range is asserted by ``assert_pins_compatible()`` below,
-#: which runs at import, before any container is built.
-AKM_CLI_VERSION_PREFIX = "0.9."
-
-#: The semver range the PINNED plugin build gates on -- a mirror of
-#: ``AKM_VERSION_RANGE`` in that build's own ``shared/akm-version.ts``.
+#: The ``akm-cli`` dependency spec declared by the PINNED plugin build -- a
+#: mirror of ``dependencies["akm-cli"]`` in its published ``package.json``.
 #:
 #: This is the second half of a CROSS-CHECK BETWEEN TWO PINS, which is why it
 #: cannot live in the container: by the time a trial runs, an in-container check
-#: can only see whether the CLI installed, not whether the plugin will accept
-#: it. When it will not, the plugin declines to load and every treatment trial
-#: silently scores as a baseline -- an A/B that measures nothing while looking
-#: completely healthy.
+#: can only see what npm installed, not whether the source pins were intended to
+#: move together. A stale mirror can silently make the globally installed CLI
+#: differ from the plugin's in-process dependency, so two tool paths report one
+#: benchmark version while executing another.
 #:
-#: The range moved from ``^0.9.0`` to ``^0.9.8`` somewhere between plugin
-#: 0.9.2202608290901 and 0.9.9202609021827, which is exactly the kind of change
-#: that goes unnoticed. UPDATE THIS whenever AKM_PLUGIN_VERSION changes;
-#: ``bin/ab-run`` re-reads the real value from the published tarball before
-#: every run and fails if this constant has gone stale.
-AKM_PLUGIN_REQUIRED_CLI_RANGE = "^0.9.8"
+#: Current plugin releases deliberately use an exact dependency; older builds
+#: used caret ranges. Keep both forms understood so historical pins remain
+#: diagnosable, but fail closed on any syntax this guard does not understand.
+#: UPDATE THIS whenever AKM_PLUGIN_VERSION changes; ``bin/ab-run`` re-reads the
+#: real dependency spec from the published tarball before every run.
+AKM_PLUGIN_REQUIRED_CLI_SPEC = "0.9.14"
 
 
-def satisfies_caret(version: str, caret_range: str) -> bool:
-    """True when ``version`` falls inside a caret range such as ``^0.9.8``.
+def satisfies_version_spec(version: str, spec: str) -> bool:
+    """Return whether ``version`` satisfies an exact or caret semver spec.
 
-    Only the caret form is implemented, because it is the only form the plugin
-    has ever published. An unrecognised range returns True rather than
-    guessing: a range this cannot parse is a reason to go look, not a reason to
-    block a run on a check that does not understand its own input.
+    The benchmark has shipped plugins using both forms. Unsupported syntax is
+    rejected rather than treated as compatible: silently accepting a spec the
+    guard cannot parse defeats the purpose of a release pin check.
     """
-    m = re.fullmatch(r"\^(\d+)\.(\d+)\.(\d+)", caret_range.strip())
-    if not m:
-        return True
-    low = tuple(int(g) for g in m.groups())
-    parsed = re.match(r"(\d+)\.(\d+)\.(\d+)", version.strip())
+    parsed = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?", version.strip())
     if not parsed:
         return False
     got = tuple(int(g) for g in parsed.groups())
+
+    exact = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?", spec.strip())
+    if exact:
+        return version.strip() == spec.strip()
+
+    caret = re.fullmatch(r"\^(\d+)\.(\d+)\.(\d+)", spec.strip())
+    if not caret:
+        return False
+    low = tuple(int(g) for g in caret.groups())
     # Caret on a 0.x version pins the MINOR, not the major: ^0.9.8 admits
     # 0.9.x >= 0.9.8 and excludes 0.10.0.
     upper = (low[0], low[1] + 1, 0) if low[0] == 0 else (low[0] + 1, 0, 0)
@@ -203,12 +198,12 @@ def assert_pins_compatible() -> None:
     any token is spent, and it fires however the run was launched --
     ``bin/ab-run``, a bare ``harbor run``, or a test.
     """
-    if not satisfies_caret(AKM_CLI_VERSION, AKM_PLUGIN_REQUIRED_CLI_RANGE):
+    if not satisfies_version_spec(AKM_CLI_VERSION, AKM_PLUGIN_REQUIRED_CLI_SPEC):
         raise RuntimeError(
             f"Incompatible pins: akm-cli {AKM_CLI_VERSION} does not satisfy "
-            f"{AKM_PLUGIN_REQUIRED_CLI_RANGE}, the range akm-opencode "
-            f"{AKM_PLUGIN_VERSION} gates on. The plugin would decline to load "
-            "and every treatment trial would silently score as a baseline. "
+            f"{AKM_PLUGIN_REQUIRED_CLI_SPEC}, the dependency spec declared by "
+            f"akm-opencode {AKM_PLUGIN_VERSION}. The benchmark's global and "
+            "in-process CLI paths would execute different releases. "
             "Fix AKM_CLI_VERSION / AKM_PLUGIN_VERSION together."
         )
 
@@ -290,8 +285,8 @@ DEFAULT_STASH_ROOT = Path(__file__).resolve().parent / "stashes"
 #: The ``permission`` block BOTH arms must carry — and the *complete* set of
 #: keys opencode actually declares.
 #:
-#: ``Config.permission`` in ``@opencode-ai/sdk@1.18.21``
-#: (``dist/gen/types.gen.d.ts:1161-1169``) declares exactly these five keys,
+#: The ``Config.permission`` shape accepted by the pinned OpenCode 1.18.29
+#: release declares exactly these five keys,
 #: each ``"ask" | "allow" | "deny"`` (``bash`` additionally accepts a
 #: per-pattern map). There is NO ``read`` / ``write`` / ``grep`` / ``glob`` /
 #: ``list`` / ``patch`` key and no per-plugin-tool key. An invented key is not
@@ -347,16 +342,20 @@ RUN_XDG_DATA_HOME = "/logs/agent/opencode/xdg-data"
 #: ``populate_context_post_run``).
 RUN_LOG_RELDIR = "opencode/xdg-data/opencode/log"
 
-#: What the plugin logs through ``client.app.log()`` once it has located the akm
-#: CLI. Absent ⇒ the plugin never loaded, or died before resolution.
-PLUGIN_RESOLVED_MARKER = "AKM CLI resolved"
+#: Emitted by the plugin's ``chat.message`` hook for every non-empty user
+#: message, before model resolution. It therefore proves the measured session
+#: instantiated the plugin even when the model never chooses an ``akm_*`` tool.
+PLUGIN_ACTIVE_MARKER = "AKM user feedback recorded"
 
-#: The plugin's failure path. Logged at WARN, after which the session
-#: CONTINUES: the ``akm_*`` tools stay registered and every call degrades. No
-#: non-zero exit, no opencode ``error`` event — the log line is the only signal
-#: that separates a degraded trial from a healthy one in which the model simply
-#: never called akm.
-PLUGIN_FAILED_MARKER = "AKM CLI resolution failed"
+#: Startup/hook failures that leave OpenCode running but make the treatment arm
+#: degraded. The plugin intentionally treats these helpers as best-effort, so
+#: process exit status alone cannot distinguish the result from a healthy arm.
+PLUGIN_FAILURE_MARKERS = (
+    "AKM synchronous helper failed",
+    "AKM command resolution failed",
+    "AKM chat.message hook failed",
+    "AKM shell.env hook failed",
+)
 
 # ---------------------------------------------------------------------------
 # Seed expectations
@@ -976,14 +975,13 @@ class AkmOpenCode(OpenCode):
         """Raise unless the RUN-PHASE opencode log proves the plugin was live.
 
         **Why install()'s self-check is not enough.** That self-check proves
-        the plugin loads in an *install-time* session. The plugin re-resolves
-        the akm CLI at every session start, so the measured run can still fail
-        — a different PATH, a symlink whose target moved, an npm fetch blocked
-        by the agent-phase network policy — and it fails *quietly*: one WARN
-        line, tools still registered, every call degraded, exit code 0. The
-        resulting trial is green with zero ``akm_*`` calls, which is exactly
-        what "the model chose not to use akm" looks like. Scoring it would put
-        a control-arm data point in the treatment column.
+        the plugin loads in an *install-time* session. The measured run creates
+        a separate OpenCode session under the task's network policy, so plugin
+        initialization or a best-effort startup hook can still fail while the
+        process continues. The resulting trial may be green with zero
+        ``akm_*`` calls, which is exactly what "the model chose not to use akm"
+        looks like. Scoring it would put a control-arm data point in the
+        treatment column.
 
         **Where the evidence is.** Harbor's ``OpenCode.run()`` exports
         ``XDG_DATA_HOME=`` ``RUN_XDG_DATA_HOME``, so opencode writes the
@@ -1030,25 +1028,26 @@ class AkmOpenCode(OpenCode):
             )
 
         degraded = sorted(
-            str(path) for path, text in logs.items() if PLUGIN_FAILED_MARKER in text
+            (str(path), marker)
+            for path, text in logs.items()
+            for marker in PLUGIN_FAILURE_MARKERS
+            if marker in text
         )
         if degraded:
+            evidence = ", ".join(f"{path} ({marker!r})" for path, marker in degraded)
             raise AkmPluginNotLoadedError(
                 f"akm-opencode DEGRADED during the measured run: "
-                f"{PLUGIN_FAILED_MARKER!r} appears in {', '.join(degraded)}. The "
-                "plugin loaded but could not resolve the akm CLI; it logs that at "
-                "WARN and continues, so the akm_* tools stayed registered and every "
-                "call failed while the process still exited 0. LOOK AT: that log "
-                "line (it names the paths the plugin tried), then /usr/local/bin/akm "
-                "in the container and the AKM_* env on the opencode process — "
-                "install() step 4 and AKM_ENV are what it depends on. Refusing to "
-                "score this trial."
+                f"{evidence}. The plugin logs these failures and continues, so "
+                "the process can still exit 0 while curation or its hooks are "
+                "unavailable. LOOK AT: the matching log entry, the bundled "
+                "akm-cli dependency in the plugin cache, and the AKM_* env on "
+                "the opencode process. Refusing to score this trial."
             )
 
-        if not any(PLUGIN_RESOLVED_MARKER in text for text in logs.values()):
+        if not any(PLUGIN_ACTIVE_MARKER in text for text in logs.values()):
             raise AkmPluginNotLoadedError(
                 f"akm-opencode DID NOT LOAD during the measured run: no "
-                f"{PLUGIN_RESOLVED_MARKER!r} line in {where} "
+                f"{PLUGIN_ACTIVE_MARKER!r} line in {where} "
                 f"({len(logs)} log file(s) scanned). A trial in this state records "
                 "zero akm_* calls, which is byte-for-byte indistinguishable from "
                 "'the model chose not to use akm' — i.e. it would report the "
@@ -1177,13 +1176,10 @@ class AkmOpenCode(OpenCode):
             environment, command=self._build_akm_dirs_command(owner)
         )
 
-        # 3. Global akm CLI. The plugin's bundled-CLI fallback CANNOT fire:
-        #    opencode's npm hoists akm-cli to the plugin cache's package root,
-        #    where the plugin's getBundledAkmCommand() does not look. Without a
-        #    real `akm` on PATH the arm half-works — the in-process
-        #    akm_search/show/curate still import the hoisted copy, but
-        #    akm_feedback, akm_remember, session hints and bundle-dir discovery
-        #    all fail — which is worse than not running the arm at all.
+        # 3. Global akm CLI for deterministic bundle setup and direct health
+        #    probes. The plugin uses its own exact, package-adjacent akm-cli
+        #    dependency; the self-check later proves both copies are the same
+        #    release so the reported benchmark pin is truthful on every path.
         await self.exec_as_agent(
             environment,
             command=self._build_install_akm_cli_command(),
@@ -1308,13 +1304,10 @@ class AkmOpenCode(OpenCode):
                 env=self._install_env,
             )
 
-        # 7. Write an npm `overrides` pin for akm-cli into
-        #    ~/.config/opencode/package.json, BEFORE opencode ever resolves
-        #    the plugin (the warm boot, next step). Verified inert against
-        #    opencode 1.18.21's actual plugin-install root -- kept anyway as
-        #    zero-cost insurance against the plugin's exec-path candidate 2.
-        #    See _build_write_npm_overrides_command()'s docstring for the
-        #    full verified/assumed split.
+        # 7. Pin any config-root akm-cli copy before OpenCode resolves the
+        #    plugin. Current releases use the plugin-adjacent exact dependency,
+        #    so this is normally inert defense against a third copy appearing
+        #    under ~/.config/opencode in a future OpenCode release.
         await self.exec_as_agent(
             environment,
             command=self._build_write_npm_overrides_command(),
@@ -1333,11 +1326,9 @@ class AkmOpenCode(OpenCode):
             env=self._install_env,
         )
 
-        # 9. Force the akm-cli copy this warm boot just hoisted beside the
-        #    plugin back onto the pin. THIS is the step that actually closes
-        #    the in-process-import pin-bypass hole (akm_search/show/curate) --
-        #    see _build_align_hoisted_akm_cli_command()'s docstring for why
-        #    step 7's overrides file cannot.
+        # 9. Verify and, if necessary, repair every plugin-adjacent akm-cli
+        #    package. With the current exact dependency this is normally a
+        #    no-op; it prevents a stale cache from changing the measured CLI.
         await self.exec_as_agent(
             environment,
             command=self._build_align_hoisted_akm_cli_command(),
@@ -1396,7 +1387,7 @@ class AkmOpenCode(OpenCode):
                 # mismatch that had nothing to do with the arm's health.
                 "AKM_SEED_EXPECTED_BY_STASH": json.dumps(stash_expectations),
                 "AKM_SEED_TYPE_DIRS": json.dumps(SEED_DIR_FOR_TYPE),
-                "AKM_CLI_VERSION_PREFIX": AKM_CLI_VERSION_PREFIX,
+                "AKM_CLI_EXPECTED_VERSION": AKM_CLI_VERSION,
             },
         )
 
@@ -1849,7 +1840,7 @@ class AkmOpenCode(OpenCode):
     def _build_warm_caches_command(self) -> str:
         """Boot opencode once, at setup, with the EXACT run-phase config.
 
-        opencode 1.18.21 keeps plugins in ~/.cache/opencode/packages/<pin>/ (NOT
+        opencode 1.18.29 keeps plugins in ~/.cache/opencode/packages/<pin>/ (NOT
         the ~/.cache/opencode/node_modules the docs describe) and installs
         @opencode-ai/plugin separately into ~/.config/opencode. Warming only the
         first leaves an offline boot stalling ~70s on "background dependency
@@ -1903,105 +1894,14 @@ class AkmOpenCode(OpenCode):
         )
 
     def _build_write_npm_overrides_command(self) -> str:
-        """Write an npm ``overrides`` pin for akm-cli into
-        ``~/.config/opencode/package.json``, before opencode ever resolves
-        the plugin.
+        """Pin any config-root ``akm-cli`` copy to the benchmark release.
 
-        **npm overrides semantics -- VERIFIED, empirically.** ``overrides``
-        constrains transitive dependency versions for any ``npm install``
-        whose PROJECT ROOT is the directory holding that ``package.json``.
-        Confirmed with a real, live install against the published
-        akm-opencode tarball: a fresh
-        ``npm install akm-opencode@0.9.1202608250804`` run in a directory
-        pre-seeded with ``{"overrides": {"akm-cli": "0.9.0"}}`` installed
-        ``akm-cli@0.9.0`` into that directory's ``node_modules`` -- where the
-        identical install with no overrides file resolves
-        ``akm-cli@0.9.1`` (the natural "latest satisfying the plugin's
-        `^0.9.0`"). A THIRD run confirmed the isolation this method's
-        placement depends on: the same overrides file written into an
-        UNRELATED directory has zero effect on an install that happens in a
-        different directory -- it too resolves ``akm-cli@0.9.1``, exactly
-        like the no-overrides control.
-
-        **Where opencode 1.18.21 actually installs plugins -- VERIFIED,
-        against its own source, not memory.** Every npm install opencode
-        performs -- the automatic one at session start that resolves this
-        agent's forced ``plugin: ["akm-opencode@<pin>"]`` entry
-        (``@opencode-ai/core`` ``packages/opencode/src/plugin/shared.ts``
-        ``resolvePluginTarget()`` -> ``Npm.add()``), AND the manual
-        ``opencode plugin <mod> --global`` CLI command (``cli/cmd/plug.ts``
-        ``createPlugTask()`` -> the same ``installPlugin()`` ->
-        ``resolvePluginTarget()`` -> ``Npm.add()``) -- is rooted at
-        ``$HOME/.cache/opencode/packages/<sanitize(spec)>/``
-        (``@opencode-ai/core`` ``packages/core/src/npm.ts``: ``directory =
-        path.join(global.cache, "packages", sanitize(pkg))``; ``sanitize()``
-        is a no-op on non-Windows). ``--global`` on ``opencode plugin`` only
-        changes where the plugin's CONFIG-FILE entry is patched
-        (``opencode.json``), never where its npm dependencies land.
-
-        **``~/.config/opencode`` IS an npm project root -- VERIFIED, and the
-        opposite of what an earlier revision of this docstring asserted.**
-        ``ConfigPaths.directories()``
-        (``packages/opencode/src/config/paths.ts``) returns
-        ``Global.Path.config`` as its FIRST element, and
-        ``packages/opencode/src/config/config.ts:439`` calls
-        ``npmSvc.install(dir, {add: [{name: "@opencode-ai/plugin", ...}]})``
-        for every directory it returns (``config/tui.ts:238`` does the same
-        on the TUI path). That directory-scoped ``Npm.install()`` reifies
-        with Arborist rooted at ``dir``, so it reads ``dir/package.json`` --
-        ``overrides`` field included -- as the project manifest. This is what
-        creates ``~/.config/opencode/node_modules``, whose existence
-        self-check probe 6 already asserts and which
-        ``_build_warm_caches_command()``'s docstring correctly describes.
-
-        **Conclusion -- still INERT today, but for a narrower reason than
-        "nothing installs there".** The only package opencode installs into
-        that root is ``@opencode-ai/plugin``, which does not depend on
-        ``akm-cli`` -- so an ``akm-cli`` override has nothing to bind to, and
-        ``~/.config/opencode/node_modules/akm-cli`` stays absent (the case
-        probes 7b and 7c treat as healthy). Neither CLI-resolution candidate
-        that matters for opencode 1.18.21 +
-        akm-opencode@<AKM_PLUGIN_VERSION> is reached by it: the "bundled"
-        candidate the in-process ``akm_search``/``akm_show``/``akm_curate``
-        tools import from is protected instead by
-        ``_build_align_hoisted_akm_cli_command()``, and the "path" candidate
-        our own ``/usr/local/bin/akm`` symlink satisfies.
-
-        **Writing it is safe -- VERIFIED against that installer's own logic.**
-        ``Npm.install()`` reifies only when ``node_modules`` is absent, or
-        when a manifest-declared dep is missing from ``package-lock.json``;
-        in both paths ``add`` still carries ``@opencode-ai/plugin``, and
-        Arborist runs with ``save: true``, so it writes that dependency back
-        into the ``package.json`` written here rather than being pruned away
-        by its empty ``dependencies``. Running BEFORE the warm boot is what
-        keeps this an initial manifest rather than a clobber of one opencode
-        has already populated -- an ordering
-        ``test_overrides_are_written_before_the_warm_boot`` pins.
-
-        **Why write it anyway -- ASSUMED, not verified, forward-looking
-        insurance.** The shipped plugin's own CLI-resolution order
-        (``getPathAkmCandidates()``, read out of the real
-        akm-opencode@<AKM_PLUGIN_VERSION> tarball's ``index.ts``) checks
-        ``${XDG_CONFIG_HOME:-~/.config}/opencode/node_modules/.bin/akm``
-        BEFORE the bare ``akm`` on PATH -- i.e. before our pin. Nothing in
-        opencode 1.18.21 or in this agent's own install() populates that
-        directory today (self-check probe 7c below will find it absent and
-        pass), but the plugin author clearly built resolution logic
-        anticipating SOME mechanism populating it (a user's own
-        ``npm install --prefix ~/.config/opencode akm-cli``, or a future
-        opencode version that does root a plugin-adjacent install there).
-        Pre-seeding the override is zero-cost and harmless either way: IF
-        that directory is ever populated by anything that respects npm
-        `overrides` semantics, this is what keeps the version pinned rather
-        than floating to whatever ``^0.9.0`` naturally resolves to at that
-        moment. Self-check probes 7b and 7c both already fail the trial
-        loudly if that directory exists and disagrees with the pin; this
-        turns "exists and disagrees" from a detected failure into a
-        structurally unreachable one, for any installer that honors
-        overrides.
-
-        Idempotent and side-effect-free: this only writes a file, creates no
-        ``node_modules``, and runs no install of its own.
+        Current ``akm-opencode`` resolves its exact package-adjacent
+        dependency, so this override is normally inert. OpenCode also owns an
+        npm project under ``~/.config/opencode``; keeping the same exact pin
+        there prevents a future config-root dependency from introducing a
+        third CLI version. The self-check treats absence as healthy and rejects
+        a conflicting copy if one exists.
         """
         payload = json.dumps(
             {
@@ -2020,29 +1920,18 @@ class AkmOpenCode(OpenCode):
     def _build_align_hoisted_akm_cli_command(self) -> str:
         """Force the akm-cli copy hoisted beside the plugin onto the pin.
 
-        **This is the fix that actually closes the in-process-import hole.**
-        Verified, out of the real akm-opencode@<AKM_PLUGIN_VERSION> tarball's
-        ``index.ts``: ``akm_search``/``akm_show``/``akm_curate`` resolve
-        akm-cli through ``runInProcess()``'s bare
-        ``import("akm-cli/dist/commands/...")`` specifier. Node/Bun module
-        resolution for a bare specifier walks UP from the importing module's
-        own location through ITS ``node_modules`` chain -- landing on
-        exactly what ``getBundledAkmCommand()`` also targets:
+        The current plugin declares an exact ``akm-cli`` dependency and its
+        in-process commands resolve that dependency from the plugin's own
+        module tree. Node/Bun resolution walks up from the importing module to
         ``<pluginPackageDir>/node_modules/akm-cli``, where
         ``pluginPackageDir`` sits under
         ``$HOME/.cache/opencode/packages/<AKM_PLUGIN_SPEC>/`` -- the tree
         opencode's own ``Npm.add()`` creates the first time the plugin is
-        resolved (this agent's warm boot, the install step immediately
-        before this one). No ``overrides`` field written anywhere else, and
-        no PATH pin, reaches that ``import()`` -- see
-        ``_build_write_npm_overrides_command()``'s docstring for the
-        verification that rules those out.
+        resolved (this agent's warm boot, immediately before this step).
 
-        **Verified empirically that realigning it is safe and surgical.**
-        Against a real, previously-installed akm-opencode@<pin> tree (fetched
-        from the live npm registry) with its natural ``akm-cli@0.9.1``
-        already hoisted: running ``npm install --prefix <that tree>
-        akm-cli@<other-version> --ignore-scripts --no-save`` flipped
+        **Verified empirically that realigning is surgical.** Against a real,
+        previously-installed plugin tree, running ``npm install --prefix
+        <that tree> akm-cli@<other-version> --ignore-scripts --no-save`` flipped
         ``node_modules/akm-cli``'s version to the requested one, left
         ``node_modules/akm-opencode`` itself untouched, and (``--no-save``)
         left the tree's ``package.json`` byte-identical -- a targeted
@@ -2059,8 +1948,8 @@ class AkmOpenCode(OpenCode):
         Runs AFTER the warm boot -- nothing exists here before opencode's
         first plugin resolution -- and BEFORE the self-check. Only actually
         reinstalls when the hoisted version disagrees with the pin; the
-        common case, where npm's own ``^0.9.0`` resolution already landed on
-        the pin, costs one ``find`` and one ``node -p`` and nothing else.
+        common case, where the plugin's exact dependency already landed on the
+        pin, costs one ``find`` and one ``node -e`` and nothing else.
         Absent is left to self-check probe 7, which already fails the trial
         with a more specific message ("no akm-cli hoisted beside the
         plugin") than anything duplicated here.
@@ -2078,7 +1967,7 @@ class AkmOpenCode(OpenCode):
         ``find`` happened to visit first and leave any other unpinned and
         unchecked -- silently reintroducing the exact drift this method
         exists to close. Realigning every match found is strictly safer than
-        that and only costs one extra ``node -p`` per additional copy, which
+        that and only costs one extra ``node -e`` per additional copy, which
         is never more than a handful.
         """
         pin = shlex.quote(AKM_CLI_VERSION)
@@ -2094,8 +1983,8 @@ class AkmOpenCode(OpenCode):
             'it"; exit 0; fi; '
             'echo "$AKM_HOISTED_PKGS" | while IFS= read -r AKM_HOISTED_PKG; do '
             '[ -n "$AKM_HOISTED_PKG" ] || continue; '
-            'AKM_HOISTED_VER="$(node -p "require(process.argv[1]).version" '
-            '"$AKM_HOISTED_PKG")"; '
+            'AKM_HOISTED_VER="$(AKM_PACKAGE_JSON="$AKM_HOISTED_PKG" '
+            'node -e "process.stdout.write(require(process.env.AKM_PACKAGE_JSON).version)")"; '
             f'if [ "$AKM_HOISTED_VER" = {pin} ]; then '
             f'echo "akm-bootstrap: hoisted akm-cli at $AKM_HOISTED_PKG '
             f'already at the pin ({AKM_CLI_VERSION})"; continue; fi; '
@@ -2105,8 +1994,8 @@ class AkmOpenCode(OpenCode):
             f'$AKM_HOISTED_ROOT"; '
             f'npm install --prefix "$AKM_HOISTED_ROOT" akm-cli@{pin} '
             "--ignore-scripts --no-audit --no-fund --no-save; "
-            'AKM_REALIGNED_VER="$(node -p '
-            '"require(process.argv[1]).version" "$AKM_HOISTED_PKG")"; '
+            'AKM_REALIGNED_VER="$(AKM_PACKAGE_JSON="$AKM_HOISTED_PKG" '
+            'node -e "process.stdout.write(require(process.env.AKM_PACKAGE_JSON).version)")"; '
             f'[ "$AKM_REALIGNED_VER" = {pin} ] || {{ echo '
             f'"AKM-BOOTSTRAP FATAL: realignment of hoisted akm-cli at '
             f'$AKM_HOISTED_PKG to {AKM_CLI_VERSION} did not take (still '
@@ -2143,7 +2032,7 @@ class AkmOpenCode(OpenCode):
         wrong cause (an empty knowledge/ enumeration, not "the mount is
         empty or misconfigured"). Every OTHER probe -- akm on PATH (1, 1b),
         the read/rank/mutate paths (3, 4, 5), the plugin cache (6),
-        CLI-version skew (7), the pin-bypass hole (7b, 7c), and the run-phase
+        CLI-version skew (7), config-root contamination (7b, 7c), and the run-phase
         log line (8) -- still gates this arm exactly as it gates the static
         one. The only content coupling left anywhere in this method is probe
         3's ``knowledge/`` prefix enumeration returning >=4 entries; probe 5
@@ -2153,6 +2042,8 @@ class AkmOpenCode(OpenCode):
         pre-populating the mount from ``harbor/treatment-library/`` (decision
         D6), not from the smoke fixture.
         """
+        failure_markers = " ".join(shlex.quote(marker) for marker in PLUGIN_FAILURE_MARKERS)
+
         # Resolve WHICH seed source this trial actually got, using the same
         # AKM_TASK_STASH the seed step used, and write its expected shape to
         # /tmp/akm-seed-want.json for the probes below. Deriving this
@@ -2352,7 +2243,7 @@ class AkmOpenCode(OpenCode):
             "set -euo pipefail; "
             "[ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; "
             'fail(){ echo "AKM-BOOTSTRAP FATAL: $*" >&2; exit 1; }; '
-            # 1) akm on PATH at a version the plugin's ^0.9.0 gate accepts.
+            # 1) akm on PATH at the exact release this benchmark reports.
             'command -v akm >/dev/null || fail "akm is not on PATH"; '
             # 1b) ...and usable from a MINIMAL PATH, with no nvm and no PATH
             #     pin. This is the only probe that actually exercises the
@@ -2370,10 +2261,9 @@ class AkmOpenCode(OpenCode):
             'bare akm"; '
             "AKM_GLOBAL_VERSION=\"$(akm --version | tr -d '[:space:]')\"; "
             'export AKM_GLOBAL_VERSION; '
-            'case "$AKM_GLOBAL_VERSION" in '
-            '"$AKM_CLI_VERSION_PREFIX"*) ;; '
-            '*) fail "akm --version=$AKM_GLOBAL_VERSION does not satisfy '
-            '${AKM_CLI_VERSION_PREFIX}x" ;; esac; '
+            '[ "$AKM_GLOBAL_VERSION" = "$AKM_CLI_EXPECTED_VERSION" ] || '
+            'fail "akm --version=$AKM_GLOBAL_VERSION, expected exact pin '
+            '$AKM_CLI_EXPECTED_VERSION"; '
             + seed_shape_probe
             + seed_count_probe
             # 3) read path. Which directory, and how many hits are required,
@@ -2421,74 +2311,49 @@ class AkmOpenCode(OpenCode):
             'plugin; the in-process tools will fail to import"; '
             "export AKM_HOISTED_PKGS; "
             f"node -e '{skew_js}' || fail \"akm-cli version skew\"; "
-            # 7b) the pin-bypass hole. The plugin's CLI resolution walks
-            #     ~/.config/opencode/node_modules/.bin/akm BEFORE bare `akm` on
-            #     PATH (getPathAkmCandidates, plugin index.ts:1313-1326). npm
-            #     resolves that copy from the plugin's own `akm-cli: ^0.9.0`
-            #     range, independently of our pin, so the moment a newer 0.9.x
-            #     publishes, the mutating call path (feedback/remember/hints)
-            #     would silently run an UNPINNED CLI while result.json still
-            #     reports the pin -- a green, plausible trial measured against
-            #     the wrong binary. Probe 7 does not cover it: that compares the
-            #     ~/.cache hoist against the global, a different pair of paths.
-            #     Absent is fine (resolution falls through to the pinned PATH
-            #     akm); present-and-different is not.
+            # 7b) config-root contamination. The current plugin does not read
+            #     this path, but OpenCode owns the npm project and a future
+            #     dependency could create another akm binary there. Absent is
+            #     healthy; present-and-different is not, because it makes the
+            #     container carry conflicting benchmark CLI versions.
             'CFG_AKM="$HOME/.config/opencode/node_modules/.bin/akm"; '
             'if [ -x "$CFG_AKM" ]; then '
             'CFG_VER="$("$CFG_AKM" --version 2>/dev/null | tr -d "[:space:]" '
             '|| true)"; '
-            f'[ "$CFG_VER" = "{AKM_CLI_VERSION}" ] || fail "akm-cli pin bypass: '
-            f'the plugin resolves $CFG_AKM (${{CFG_VER:-unknown}}) before the '
-            f'pinned PATH akm ({AKM_CLI_VERSION}); pin the transitive dep with '
-            'an npm overrides entry in ~/.config/opencode/package.json"; '
+            f'[ "$CFG_VER" = "{AKM_CLI_VERSION}" ] || fail "akm-cli pin '
+            f'conflict: unexpected config-root $CFG_AKM reports '
+            f'${{CFG_VER:-unknown}}, benchmark pin is {AKM_CLI_VERSION}"; '
             'fi; '
-            # 7c) same directory as 7b, but reads the PACKAGE version directly
-            #     instead of shelling out to node_modules/.bin/akm --version --
-            #     catches a package present with no working bin shim (e.g.
-            #     installed with --no-bin-links, or dropped in by hand) that
-            #     7b's `-x "$CFG_AKM"` guard would silently step over. Historical
-            #     note, not a claim about today's resolution: this directory is
-            #     the plugin's EXEC-path candidate 2
-            #     (getPathAkmCandidates()), the same one 7b covers -- it is NOT
-            #     the root the in-process akm_search/show/curate tools import
-            #     from. That one is
-            #     $HOME/.cache/opencode/packages/.../node_modules/akm-cli,
-            #     forced onto the pin by install()'s own
-            #     _build_align_hoisted_akm_cli_command() step, immediately
-            #     before this self-check runs -- see that method's docstring
-            #     for the verified/assumed split behind this comment. Absent is
-            #     fine here too, for the same reason 7b treats it as fine.
-            #     Note the precise claim: opencode 1.18.21 DOES npm-install
-            #     into ~/.config/opencode (ConfigPaths.directories() lists it
-            #     first; config.ts:439 installs into every entry -- that is
-            #     what probe 6's node_modules assertion relies on), but the
-            #     only package it puts there is @opencode-ai/plugin, which has
-            #     no akm-cli dependency. So this akm-cli path specifically
-            #     stays absent, and absence is the expected case, not evidence
-            #     of anything wrong.
+            # 7c) same contamination check using package.json directly. This
+            #     catches a copy with no executable bin shim, which 7b's `-x`
+            #     guard cannot see. OpenCode 1.18.29 normally installs only its
+            #     plugin SDK in this config root, so absence remains expected.
             'CFG_AKM_PKG="$HOME/.config/opencode/node_modules/akm-cli/'
             'package.json"; '
             'if [ -f "$CFG_AKM_PKG" ]; then '
-            'CFG_PKG_VER="$(node -p "require(process.argv[1]).version" '
-            '"$CFG_AKM_PKG" 2>/dev/null || true)"; '
+            'CFG_PKG_VER="$(AKM_PACKAGE_JSON="$CFG_AKM_PKG" '
+            'node -e "process.stdout.write(require(process.env.AKM_PACKAGE_JSON).version)" '
+            '2>/dev/null || true)"; '
             f'[ "$CFG_PKG_VER" = "{AKM_CLI_VERSION}" ] || fail "akm-cli pin '
-            f'bypass (package.json): $CFG_AKM_PKG reports '
+            f'conflict (package.json): $CFG_AKM_PKG reports '
             f'${{CFG_PKG_VER:-unknown}}, pin is {AKM_CLI_VERSION}"; '
             'fi; '
-            # 8) strongest check: the plugin loaded and resolved akm in a real
-            #    session, booted from the REAL run-phase config (step 7), so a
-            #    config opencode rejects fails setup here rather than during
-            #    the paid run. Resolution failure is a WARN, not a non-zero
-            #    exit, so only the log proves it. The same two markers are
-            #    re-checked against the RUN-phase log by _assert_plugin_ran():
-            #    this install-time session cannot speak for that one.
+            # 8) strongest check: a plugin hook ran in a real session booted
+            #    from the REAL run-phase config, so a config OpenCode rejects
+            #    fails setup here rather than during the paid run. Hook/helper
+            #    failures are log-only, so the process status cannot prove
+            #    health. The same markers are checked against the RUN-phase
+            #    log by _assert_plugin_ran(); this install-time session cannot
+            #    speak for that one.
             f'OPENCODE_LOG="{INSTALL_XDG_DATA_HOME}/opencode/log"; '
-            f'grep -qh "{PLUGIN_RESOLVED_MARKER}" "$OPENCODE_LOG"/*.log || '
-            f'fail "no {PLUGIN_RESOLVED_MARKER} in the opencode log at '
+            f'grep -Fqh "{PLUGIN_ACTIVE_MARKER}" "$OPENCODE_LOG"/*.log || '
+            f'fail "no {PLUGIN_ACTIVE_MARKER} in the opencode log at '
             '$OPENCODE_LOG; the plugin did not load, or opencode rejected the '
             'config this arm writes"; '
-            f'if grep -qh "{PLUGIN_FAILED_MARKER}" "$OPENCODE_LOG"/*.log; then '
-            f'fail "the opencode log contains {PLUGIN_FAILED_MARKER}"; fi; '
+            f'for AKM_FAILURE_MARKER in {failure_markers}; do '
+            'if grep -Fqh "$AKM_FAILURE_MARKER" "$OPENCODE_LOG"/*.log; then '
+            'fail "the opencode log contains AKM plugin degradation marker: '
+            '$AKM_FAILURE_MARKER"; fi; done; '
             'echo "AKM bootstrap OK (akm $AKM_GLOBAL_VERSION, plugin '
             "$PLUGIN_PKG)\""
         )

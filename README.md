@@ -61,9 +61,9 @@ passes cannot measure akm, however carefully it is run. On the v1 train slice,
 
 **Version pins** live in `harbor/akm_opencode.py` and nowhere else. Changing
 them there is enough; `bin/ab-run` prints what it resolved and refuses to start
-if the pinned `akm-cli` falls outside the pinned plugin's own compatibility
-range, which would otherwise leave the plugin unloaded and score every treatment
-trial as a baseline.
+if the pinned `akm-cli` does not satisfy the pinned plugin's published
+`dependencies["akm-cli"]` spec. That prevents a run from reporting one CLI
+version while the plugin's in-process tools execute another.
 
 **Do not compare a v2 number to a v1 number** without
 `results/calibration/transition-v1-v2-0910.md`. v2 excludes the tasks that
@@ -72,32 +72,39 @@ composition, not improvement.
 
 ## What You Need
 
-- `bun`
-- `opencode`
-- an opencode config that can access the model you want to benchmark
+- `git`
+- Docker with a reachable daemon
+- an OpenCode config and the API environment variables required by its model
+
+The supported runner installs Bun, OpenCode, AKM, Python, and test dependencies
+inside the image. A host-native contributor workflow is still available, but
+it additionally requires Bun and OpenCode.
 
 ## Quick Start
 
-1. Install dependencies.
-
-```sh
-bun install
-```
-
-2. Create a repo-local opencode config.
+1. Create a repo-local OpenCode config.
 
 ```sh
 cp ~/.config/opencode.json ./config/opencode.local.json
 ```
 
-This repo does not automatically read a global opencode config. That is
-intentional so benchmark runs do not accidentally consume tokens from a paid or
-metered setup.
+This repo does not automatically read a global OpenCode config. That keeps a
+benchmark from accidentally inheriting unrelated plugins, credentials, or
+model settings.
 
-3. Run the smallest benchmark.
+2. Run the smallest benchmark in the pinned image.
 
 ```sh
-bun run src/cli.ts config/nano-quick.json
+bash bin/akm-bench run config/nano-quick.json \
+  --results-dir ./bench-results \
+  --opencode-config ./config/opencode.local.json
+```
+
+For host-native development only:
+
+```sh
+bun install
+bun run src/cli.ts config/nano-quick.json --opencode-config ./config/opencode.local.json
 ```
 
 Start with `config/nano-quick.json`. It is the fastest way to verify that your
@@ -149,10 +156,10 @@ Run against a specific published AKM version:
 
 ```sh
 bash bin/akm-bench run config/nano-quick.json \
-  --results-dir ./bench-results/akm-0.7.1 \
+  --results-dir ./bench-results/akm-0.9.14 \
   --opencode-config ./config/opencode.local.json \
   --akm-mode version \
-  --akm-version 0.7.1
+  --akm-version 0.9.14
 ```
 
 Run against a local AKM checkout while contributing:
@@ -168,6 +175,9 @@ bash bin/akm-bench run config/nano-quick.json \
 Notes:
 
 - The wrapper defaults to `--network host`.
+- By default the wrapper refreshes the image through Docker's layer cache, so a
+  pre-existing version tag cannot hide newer benchmark code. Use `--no-build`
+  only when intentionally reusing an already-verified image.
 - The image includes `opencode`, OpenAI support, and Antigravity auth support.
 - Use `--env OPENAI_API_KEY` or `--env-file <path>` when your provider config references host secrets.
 - Use `--opencode-home ~/.config/opencode` if you need to import Antigravity auth files into the container.
@@ -376,9 +386,9 @@ opencode/...`) -- akm-eval's `OPENAI_API_KEY` is a different repo's variable
 for a different consumer (its LongMemEval evaluator's own OpenAI client), not
 this one's. See `docs/harbor-p0.md` prerequisite 3.
 
-**This path has not been executed live yet.** Nothing below has run in a
-container: it is Harbor 0.22.0 source reading plus host-side simulation. It does
-not affect any of the workflows documented above.
+The exact OpenCode/plugin load path was smoke-tested in a disposable container
+on 2026-09-06. The full Harbor corpus remains experimental and is separate from
+the completed native-harness release comparison documented above.
 
 P0 answers exactly one question -- "can the model reach `akm_*` tools inside a
 task container" -- and is **not** evidence that akm improves task performance.
@@ -424,7 +434,7 @@ from `harbor/akm_opencode.py` and are printed in the banner; change them there,
 never here.
 
 It will not start without a reachable Docker daemon or a resolvable API key,
-and it will not start on a stale plugin-compatibility mirror (below). Where a
+and it will not start on a stale plugin-dependency mirror (below). Where a
 run *can* safely proceed it does: a second run of the same slice and pin lands
 in `jobs/<job_name>-r2/` rather than stopping to ask, because a fresh directory
 per run is what keeps `akm-bench-analyze` — which walks the whole tree — from
@@ -432,27 +442,23 @@ pooling two runs into one meaningless statistic.
 
 Each run writes `results/harbor/<date>/<slice>-<pin>-<stamp>.{md,json,log}`.
 
-#### The plugin-compatibility cross-check
+#### The plugin dependency cross-check
 
-The pinned `akm-cli` must satisfy the pinned plugin's own `AKM_VERSION_RANGE`.
-When it does not, the plugin quietly declines to load and **every treatment
-trial scores as a baseline** — an A/B that measures nothing while looking
-perfectly healthy for three hours. This cannot be caught in the container: by
-then, the only observable fact is whether the CLI installed, not whether the
-plugin will accept it. It is a cross-check between two pins, so it lives where
+The benchmark installs a global `akm-cli` for bundle setup, while current
+`akm-opencode` releases execute their own declared dependency in process. Those
+versions must match. Otherwise the report names one release while some tool
+paths execute another. It is a cross-check between two pins, so it lives where
 both are known:
 
-- `harbor/akm_opencode.py` mirrors the range as
-  `AKM_PLUGIN_REQUIRED_CLI_RANGE` and calls `assert_pins_compatible()` **at
+- `harbor/akm_opencode.py` mirrors the dependency as
+  `AKM_PLUGIN_REQUIRED_CLI_SPEC` and calls `assert_pins_compatible()` **at
   import**, so a bare `harbor run` is covered too, before any container is
   built. `harbor/tests/` covers it.
-- `bin/ab-run` additionally reads the range out of the published plugin tarball
-  before every run and fails if the mirrored copy has gone stale — the failure
-  mode that actually happened, when the range moved `^0.9.0` → `^0.9.8` between
-  plugin builds and nothing noticed.
+- `bin/ab-run` additionally reads `dependencies["akm-cli"]` out of the published
+  plugin tarball before every run and fails if the mirrored copy has gone stale.
 
-The in-container shell guard remains a coarse "is this a 0.9.x at all" install
-check; a POSIX glob cannot express `^0.9.8`, and it is no longer asked to.
+The in-container shell guard also requires the globally installed CLI and the
+plugin-adjacent package to equal the exact benchmark pin.
 
 ### Three-arm A/B job configs (P2)
 

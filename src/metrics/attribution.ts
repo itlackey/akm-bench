@@ -10,6 +10,7 @@ import type { RunResult } from "../driver";
 import { getStashesRoot } from "../fixtures-root";
 import type { RunRecordSerialized, UtilityRunReport } from "../run-record";
 import { serializeRunForReport } from "../run-record";
+import { parseAssetRef } from "../support/asset-ref";
 import { safeRealpath } from "../support/fs";
 import { benchMkdtemp } from "../tmp";
 
@@ -22,9 +23,8 @@ import { benchMkdtemp } from "../tmp";
  * Detection strategy (all heuristic, all conservative):
  *   1. `event.eventType === "show"` with `event.ref` (forward-compat — akm
  *      itself does not currently emit `show` events).
- *   2. Substring match on `akm show <ref>` in stdout. The ref shape is
- *      `[origin//]type:name` per the v1 contract; we accept word-boundary
- *      terminators after the name.
+ *   2. Substring match on `akm show <ref>` in stdout. The ref shape is the
+ *      AKM 0.9 `[bundle//]conceptId[#fragment]` contract.
  *   3. Tool-call JSON `{"args":["show","<ref>"]}` — the form opencode logs
  *      when the agent invokes the akm CLI as a tool. We extract refs that
  *      look like asset refs from the args array entries adjacent to "show".
@@ -34,25 +34,11 @@ import { benchMkdtemp } from "../tmp";
  * runaway agents from OOMing the bench.
  */
 const ASSET_LOAD_STDOUT_SCAN_CAP = 16 * 1024 * 1024;
-// Asset ref grammar: optional `origin//` prefix, type:name, where type and
-// name are lowercase letters, digits, `_`, `-`. We deliberately do NOT match
-// `://` schemes (those are install locators, not asset refs). The character
-// class is intentionally tight so we don't mis-pickup arbitrary words after
-// `akm show`. The `name` segment is restricted to `[A-Za-z0-9_-]+` (no `/`,
-// no `.`) — the v1 grammar in src/core/asset-ref.ts permits `/` and `.` in
-// names (e.g. `script:db/migrate/run.sh`), but the masker treats names as
-// untrusted input and rejects any traversal-shaped value, so the bench-side
-// scanner does not need (or want) to extract such refs from agent stdout.
-// Limiting the regex here is defense-in-depth against a prompt-injected
-// agent emitting `akm show "skill:../../etc"` and us pulling that ref into
-// the masking flow.
-const ASSET_REF_PATTERN = /(?:[a-z0-9_-]+\/\/)?[a-z][a-z0-9_-]*:[A-Za-z0-9_-]+/g;
-
 export function extractAssetLoads(runResult: RunResult): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   const push = (ref: string): void => {
-    if (!ref) return;
+    if (!ref || !isSafeAssetRef(ref)) return;
     if (seen.has(ref)) return;
     seen.add(ref);
     out.push(ref);
@@ -78,59 +64,46 @@ export function extractAssetLoads(runResult: RunResult): string[] {
     haystack = haystack.slice(0, ASSET_LOAD_STDOUT_SCAN_CAP);
   }
 
-  // `akm show <ref>` literal form. Accept optional quoting around the ref so
-  // shell traces like `akm show "skill:foo"` work too.
-  const literalRe = /akm\s+show\s+["']?((?:[a-z0-9_-]+\/\/)?[a-z][a-z0-9_-]*:[A-Za-z0-9_-]+)["']?/g;
+  // `akm show <ref>` literal form. Quoted refs may contain spaces; unquoted
+  // refs stop at the first shell delimiter. `push` validates the whole token
+  // before accepting it.
+  const literalRe = /\bakm\s+show\s+(?:"([^"]+)"|'([^']+)'|([^\s"'`]+))/g;
   for (const literalMatch of haystack.matchAll(literalRe)) {
-    push(literalMatch[1] as string);
+    push((literalMatch[1] ?? literalMatch[2] ?? literalMatch[3]) as string);
   }
 
   // Tool-call JSON form. `"args":[..., "show", "<ref>", ...]`. We extract
   // every refish token in the haystack that follows a "show" arg in JSON-y
   // form. A second cheap pass keeps the pattern simple.
-  const toolCallRe = /"show"\s*,\s*"((?:[a-z0-9_-]+\/\/)?[a-z][a-z0-9_-]*:[A-Za-z0-9_-]+)"/g;
+  const toolCallRe = /"show"\s*,\s*"((?:\\.|[^"\\])+)"/g;
   for (const toolCallMatch of haystack.matchAll(toolCallRe)) {
-    push(toolCallMatch[1] as string);
+    try {
+      push(JSON.parse(`"${toolCallMatch[1]}"`) as string);
+    } catch {
+      // Malformed JSON-ish tool trace: ignore it.
+    }
   }
 
   return out;
 }
 
-// Suppress the unused warning for `ASSET_REF_PATTERN` above. The constant is
-// retained as the documentation seam called out by the #251 review addenda,
-// even though `extractAssetLoads` uses inline regexes for its two scan forms.
-void ASSET_REF_PATTERN;
-
-/**
- * Anchored variant of `ASSET_REF_PATTERN` for whole-string validation.
- *
- * Used by `materialiseMaskedStash` (#251) to gate every asset ref BEFORE we
- * touch the filesystem. The base `ASSET_REF_PATTERN` is `/g`-flagged for
- * scanning agent stdout; we re-anchor here so a hostile string like
- * `skill:foo/../../etc` is rejected as a whole even though the regex would
- * happily match a `skill:foo` substring under `/g`.
- *
- * Rejects `..`, absolute paths, drive letters, null bytes, `/`, `\`, and
- * anything else outside the v1 ref grammar (mirrors src/core/asset-ref.ts).
- */
-const ASSET_REF_ANCHORED = /^(?:[a-z0-9_-]+\/\/)?[a-z][a-z0-9_-]*:[A-Za-z0-9_-]+$/;
-
 /**
  * Reject hostile asset refs before they reach any `fs.rmSync` call. The ref
- * comes from agent stdout (untrusted; the agent could be prompt-injected) so
- * we apply the anchored grammar pattern first, then the per-segment shape
- * check after the colon-split. Defense in depth — each layer is sufficient
- * on its own; the layered structure makes a future grammar relax safe.
+ * comes from agent stdout (untrusted; the agent could be prompt-injected), so
+ * parse it with the current grammar before resolving anything on disk.
  */
 function isSafeAssetRef(ref: string): boolean {
-  if (!ref) return false;
-  if (ref.includes("\0")) return false;
-  return ASSET_REF_ANCHORED.test(ref);
+  try {
+    parseAssetRef(ref);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Per-asset attribution row (§6.5). */
 export interface PerAssetAttributionRow {
-  /** Asset ref, e.g. `skill:docker-homelab`. */
+  /** Asset ref, e.g. `skills/docker-homelab`. */
   assetRef: string;
   /** Number of akm-arm runs that loaded this asset AND passed. */
   loadCountPassing: number;
@@ -491,12 +464,9 @@ export async function runMaskedCorpus(opts: RunMaskedCorpusOptions): Promise<Mas
  * asset is not present in the fixture (we still re-run, but the result will
  * mirror the base — which is itself a meaningful diagnostic).
  *
- * The masking heuristic:
- *   1. Walk `<stash>/*<...>/.stash.json` files.
- *   2. For each entry whose `name` + `type` matches the asset ref, drop the
- *      entry and delete its `filename` if present.
- *   3. Rewrite the `.stash.json` with the trimmed entries (or remove it if
- *      it is now empty).
+ * The masking heuristic resolves the current concept id to the built-in AKM
+ * adapter's physical placement, removes that file/directory from a temporary
+ * copy, and trims any legacy `.stash.json` entry that names the same file.
  */
 export function materialiseMaskedStash(fixturesRoot: string, stashName: string, assetRef: string): string | null {
   // #271: validate stashName containment BEFORE touching the filesystem.
@@ -511,36 +481,21 @@ export function materialiseMaskedStash(fixturesRoot: string, stashName: string, 
   if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
   if (!fs.existsSync(path.join(sourceDir, "MANIFEST.json"))) return null;
 
-  // Issue #251 review addendum: validate the WHOLE ref against the anchored
-  // grammar before we touch the filesystem. The downstream `isSafeAssetNameSegment`
-  // + `isPathContained` checks are still applied — this is defense in depth.
+  // Validate the WHOLE ref before touching the filesystem.
   if (!isSafeAssetRef(assetRef)) return null;
-
-  const colonIdx = assetRef.indexOf(":");
-  if (colonIdx < 0) {
-    // Malformed ref: still produce a tmp copy with no edits so the caller's
-    // re-run sees the unmodified fixture.
-    const tmpRoot = benchMkdtemp(`akm-bench-masked-${stashName}-`);
-    copyDirRecursive(sourceDir, tmpRoot);
-    return tmpRoot;
-  }
-  const typeWithOrigin = assetRef.slice(0, colonIdx);
-  const name = assetRef.slice(colonIdx + 1);
-  const type = typeWithOrigin.includes("//") ? (typeWithOrigin.split("//")[1] ?? typeWithOrigin) : typeWithOrigin;
-
-  // SECURITY: the asset ref originates from agent stdout (untrusted; the
-  // agent could be prompt-injected). The masking heuristic below will
-  // `fs.rmSync` files under the tmp stash dir whose names are derived from
-  // `name`. A traversal-shaped name (`../etc`, `/abs/path`, `..\\..`) would
-  // escape the tmp root and delete arbitrary disk content. Reject those
-  // shapes BEFORE we materialise — and re-validate after path-resolving
-  // each candidate. Mirrors src/core/asset-ref.ts validateName().
-  if (!isSafeAssetNameSegment(name)) return null;
+  const { conceptId } = parseAssetRef(assetRef);
+  const relativeTargets = physicalPathsForConceptId(conceptId);
+  if (relativeTargets.length === 0) return null;
 
   const tmpRoot = benchMkdtemp(`akm-bench-masked-${stashName}-`);
   copyDirRecursive(sourceDir, tmpRoot);
+  const targets = relativeTargets
+    .map((relativeTarget) => path.resolve(tmpRoot, relativeTarget))
+    .filter((target) => isPathContained(tmpRoot, target));
+  let removed = false;
 
-  // Walk every .stash.json under the tmp root and edit in place.
+  // Trim compatibility metadata before removing directory targets that may
+  // contain their own `.stash.json`.
   walkStashJsonFiles(tmpRoot, (jsonPath) => {
     let raw: string;
     try {
@@ -558,33 +513,26 @@ export function materialiseMaskedStash(fixturesRoot: string, stashName: string, 
     const kept: Array<Record<string, unknown>> = [];
     const jsonDir = path.dirname(jsonPath);
     for (const entry of entries) {
-      if (entry.type === type && entry.name === name) {
+      const filename = entry.filename;
+      const entryTarget = typeof filename === "string" ? path.resolve(jsonDir, filename) : undefined;
+      const belongsToMaskedTarget =
+        entryTarget !== undefined &&
+        isPathContained(tmpRoot, entryTarget) &&
+        targets.some((target) => entryTarget === target || isPathContained(target, entryTarget));
+      if (belongsToMaskedTarget) {
         // Remove the entry's content file(s). The on-disk `filename` is read
         // from the fixture .stash.json (trusted) but the value still passes
         // through path.relative containment so a malicious fixture can't use
         // this path to escape either.
-        const filename = entry.filename;
         if (typeof filename === "string" && isSafeAssetNameSegment(filename)) {
           const target = path.resolve(jsonDir, filename);
           if (isPathContained(tmpRoot, target)) {
             try {
               fs.rmSync(target, { force: true });
+              removed = true;
             } catch {
               // ignore
             }
-          }
-        }
-        // Some fixtures keep a per-asset directory (e.g. skills/<name>/SKILL.md).
-        const dirCandidate = path.resolve(jsonDir, name);
-        if (
-          isPathContained(tmpRoot, dirCandidate) &&
-          fs.existsSync(dirCandidate) &&
-          fs.statSync(dirCandidate).isDirectory()
-        ) {
-          try {
-            fs.rmSync(dirCandidate, { recursive: true, force: true });
-          } catch {
-            // ignore
           }
         }
         continue;
@@ -603,7 +551,59 @@ export function materialiseMaskedStash(fixturesRoot: string, stashName: string, 
     }
   });
 
+  for (const target of targets) {
+    if (!fs.existsSync(target)) continue;
+    try {
+      fs.rmSync(target, { recursive: true, force: true });
+      removed = true;
+    } catch {
+      // Best effort; a still-present target means this candidate was not masked.
+    }
+  }
+
+  if (!removed) {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+    return null;
+  }
   return tmpRoot;
+}
+
+const MARKDOWN_CONCEPT_DIRS = new Set([
+  "agents",
+  "commands",
+  "facts",
+  "instructions",
+  "knowledge",
+  "lessons",
+  "memories",
+  "sessions",
+]);
+
+/** Physical spellings owned by the built-in AKM adapter for one concept id. */
+function physicalPathsForConceptId(conceptId: string): string[] {
+  const [family, ...tailParts] = conceptId.split("/");
+  if (!family || tailParts.length === 0) return [];
+  const tail = tailParts.join("/");
+  const exact = `${family}/${tail}`;
+  if (family === "skills") {
+    // Current skills are directories containing SKILL.md. Keep the flat
+    // markdown spelling as a fixture-compatibility target for old reports.
+    return [exact, `${exact}.md`];
+  }
+  if (family === "scripts" || family === "secrets") return [exact];
+  if (MARKDOWN_CONCEPT_DIRS.has(family)) return [exact.endsWith(".md") ? exact : `${exact}.md`];
+  if (family === "workflows") {
+    return /\.(?:md|yml)$/i.test(exact) ? [exact] : [`${exact}.md`, `${exact}.yml`];
+  }
+  if (family === "tasks") return [exact.endsWith(".yml") ? exact : `${exact}.yml`];
+  if (family === "env") {
+    if (tail === "default") return [`${family}/.env`, `${family}/default.env`];
+    if (tail.endsWith("/default")) {
+      return [`${family}/${tail.slice(0, -"default".length)}.env`, `${exact}.env`];
+    }
+    return [exact.endsWith(".env") ? exact : `${exact}.env`];
+  }
+  return [];
 }
 
 /**

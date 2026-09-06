@@ -1,7 +1,7 @@
 """Deterministic verifier for distractor-docker-port-publish.
 
 Checks the `web` service publishes container port 80 on host 8080. The
-gold-ref skill (`skill:docker` in the noisy stash) discusses compose stacks
+gold-ref skill (`skills/docker` in the noisy stash) discusses compose stacks
 in general terms only and does not contain `8080:80` or any subscript chain
 of the form ``services["web"]["ports"]`` — leakage check still runs.
 """

@@ -13,8 +13,10 @@ import { benchMkdtemp } from "../src/tmp";
 
 describe("loadFixtureStash", () => {
   test("materialises the minimal fixture and cleanup removes it", () => {
+    const priorAkmBundleDir = process.env.AKM_BUNDLE_DIR;
     const priorAkmStashDir = process.env.AKM_STASH_DIR;
     const sentinel = "/tmp/some-prior-value";
+    process.env.AKM_BUNDLE_DIR = sentinel;
     process.env.AKM_STASH_DIR = sentinel;
 
     const { stashDir, cleanup, contentHash } = loadFixtureStash("minimal");
@@ -31,28 +33,33 @@ describe("loadFixtureStash", () => {
       // Content hash is non-empty hex.
       expect(contentHash).toMatch(/^[0-9a-f]{64}$/);
 
-      // The helper set AKM_STASH_DIR to the materialised path.
+      // The helper sets the current override and its transition alias.
+      expect(process.env.AKM_BUNDLE_DIR).toBe(stashDir);
       expect(process.env.AKM_STASH_DIR).toBe(stashDir);
 
       // Default behaviour runs `akm index`, which writes the SQLite DB into
-      // the helper's isolated XDG_CACHE_HOME (sibling of stashDir).
+      // the helper's isolated XDG_DATA_HOME (sibling of stashDir).
       const tmpRoot = path.dirname(stashDir);
-      const dbPath = path.join(tmpRoot, "cache", "akm", "index.db");
+      const dbPath = path.join(tmpRoot, "data", "akm", "index.db");
       expect(fs.existsSync(dbPath)).toBe(true);
     } finally {
       cleanup();
     }
 
-    // After cleanup, the tmp tree is gone and AKM_STASH_DIR is restored.
+    // After cleanup, the tmp tree is gone and both overrides are restored.
     expect(fs.existsSync(stashDir)).toBe(false);
+    expect(process.env.AKM_BUNDLE_DIR).toBe(sentinel);
     expect(process.env.AKM_STASH_DIR).toBe(sentinel);
 
     // Restore the test's own prior value rather than the synthetic sentinel.
+    if (priorAkmBundleDir === undefined) delete process.env.AKM_BUNDLE_DIR;
+    else process.env.AKM_BUNDLE_DIR = priorAkmBundleDir;
     if (priorAkmStashDir === undefined) delete process.env.AKM_STASH_DIR;
     else process.env.AKM_STASH_DIR = priorAkmStashDir;
   });
 
   test("with { skipIndex: true } does not invoke akm index", () => {
+    const priorAkmBundleDir = process.env.AKM_BUNDLE_DIR;
     const priorAkmStashDir = process.env.AKM_STASH_DIR;
 
     const { stashDir, cleanup } = loadFixtureStash("minimal", { skipIndex: true });
@@ -60,17 +67,20 @@ describe("loadFixtureStash", () => {
     try {
       // The fixture is still materialised and AKM_STASH_DIR is still set.
       expect(fs.existsSync(stashDir)).toBe(true);
+      expect(process.env.AKM_BUNDLE_DIR).toBe(stashDir);
       expect(process.env.AKM_STASH_DIR).toBe(stashDir);
 
       // But the index DB the helper would otherwise have created in the
-      // isolated XDG_CACHE_HOME is absent — proving no `akm index` ran.
+      // isolated XDG_DATA_HOME is absent — proving no `akm index` ran.
       const tmpRoot = path.dirname(stashDir);
-      const dbPath = path.join(tmpRoot, "cache", "akm", "index.db");
+      const dbPath = path.join(tmpRoot, "data", "akm", "index.db");
       expect(fs.existsSync(dbPath)).toBe(false);
     } finally {
       cleanup();
     }
 
+    if (priorAkmBundleDir === undefined) delete process.env.AKM_BUNDLE_DIR;
+    else process.env.AKM_BUNDLE_DIR = priorAkmBundleDir;
     if (priorAkmStashDir === undefined) delete process.env.AKM_STASH_DIR;
     else process.env.AKM_STASH_DIR = priorAkmStashDir;
   });

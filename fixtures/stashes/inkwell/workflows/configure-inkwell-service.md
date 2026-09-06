@@ -14,13 +14,13 @@ params:
 Step ID: lookup-schema
 
 ### Instructions
-Run `akm show skill:inkwell` to retrieve the inkwell/v2 YAML schema. Read the
+Run `akm show skills/inkwell` to retrieve the inkwell/v2 YAML schema. Read the
 output carefully — pay attention to the exact field names and value types
 (especially integer vs string, and exact metric names like `rps` not
 `requests_per_second`).
 
 ### Completion Criteria
-- `akm show skill:inkwell` has been run and the output reviewed
+- `akm show skills/inkwell` has been run and the output reviewed
 - Exact field names for the required configuration block are known
 
 ## Step: Apply the configuration

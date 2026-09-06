@@ -228,7 +228,7 @@ function stripQuotes(s: string): string {
 function collectRefsFromLine(line: string, out: string[]): void {
   if (out.length >= TOP_K) return;
 
-  // JSON form: `"ref":"skill:foo"` or `"ref": "skill:foo"`. Multiple per line possible.
+  // JSON form: `"ref":"skills/foo"` or `"ref": "skills/foo"`. Multiple per line possible.
   const jsonRe = /"ref"\s*:\s*"([^"]+)"/g;
   let m: RegExpExecArray | null;
   m = jsonRe.exec(line);
@@ -238,7 +238,7 @@ function collectRefsFromLine(line: string, out: string[]): void {
     m = jsonRe.exec(line);
   }
 
-  // Plain text form: `  ref: skill:foo`. Only treat the line as a ref-bearing
+  // Plain text form: `  ref: skills/foo`. Only treat the line as a ref-bearing
   // line if it starts with `ref:` (after whitespace). Avoids picking up
   // every `:` in arbitrary stdout.
   const textRe = /^ref:\s*([^\s,]+)/;
@@ -251,7 +251,7 @@ function collectRefsFromLine(line: string, out: string[]): void {
 /**
  * 1-based rank of `goldRef` in `results`, or `null` if absent within the
  * top 10. We use `matchesGold` for prefix-tolerant matching so
- * `team//skill:foo` counts as `skill:foo` (mirrors trajectory parser).
+ * `team//skills/foo` counts as `skills/foo` (mirrors trajectory parser).
  */
 function computeRank(results: string[], goldRef: string): number | null {
   const cap = Math.min(results.length, TOP_K);

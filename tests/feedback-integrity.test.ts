@@ -48,7 +48,7 @@ function fb(
   return {
     taskId: "t",
     seed: 0,
-    goldRef: "skill:s",
+    goldRef: "skills/s",
     signal: "positive",
     ok: true,
     ...overrides,
@@ -58,7 +58,7 @@ function fb(
 describe("computeFeedbackIntegrity — 2x2 quadrants", () => {
   test("TP: feedback + on a passed run", () => {
     const phase1 = { akmRuns: [fakeRun({ taskId: "t1", seed: 0, outcome: "pass" })] };
-    const feedbackLog = [fb({ taskId: "t1", seed: 0, goldRef: "skill:a", signal: "positive" })];
+    const feedbackLog = [fb({ taskId: "t1", seed: 0, goldRef: "skills/a", signal: "positive" })];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(m.aggregate.truePositive).toBe(1);
     expect(m.aggregate.falsePositive).toBe(0);
@@ -67,14 +67,14 @@ describe("computeFeedbackIntegrity — 2x2 quadrants", () => {
     expect(m.aggregate.feedback_agreement).toBeCloseTo(1);
     expect(m.aggregate.feedback_coverage).toBeCloseTo(1);
     expect(m.perAsset).toHaveLength(1);
-    expect(m.perAsset[0].ref).toBe("skill:a");
+    expect(m.perAsset[0].ref).toBe("skills/a");
     expect(m.perAsset[0].truePositive).toBe(1);
     expect(m.perAsset[0].feedback_agreement).toBeCloseTo(1);
   });
 
   test("FP: feedback + on a failed run", () => {
     const phase1 = { akmRuns: [fakeRun({ taskId: "t1", seed: 0, outcome: "fail" })] };
-    const feedbackLog = [fb({ taskId: "t1", seed: 0, goldRef: "skill:a", signal: "positive" })];
+    const feedbackLog = [fb({ taskId: "t1", seed: 0, goldRef: "skills/a", signal: "positive" })];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(m.aggregate.truePositive).toBe(0);
     expect(m.aggregate.falsePositive).toBe(1);
@@ -87,7 +87,7 @@ describe("computeFeedbackIntegrity — 2x2 quadrants", () => {
 
   test("TN: feedback - on a failed run", () => {
     const phase1 = { akmRuns: [fakeRun({ taskId: "t1", seed: 0, outcome: "fail" })] };
-    const feedbackLog = [fb({ taskId: "t1", seed: 0, goldRef: "skill:a", signal: "negative" })];
+    const feedbackLog = [fb({ taskId: "t1", seed: 0, goldRef: "skills/a", signal: "negative" })];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(m.aggregate.trueNegative).toBe(1);
     expect(m.aggregate.feedback_agreement).toBeCloseTo(1);
@@ -97,7 +97,7 @@ describe("computeFeedbackIntegrity — 2x2 quadrants", () => {
 
   test("FN: feedback - on a passed run", () => {
     const phase1 = { akmRuns: [fakeRun({ taskId: "t1", seed: 0, outcome: "pass" })] };
-    const feedbackLog = [fb({ taskId: "t1", seed: 0, goldRef: "skill:a", signal: "negative" })];
+    const feedbackLog = [fb({ taskId: "t1", seed: 0, goldRef: "skills/a", signal: "negative" })];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(m.aggregate.falseNegative).toBe(1);
     expect(m.aggregate.feedback_agreement).toBeCloseTo(0);
@@ -118,10 +118,10 @@ describe("computeFeedbackIntegrity — aggregate over mixed quadrants", () => {
       ],
     };
     const feedbackLog = [
-      fb({ taskId: "tp", seed: 0, goldRef: "skill:tp", signal: "positive" }),
-      fb({ taskId: "fp", seed: 0, goldRef: "skill:fp", signal: "positive" }),
-      fb({ taskId: "tn", seed: 0, goldRef: "skill:tn", signal: "negative" }),
-      fb({ taskId: "fn", seed: 0, goldRef: "skill:fn", signal: "negative" }),
+      fb({ taskId: "tp", seed: 0, goldRef: "skills/tp", signal: "positive" }),
+      fb({ taskId: "fp", seed: 0, goldRef: "skills/fp", signal: "positive" }),
+      fb({ taskId: "tn", seed: 0, goldRef: "skills/tn", signal: "negative" }),
+      fb({ taskId: "fn", seed: 0, goldRef: "skills/fn", signal: "negative" }),
     ];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(m.aggregate.truePositive).toBe(1);
@@ -134,13 +134,13 @@ describe("computeFeedbackIntegrity — aggregate over mixed quadrants", () => {
     expect(m.aggregate.feedback_coverage).toBeCloseTo(1);
     expect(m.perAsset).toHaveLength(4);
     // Per-asset rows should be sorted by ref
-    expect(m.perAsset.map((r) => r.ref)).toEqual(["skill:fn", "skill:fp", "skill:tn", "skill:tp"]);
+    expect(m.perAsset.map((r) => r.ref)).toEqual(["skills/fn", "skills/fp", "skills/tn", "skills/tp"]);
   });
 });
 
 describe("computeFeedbackIntegrity — per-asset mixed signals", () => {
   test("aggregates correctly when one asset appears across multiple Phase 1 runs", () => {
-    // skill:shared has 2 TP, 1 FP, 1 TN, 1 FN across 5 runs.
+    // skills/shared has 2 TP, 1 FP, 1 TN, 1 FN across 5 runs.
     const phase1 = {
       akmRuns: [
         fakeRun({ taskId: "t", seed: 0, outcome: "pass" }),
@@ -151,16 +151,16 @@ describe("computeFeedbackIntegrity — per-asset mixed signals", () => {
       ],
     };
     const feedbackLog = [
-      fb({ taskId: "t", seed: 0, goldRef: "skill:shared", signal: "positive" }), // TP
-      fb({ taskId: "t", seed: 1, goldRef: "skill:shared", signal: "positive" }), // TP
-      fb({ taskId: "t", seed: 2, goldRef: "skill:shared", signal: "positive" }), // FP
-      fb({ taskId: "t", seed: 3, goldRef: "skill:shared", signal: "negative" }), // TN
-      fb({ taskId: "t", seed: 4, goldRef: "skill:shared", signal: "negative" }), // FN
+      fb({ taskId: "t", seed: 0, goldRef: "skills/shared", signal: "positive" }), // TP
+      fb({ taskId: "t", seed: 1, goldRef: "skills/shared", signal: "positive" }), // TP
+      fb({ taskId: "t", seed: 2, goldRef: "skills/shared", signal: "positive" }), // FP
+      fb({ taskId: "t", seed: 3, goldRef: "skills/shared", signal: "negative" }), // TN
+      fb({ taskId: "t", seed: 4, goldRef: "skills/shared", signal: "negative" }), // FN
     ];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(m.perAsset).toHaveLength(1);
     const row = m.perAsset[0];
-    expect(row.ref).toBe("skill:shared");
+    expect(row.ref).toBe("skills/shared");
     expect(row.truePositive).toBe(2);
     expect(row.falsePositive).toBe(1);
     expect(row.trueNegative).toBe(1);
@@ -173,7 +173,7 @@ describe("computeFeedbackIntegrity — per-asset mixed signals", () => {
 
 describe("computeFeedbackIntegrity — attribution rule", () => {
   test("attributes feedback to the run that produced it, not a later run touching the same asset", () => {
-    // skill:contested appears across two Phase 1 runs:
+    // skills/contested appears across two Phase 1 runs:
     //   run #0: passed, feedback +  → TP
     //   run #1: failed, feedback +  → FP
     // The naive (wrong) implementation would conflate both events with
@@ -183,8 +183,8 @@ describe("computeFeedbackIntegrity — attribution rule", () => {
       akmRuns: [fakeRun({ taskId: "t", seed: 0, outcome: "pass" }), fakeRun({ taskId: "t", seed: 1, outcome: "fail" })],
     };
     const feedbackLog = [
-      fb({ taskId: "t", seed: 0, goldRef: "skill:contested", signal: "positive" }),
-      fb({ taskId: "t", seed: 1, goldRef: "skill:contested", signal: "positive" }),
+      fb({ taskId: "t", seed: 0, goldRef: "skills/contested", signal: "positive" }),
+      fb({ taskId: "t", seed: 1, goldRef: "skills/contested", signal: "positive" }),
     ];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(m.aggregate.truePositive).toBe(1);
@@ -208,8 +208,8 @@ describe("computeFeedbackIntegrity — feedback_coverage", () => {
       ],
     };
     const feedbackLog = [
-      fb({ taskId: "t", seed: 0, goldRef: "skill:a", signal: "positive" }),
-      fb({ taskId: "t", seed: 1, goldRef: "skill:a", signal: "negative" }),
+      fb({ taskId: "t", seed: 0, goldRef: "skills/a", signal: "positive" }),
+      fb({ taskId: "t", seed: 1, goldRef: "skills/a", signal: "negative" }),
     ];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(m.aggregate.feedback_coverage).toBeCloseTo(0.5); // 2 of 4
@@ -240,8 +240,8 @@ describe("computeFeedbackIntegrity — NaN safety", () => {
       akmRuns: [fakeRun({ taskId: "t", seed: 0, outcome: "pass" }), fakeRun({ taskId: "t", seed: 1, outcome: "pass" })],
     };
     const feedbackLog = [
-      fb({ taskId: "t", seed: 0, goldRef: "skill:only-tp", signal: "positive" }),
-      fb({ taskId: "t", seed: 1, goldRef: "skill:only-tp", signal: "positive" }),
+      fb({ taskId: "t", seed: 0, goldRef: "skills/only-tp", signal: "positive" }),
+      fb({ taskId: "t", seed: 1, goldRef: "skills/only-tp", signal: "positive" }),
     ];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     const row = m.perAsset[0];
@@ -255,8 +255,8 @@ describe("computeFeedbackIntegrity — NaN safety", () => {
       akmRuns: [fakeRun({ taskId: "t", seed: 0, outcome: "fail" }), fakeRun({ taskId: "t", seed: 1, outcome: "fail" })],
     };
     const feedbackLog = [
-      fb({ taskId: "t", seed: 0, goldRef: "skill:only-tn", signal: "negative" }),
-      fb({ taskId: "t", seed: 1, goldRef: "skill:only-tn", signal: "negative" }),
+      fb({ taskId: "t", seed: 0, goldRef: "skills/only-tn", signal: "negative" }),
+      fb({ taskId: "t", seed: 1, goldRef: "skills/only-tn", signal: "negative" }),
     ];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     const row = m.perAsset[0];
@@ -270,8 +270,8 @@ describe("computeFeedbackIntegrity — NaN safety", () => {
       akmRuns: [fakeRun({ taskId: "t", seed: 0, outcome: "pass" }), fakeRun({ taskId: "t", seed: 1, outcome: "fail" })],
     };
     const feedbackLog = [
-      fb({ taskId: "t", seed: 0, goldRef: "skill:a", signal: "positive", ok: true }),
-      fb({ taskId: "t", seed: 1, goldRef: "skill:a", signal: "negative", ok: false }),
+      fb({ taskId: "t", seed: 0, goldRef: "skills/a", signal: "positive", ok: true }),
+      fb({ taskId: "t", seed: 1, goldRef: "skills/a", signal: "negative", ok: false }),
     ];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     // Only the ok=true entry contributes to the matrix (TP=1).
@@ -283,7 +283,7 @@ describe("computeFeedbackIntegrity — NaN safety", () => {
 
   test("harness_error runs are excluded from the matrix even with a stamped feedback event", () => {
     const phase1 = { akmRuns: [fakeRun({ taskId: "t", seed: 0, outcome: "harness_error" })] };
-    const feedbackLog = [fb({ taskId: "t", seed: 0, goldRef: "skill:a", signal: "positive" })];
+    const feedbackLog = [fb({ taskId: "t", seed: 0, goldRef: "skills/a", signal: "positive" })];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(m.aggregate.truePositive).toBe(0);
     expect(m.aggregate.falsePositive).toBe(0);
@@ -292,7 +292,7 @@ describe("computeFeedbackIntegrity — NaN safety", () => {
 
   test("feedback for a run not present in akmRuns is silently dropped", () => {
     const phase1 = { akmRuns: [fakeRun({ taskId: "real", seed: 0, outcome: "pass" })] };
-    const feedbackLog = [fb({ taskId: "ghost", seed: 99, goldRef: "skill:a", signal: "positive" })];
+    const feedbackLog = [fb({ taskId: "ghost", seed: 99, goldRef: "skills/a", signal: "positive" })];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(m.aggregate.truePositive).toBe(0);
     expect(m.perAsset).toEqual([]);
@@ -370,20 +370,20 @@ describe("renderFeedbackIntegrityTable", () => {
       akmRuns: [fakeRun({ taskId: "t", seed: 0, outcome: "pass" }), fakeRun({ taskId: "t", seed: 1, outcome: "fail" })],
     };
     const feedbackLog = [
-      fb({ taskId: "t", seed: 0, goldRef: "skill:a", signal: "positive" }),
-      fb({ taskId: "t", seed: 1, goldRef: "skill:a", signal: "negative" }),
+      fb({ taskId: "t", seed: 0, goldRef: "skills/a", signal: "positive" }),
+      fb({ taskId: "t", seed: 1, goldRef: "skills/a", signal: "negative" }),
     ];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     const md = renderFeedbackIntegrityTable(m);
     expect(md).toContain("Feedback-signal integrity");
     expect(md).toContain("feedback_agreement | 1.00");
     expect(md).toContain("feedback_coverage | 1.00");
-    expect(md).toContain("`skill:a`");
+    expect(md).toContain("`skills/a`");
   });
 
   test("renders n/a when a per-asset rate is null", () => {
     const phase1 = { akmRuns: [fakeRun({ taskId: "t", seed: 0, outcome: "pass" })] };
-    const feedbackLog = [fb({ taskId: "t", seed: 0, goldRef: "skill:a", signal: "positive" })];
+    const feedbackLog = [fb({ taskId: "t", seed: 0, goldRef: "skills/a", signal: "positive" })];
     const m = computeFeedbackIntegrity({ phase1, feedbackLog });
     const md = renderFeedbackIntegrityTable(m);
     // Only TP — false_positive_rate denom is 0 → null → "n/a".
@@ -412,7 +412,7 @@ describe("renderEvolveReport — feedback_agreement headline + warning marker", 
   test("places real feedback_agreement after improvement_slope when metrics provided", () => {
     const metrics = computeFeedbackIntegrity({
       phase1: { akmRuns: [fakeRun({ taskId: "t", seed: 0, outcome: "pass" })] },
-      feedbackLog: [fb({ taskId: "t", seed: 0, goldRef: "skill:a", signal: "positive" })],
+      feedbackLog: [fb({ taskId: "t", seed: 0, goldRef: "skills/a", signal: "positive" })],
     });
     const { markdown, json } = renderEvolveReport(evolveInputWith(metrics));
     // feedback_agreement is on a line directly after improvement_slope.
@@ -432,7 +432,7 @@ describe("renderEvolveReport — feedback_agreement headline + warning marker", 
   test("renders longitudinal interpretation + machine-readable fields", () => {
     const metrics = computeFeedbackIntegrity({
       phase1: { akmRuns: [fakeRun({ taskId: "t", seed: 0, outcome: "pass" })] },
-      feedbackLog: [fb({ taskId: "t", seed: 0, goldRef: "skill:a", signal: "positive" })],
+      feedbackLog: [fb({ taskId: "t", seed: 0, goldRef: "skills/a", signal: "positive" })],
     });
     const input = evolveInputWith(metrics);
     input.longitudinal = {
@@ -490,11 +490,11 @@ describe("renderEvolveReport — feedback_agreement headline + warning marker", 
       ],
     };
     const feedbackLog = [
-      fb({ taskId: "t", seed: 0, goldRef: "skill:a", signal: "positive" }),
-      fb({ taskId: "t", seed: 1, goldRef: "skill:a", signal: "positive" }),
-      fb({ taskId: "t", seed: 2, goldRef: "skill:a", signal: "positive" }),
-      fb({ taskId: "t", seed: 3, goldRef: "skill:a", signal: "positive" }),
-      fb({ taskId: "t", seed: 4, goldRef: "skill:a", signal: "positive" }),
+      fb({ taskId: "t", seed: 0, goldRef: "skills/a", signal: "positive" }),
+      fb({ taskId: "t", seed: 1, goldRef: "skills/a", signal: "positive" }),
+      fb({ taskId: "t", seed: 2, goldRef: "skills/a", signal: "positive" }),
+      fb({ taskId: "t", seed: 3, goldRef: "skills/a", signal: "positive" }),
+      fb({ taskId: "t", seed: 4, goldRef: "skills/a", signal: "positive" }),
     ];
     const metrics = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(metrics.aggregate.feedback_agreement).toBeCloseTo(0.2);
@@ -524,11 +524,11 @@ describe("renderEvolveReport — feedback_agreement headline + warning marker", 
       ],
     };
     const feedbackLog = [
-      fb({ taskId: "t", seed: 0, goldRef: "skill:a", signal: "positive" }),
-      fb({ taskId: "t", seed: 1, goldRef: "skill:a", signal: "positive" }),
-      fb({ taskId: "t", seed: 2, goldRef: "skill:a", signal: "positive" }),
-      fb({ taskId: "t", seed: 3, goldRef: "skill:a", signal: "positive" }),
-      fb({ taskId: "t", seed: 4, goldRef: "skill:a", signal: "positive" }),
+      fb({ taskId: "t", seed: 0, goldRef: "skills/a", signal: "positive" }),
+      fb({ taskId: "t", seed: 1, goldRef: "skills/a", signal: "positive" }),
+      fb({ taskId: "t", seed: 2, goldRef: "skills/a", signal: "positive" }),
+      fb({ taskId: "t", seed: 3, goldRef: "skills/a", signal: "positive" }),
+      fb({ taskId: "t", seed: 4, goldRef: "skills/a", signal: "positive" }),
     ];
     const metrics = computeFeedbackIntegrity({ phase1, feedbackLog });
     expect(metrics.aggregate.feedback_agreement).toBeCloseTo(0.8);

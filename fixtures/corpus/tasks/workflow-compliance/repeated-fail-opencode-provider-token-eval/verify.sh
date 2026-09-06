@@ -38,7 +38,7 @@ if ! grep -qx 'akm-search-query: opencode config' prep-note.txt; then
   exit 1
 fi
 
-if ! grep -qx 'akm-show-ref: skill:opencode' prep-note.txt; then
+if ! grep -qx 'akm-show-ref: skills/opencode' prep-note.txt; then
   echo "prep-note.txt missing akm-show-ref provenance line"
   exit 1
 fi

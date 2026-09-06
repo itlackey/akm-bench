@@ -73,22 +73,22 @@ function makeReport(akmRuns: RunResult[]): UtilityRunReport {
 
 describe("extractAssetLoads", () => {
   test("parses literal `akm show <ref>` from verifierStdout", () => {
-    const r = makeRun({ verifierStdout: "tool: akm show skill:docker-homelab\nresult: ok\n" });
-    expect(extractAssetLoads(r)).toEqual(["skill:docker-homelab"]);
+    const r = makeRun({ verifierStdout: "tool: akm show skills/docker-homelab\nresult: ok\n" });
+    expect(extractAssetLoads(r)).toEqual(["skills/docker-homelab"]);
   });
 
   test('parses tool-call JSON form `args:["show","<ref>"]`', () => {
     const r = makeRun({
-      verifierStdout: '{"command":"akm","args":["show","skill:az-cli"]} done',
+      verifierStdout: '{"command":"akm","args":["show","skills/az-cli"]} done',
     });
-    expect(extractAssetLoads(r)).toEqual(["skill:az-cli"]);
+    expect(extractAssetLoads(r)).toEqual(["skills/az-cli"]);
   });
 
   test("dedupes refs and preserves first-seen order", () => {
     const r = makeRun({
-      verifierStdout: "akm show skill:foo\nakm show skill:bar\nakm show skill:foo\n",
+      verifierStdout: "akm show skills/foo\nakm show skills/bar\nakm show skills/foo\n",
     });
-    expect(extractAssetLoads(r)).toEqual(["skill:foo", "skill:bar"]);
+    expect(extractAssetLoads(r)).toEqual(["skills/foo", "skills/bar"]);
   });
 
   test("parses ref from events.jsonl `show` event", () => {
@@ -99,11 +99,11 @@ describe("extractAssetLoads", () => {
           id: 0,
           ts: "2026-04-27T00:00:00Z",
           eventType: "show",
-          ref: "skill:from-event",
+          ref: "skills/from-event",
         },
       ],
     });
-    expect(extractAssetLoads(r)).toEqual(["skill:from-event"]);
+    expect(extractAssetLoads(r)).toEqual(["skills/from-event"]);
   });
 
   test("merges events + stdout sources, dedupes across sources", () => {
@@ -114,12 +114,12 @@ describe("extractAssetLoads", () => {
           id: 0,
           ts: "2026-04-27T00:00:00Z",
           eventType: "show",
-          ref: "skill:shared",
+          ref: "skills/shared",
         },
       ],
-      verifierStdout: "akm show skill:shared\nakm show skill:only-stdout\n",
+      verifierStdout: "akm show skills/shared\nakm show skills/only-stdout\n",
     });
-    expect(extractAssetLoads(r)).toEqual(["skill:shared", "skill:only-stdout"]);
+    expect(extractAssetLoads(r)).toEqual(["skills/shared", "skills/only-stdout"]);
   });
 
   test("returns empty array when no `akm show` invocations are present", () => {
@@ -127,56 +127,67 @@ describe("extractAssetLoads", () => {
     expect(extractAssetLoads(r)).toEqual([]);
   });
 
-  test("supports origin-prefixed refs (`team//skill:foo`)", () => {
-    const r = makeRun({ verifierStdout: "akm show team//skill:foo\n" });
-    expect(extractAssetLoads(r)).toEqual(["team//skill:foo"]);
+  test("supports origin-prefixed refs (`team//skills/foo`)", () => {
+    const r = makeRun({ verifierStdout: "akm show team//skills/foo\n" });
+    expect(extractAssetLoads(r)).toEqual(["team//skills/foo"]);
+  });
+
+  test("accepts fragments but rejects retired and traversal-shaped refs", () => {
+    const r = makeRun({
+      verifierStdout: [
+        "akm show knowledge/guide#authentication",
+        "akm show skill:retired",
+        "akm show skills/../../etc",
+      ].join("\n"),
+    });
+    expect(extractAssetLoads(r)).toEqual(["knowledge/guide#authentication"]);
   });
 });
 
 describe("computePerAssetAttribution", () => {
   test("counts pass/fail loads and computes pass rate", () => {
     const runs: RunResult[] = [
-      // skill:a: 2 pass, 1 fail → 0.667
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:a"] }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:a"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:a"] }),
-      // skill:b: 0 pass, 2 fail → 0
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:b"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:b"] }),
-      // skill:c: 1 pass, 0 fail → 1.0
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:c"] }),
+      // skills/a: 2 pass, 1 fail → 0.667
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/a"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/a"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/a"] }),
+      // skills/b: 0 pass, 2 fail → 0
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/b"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/b"] }),
+      // skills/c: 1 pass, 0 fail → 1.0
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/c"] }),
     ];
     const attr = computePerAssetAttribution(makeReport(runs));
     expect(attr.totalAkmRuns).toBe(6);
-    const a = attr.rows.find((r) => r.assetRef === "skill:a");
+    const a = attr.rows.find((r) => r.assetRef === "skills/a");
     expect(a).toMatchObject({ loadCount: 3, loadCountPassing: 2, loadCountFailing: 1 });
     expect(a?.loadPassRate).toBeCloseTo(2 / 3, 5);
-    const b = attr.rows.find((r) => r.assetRef === "skill:b");
+    const b = attr.rows.find((r) => r.assetRef === "skills/b");
     expect(b?.loadPassRate).toBe(0);
-    const c = attr.rows.find((r) => r.assetRef === "skill:c");
+    const c = attr.rows.find((r) => r.assetRef === "skills/c");
     expect(c?.loadPassRate).toBe(1);
   });
 
   test("orders rows by load count desc, pass rate desc, ref asc", () => {
     const runs: RunResult[] = [
-      // skill:high-load-fail — 4 loads, all fail
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:high-load-fail"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:high-load-fail"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:high-load-fail"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:high-load-fail"] }),
-      // skill:high-load-pass — 4 loads, all pass (same count, higher pass_rate → first)
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:high-load-pass"] }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:high-load-pass"] }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:high-load-pass"] }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:high-load-pass"] }),
-      // skill:low-load — 1 load, pass
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:low-load"] }),
+      // skills/high-load-fail — 4 loads, all fail
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/high-load-fail"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/high-load-fail"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/high-load-fail"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/high-load-fail"] }),
+      // skills/high-load-pass — 4 loads, all pass (same count, higher pass_rate → first)
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/high-load-pass"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/high-load-pass"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/high-load-pass"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/high-load-pass"] }),
+      // skills/low-load — 1 load, pass
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/low-load"] }),
     ];
     const attr = computePerAssetAttribution(makeReport(runs));
     expect(attr.rows.map((r) => r.assetRef)).toEqual([
-      "skill:high-load-pass", // count=4, rate=1
-      "skill:high-load-fail", // count=4, rate=0
-      "skill:low-load", // count=1
+      "skills/high-load-pass", // count=4, rate=1
+      "skills/high-load-fail", // count=4, rate=0
+      "skills/low-load", // count=1
     ]);
   });
 
@@ -193,19 +204,19 @@ describe("renderAttributionTable", () => {
     const attr: PerAssetAttribution = {
       totalAkmRuns: 10,
       rows: [
-        { assetRef: "skill:works", loadCount: 8, loadCountPassing: 7, loadCountFailing: 1, loadPassRate: 7 / 8 },
-        { assetRef: "skill:broken", loadCount: 6, loadCountPassing: 1, loadCountFailing: 5, loadPassRate: 1 / 6 },
-        { assetRef: "skill:rare", loadCount: 1, loadCountPassing: 1, loadCountFailing: 0, loadPassRate: 1 },
+        { assetRef: "skills/works", loadCount: 8, loadCountPassing: 7, loadCountFailing: 1, loadPassRate: 7 / 8 },
+        { assetRef: "skills/broken", loadCount: 6, loadCountPassing: 1, loadCountFailing: 5, loadPassRate: 1 / 6 },
+        { assetRef: "skills/rare", loadCount: 1, loadCountPassing: 1, loadCountFailing: 0, loadPassRate: 1 },
       ],
     };
     const md = renderAttributionTable(attr);
     expect(md).toContain("Well-used and working");
-    expect(md).toContain("`skill:works`");
+    expect(md).toContain("`skills/works`");
     expect(md).toContain("Well-used and NOT working");
-    expect(md).toContain("`skill:broken`");
-    // skill:rare is below the high-load cutoff so should NOT appear in the working callout (only in the table).
+    expect(md).toContain("`skills/broken`");
+    // skills/rare is below the high-load cutoff so should NOT appear in the working callout (only in the table).
     const workingSection = md.split("Well-used and working")[1]?.split("Well-used and NOT working")[0] ?? "";
-    expect(workingSection).not.toContain("`skill:rare`");
+    expect(workingSection).not.toContain("`skills/rare`");
   });
 
   test("renders empty-state message when no rows", () => {
@@ -259,13 +270,13 @@ describe("runMaskedCorpus", () => {
 
     const baseRuns: RunResult[] = [
       // alpha: 3 pass, 1 fail → load_count 4
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:alpha"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/alpha"] }),
       // beta: 1 pass, 1 fail → load_count 2
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:beta"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:beta"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/beta"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/beta"] }),
     ];
     const baseReport = makeReport(baseRuns);
     baseReport.taskMetadata = [fakeTask()];
@@ -312,13 +323,13 @@ describe("runMaskedCorpus", () => {
 
     // Asset ranking: alpha first (load_count 4), beta second.
     const alpha = result.attributions[0];
-    expect(alpha?.assetRef).toBe("skill:alpha");
+    expect(alpha?.assetRef).toBe("skills/alpha");
     expect(alpha?.basePassRate).toBeCloseTo(4 / 6, 5);
     expect(alpha?.maskedPassRate).toBe(0.25);
     expect(alpha?.marginalContribution).toBeCloseTo(4 / 6 - 0.25, 5);
 
     const beta = result.attributions[1];
-    expect(beta?.assetRef).toBe("skill:beta");
+    expect(beta?.assetRef).toBe("skills/beta");
     expect(beta?.maskedPassRate).toBe(0.6);
 
     // Source fixture content untouched.
@@ -339,7 +350,7 @@ describe("runMaskedCorpus", () => {
     expect(seenStashFieldUnchanged.every(Boolean)).toBe(true);
     // The masking strategy + masked refs are surfaced on the result envelope.
     expect(result.maskingStrategy).toBe("leave-one-out");
-    expect(result.maskedRefs).toEqual(["skill:alpha", "skill:beta"]);
+    expect(result.maskedRefs).toEqual(["skills/alpha", "skills/beta"]);
 
     fs.rmSync(fixturesRoot, { recursive: true, force: true });
   });
@@ -357,8 +368,8 @@ describe("runMaskedCorpus", () => {
     // the marginal contribution would be 0 (false negative).
     const fixturesRoot = makeFixturesRoot();
     const baseRuns: RunResult[] = [
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
     ];
     const baseReport = makeReport(baseRuns);
     baseReport.taskMetadata = [fakeTask({ taskDir: "/some/task/dir" })];
@@ -423,8 +434,8 @@ describe("runMaskedCorpus", () => {
     fs.writeFileSync(sentinelPath, sentinelBody);
 
     const baseRuns: RunResult[] = [
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:beta"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/beta"] }),
     ];
     const baseReport = makeReport(baseRuns);
     baseReport.taskMetadata = [fakeTask()];
@@ -458,8 +469,8 @@ describe("runMaskedCorpus", () => {
     // the await they must NOT exist.
     const fixturesRoot = makeFixturesRoot();
     const baseRuns: RunResult[] = [
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:beta"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/beta"] }),
     ];
     const baseReport = makeReport(baseRuns);
     baseReport.taskMetadata = [fakeTask()];
@@ -611,8 +622,8 @@ describe("runMaskedCorpus", () => {
   test("cost accounting: runs N times when N <= asset count", async () => {
     const fixturesRoot = makeFixturesRoot();
     const baseRuns: RunResult[] = [
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:beta"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/beta"] }),
     ];
     const baseReport = makeReport(baseRuns);
     baseReport.taskMetadata = [fakeTask()];
@@ -683,13 +694,13 @@ describe("bench attribute --top clamping", () => {
         total_akm_runs: 4,
         rows: [
           {
-            asset_ref: "skill:alpha",
+            asset_ref: "skills/alpha",
             load_count: 2,
             load_count_passing: 1,
             load_count_failing: 1,
             load_pass_rate: 0.5,
           },
-          { asset_ref: "skill:beta", load_count: 1, load_count_passing: 1, load_count_failing: 0, load_pass_rate: 1 },
+          { asset_ref: "skills/beta", load_count: 1, load_count_passing: 1, load_count_failing: 0, load_pass_rate: 1 },
         ],
       },
     };
@@ -775,13 +786,13 @@ describe("runMaskedCorpus marginal_contribution arithmetic", () => {
     const fixturesRoot = makeMarginalFixturesRoot();
     const baseRuns: RunResult[] = [
       // alpha: 4 pass, 0 fail → load_count 4
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha"] }),
       // beta: 1 pass, 1 fail → load_count 2
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:beta"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:beta"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/beta"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/beta"] }),
     ];
     const baseReport: UtilityRunReport = {
       timestamp: "2026-04-27T00:00:00Z",
@@ -817,8 +828,8 @@ describe("runMaskedCorpus marginal_contribution arithmetic", () => {
     // Map masked-asset → simulated pass rate. The injected runner inspects
     // the on-disk masked stash to detect which asset is missing.
     const maskedPassRates: Record<string, number> = {
-      "skill:alpha": 0.4,
-      "skill:beta": 0.5,
+      "skills/alpha": 0.4,
+      "skills/beta": 0.5,
     };
 
     const result = await runMaskedCorpus({
@@ -831,7 +842,7 @@ describe("runMaskedCorpus marginal_contribution arithmetic", () => {
         const stashDir = options.tasks[0]?.stashDirOverride ?? "";
         const alphaMissing = !fs.existsSync(path.join(stashDir, "skills", "alpha.md"));
         const betaMissing = !fs.existsSync(path.join(stashDir, "skills", "beta.md"));
-        const masked = alphaMissing ? "skill:alpha" : betaMissing ? "skill:beta" : "none";
+        const masked = alphaMissing ? "skills/alpha" : betaMissing ? "skills/beta" : "none";
         const passRate = maskedPassRates[masked] ?? 0;
         return {
           ...baseReport,
@@ -846,8 +857,8 @@ describe("runMaskedCorpus marginal_contribution arithmetic", () => {
     expect(result.runsPerformed).toBe(2);
     expect(result.attributions.length).toBe(2);
 
-    const alpha = result.attributions.find((a) => a.assetRef === "skill:alpha");
-    const beta = result.attributions.find((a) => a.assetRef === "skill:beta");
+    const alpha = result.attributions.find((a) => a.assetRef === "skills/alpha");
+    const beta = result.attributions.find((a) => a.assetRef === "skills/beta");
 
     // Both rows carry the engineered base pass rate.
     expect(alpha?.basePassRate).toBeCloseTo(0.8, 5);
@@ -937,7 +948,7 @@ describe("bench attribute prefers persisted runs[] (#249)", () => {
           wallclock_ms: 100,
           verifier_exit_code: 0,
           trajectory: { correct_asset_loaded: true, feedback_recorded: false },
-          assets_loaded: ["skill:alpha", "skill:beta"],
+          assets_loaded: ["skills/alpha", "skills/beta"],
           failure_mode: null,
         },
         {
@@ -950,7 +961,7 @@ describe("bench attribute prefers persisted runs[] (#249)", () => {
           wallclock_ms: 110,
           verifier_exit_code: 1,
           trajectory: { correct_asset_loaded: false, feedback_recorded: false },
-          assets_loaded: ["skill:alpha"],
+          assets_loaded: ["skills/alpha"],
           failure_mode: "wrong_asset",
         },
       ],
@@ -960,14 +971,14 @@ describe("bench attribute prefers persisted runs[] (#249)", () => {
         total_akm_runs: 2,
         rows: [
           {
-            asset_ref: "skill:alpha",
+            asset_ref: "skills/alpha",
             load_count: 2,
             load_count_passing: 1,
             load_count_failing: 1,
             load_pass_rate: 0.5,
           },
           {
-            asset_ref: "skill:beta",
+            asset_ref: "skills/beta",
             load_count: 1,
             load_count_passing: 1,
             load_count_failing: 0,
@@ -1053,7 +1064,7 @@ describe("bench attribute prefers persisted runs[] (#249)", () => {
         total_akm_runs: 2,
         rows: [
           {
-            asset_ref: "skill:alpha",
+            asset_ref: "skills/alpha",
             load_count: 2,
             load_count_passing: 1,
             load_count_failing: 1,
@@ -1111,9 +1122,9 @@ describe("aggregateRunsForReport + rehydrate round-trip (#249)", () => {
       computePerAssetAttribution: cpa,
     } = await import("../src/metrics");
     const original: RunResult[] = [
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:alpha", "skill:beta"] }),
-      makeRun({ outcome: "fail", assetsLoaded: ["skill:alpha"], verifierStdout: "junk" }),
-      makeRun({ outcome: "pass", assetsLoaded: ["skill:beta"] }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/alpha", "skills/beta"] }),
+      makeRun({ outcome: "fail", assetsLoaded: ["skills/alpha"], verifierStdout: "junk" }),
+      makeRun({ outcome: "pass", assetsLoaded: ["skills/beta"] }),
     ];
     const reportBefore = makeReport(original);
     const before = cpa(reportBefore);

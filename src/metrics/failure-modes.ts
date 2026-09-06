@@ -201,7 +201,7 @@ function hasAkmSearch(trace: string, runResult: RunResult): boolean {
 /**
  * Find the 1-based rank of `goldRef` in the search results captured in the
  * trace, or `null` if not present. Best-effort heuristics:
- *   1. Look for an `akm search` block followed by a numbered list (`1. skill:foo`).
+ *   1. Look for an `akm search` block followed by a numbered list (`1. skills/foo`).
  *   2. Look for a JSON-ish results array containing the ref.
  *   3. Fall back to substring presence — if the ref appears anywhere after
  *      a search invocation, treat it as rank-unknown. We err on the side of
@@ -234,7 +234,7 @@ function findRefRankInText(text: string, goldRef: string): number | null {
       return Number.parseInt(match[1], 10);
     }
   }
-  // JSON array form: `"results":["a","b","skill:foo"]`. Estimate rank by
+  // JSON array form: `"results":["a","b","skills/foo"]`. Estimate rank by
   // splitting on commas after the bracket. Best-effort.
   const jsonRe = /"results"\s*:\s*\[([^\]]+)\]/;
   const jsonMatch = text.match(jsonRe);
@@ -262,10 +262,10 @@ function refsMatch(candidate: string, goldRef: string): boolean {
 function hasAkmShow(trace: string, runResult: RunResult, goldRef: string): boolean {
   const escaped = goldRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // CLI form, exact ref. Also matches origin-prefixed variants like
-  // `akm show team//skill:foo` because the `[\w/]*//` prefix is optional.
+  // `akm show team//skills/foo` because the bundle prefix is optional.
   const cliRe = new RegExp(`\\bakm\\s+show\\s+["']?(?:[\\w-]+//)?${escaped}(?:\\b|\\W)`);
   if (cliRe.test(trace)) return true;
-  // Tool-call JSON form: `"args":["show","skill:foo"]`.
+  // Tool-call JSON form: `"args":["show","skills/foo"]`.
   if (trace.includes(`"show"`) && trace.includes(goldRef)) return true;
   // Event-stream metadata.ref.
   for (const event of runResult.events) {
