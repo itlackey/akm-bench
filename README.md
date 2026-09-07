@@ -145,6 +145,12 @@ bash bin/akm-bench run config/nano-quick.json \
   --opencode-config ./config/opencode.local.json
 ```
 
+For a deterministic API-level comparison of the 0.9.14 fragment behavior and
+the 0.9.15 bounded-context candidate, run `bin/akm-fragment-contract`. It needs
+no model or API credentials and accepts a published version, local source
+checkout, or local npm package. See
+[`docs/fragment-contract.md`](./docs/fragment-contract.md).
+
 Run against a specific published AKM version:
 
 ```sh

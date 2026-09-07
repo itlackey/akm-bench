@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/akm-fragment-contract run --results-dir DIR [runtime] [options]
+  bin/akm-fragment-contract compare --baseline FILE --candidate FILE --output FILE [options]
+
+Run-time selection (choose at most one; installed is the default):
+  --akm-version VERSION   Install an exact published akm-cli version in the image.
+  --akm-source DIR        Build and test a local AKM checkout inside the container.
+  --akm-package FILE      Install and test a local npm package tarball.
+
+Run options:
+  --results-dir DIR       Persistent host output directory. Required.
+  --expect MODE           baseline or candidate. Inferred from --akm-version when omitted.
+  --label LABEL           Output basename. Defaults to the selected runtime.
+  --cache-dir DIR         Persistent container cache. Default: ./.akm-bench-cache.
+  --image IMAGE           Override the Docker image tag.
+  --no-build              Fail if the selected image does not already exist.
+
+Compare options:
+  --baseline FILE         Baseline JSON report.
+  --candidate FILE        Candidate JSON report.
+  --output FILE           Comparison JSON report.
+  --image IMAGE           Docker image containing this benchmark checkout.
+
+Examples:
+  bin/akm-fragment-contract run --results-dir ./bench-results/fragments \
+    --akm-version 0.9.14 --expect baseline
+  bin/akm-fragment-contract run --results-dir ./bench-results/fragments \
+    --akm-source ../akm --expect candidate --label akm-0.9.15-local
+EOF
+}
+
+die() {
+  printf '%s\n' "$*" >&2
+  exit 2
+}
+
+abs_path() {
+  local value="$1"
+  if [[ "${value}" == /* ]]; then
+    printf '%s\n' "${value}"
+  else
+    printf '%s/%s\n' "$(pwd -P)" "${value#./}"
+  fi
+}
+
+sanitize() {
+  printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '-'
+}
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+bench_files="$(
+  git -C "${repo_root}" ls-files -co --exclude-standard -- \
+    .dockerignore Dockerfile package.json bun.lock biome.json tsconfig.json \
+    README.md LICENSE bin/docker-entrypoint.sh config docs fixtures src tests
+)" || die "could not list benchmark image inputs; is this a Git checkout?"
+[[ -n "${bench_files}" ]] || die "benchmark image input list is empty"
+bench_fingerprint="$({
+  while IFS= read -r file; do
+    [[ -e "${repo_root}/${file}" || -L "${repo_root}/${file}" ]] || continue
+    printf '%s\t' "${file}"
+    git -C "${repo_root}" hash-object -- "${file}" || exit 1
+  done <<<"${bench_files}"
+} | git hash-object --stdin)" || die "could not fingerprint benchmark image inputs"
+
+ensure_image() {
+  local image="$1"
+  local akm_version="$2"
+  local no_build="$3"
+  local actual_fingerprint=""
+  actual_fingerprint="$(docker image inspect --format '{{ index .Config.Labels "dev.akm.bench.source-fingerprint" }}' "${image}" 2>/dev/null || true)"
+  if [[ "${actual_fingerprint}" == "${bench_fingerprint}" ]]; then
+    return
+  fi
+  if [[ "${no_build}" != "0" ]]; then
+    if [[ -n "${actual_fingerprint}" ]]; then
+      die "docker image ${image} contains benchmark ${actual_fingerprint}, expected ${bench_fingerprint}"
+    fi
+    die "docker image not found or missing its benchmark fingerprint: ${image}"
+  fi
+  local build=(docker build -t "${image}" --build-arg "BENCH_SOURCE_FINGERPRINT=${bench_fingerprint}")
+  if [[ -n "${akm_version}" ]]; then
+    build+=(--build-arg "AKM_CLI_VERSION=${akm_version}")
+  fi
+  build+=("${repo_root}")
+  "${build[@]}"
+}
+
+docker_user_args=()
+if command -v id >/dev/null 2>&1; then
+  docker_user_args=(--user "$(id -u):$(id -g)")
+fi
+
+subcommand="${1:-}"
+if [[ -z "${subcommand}" || "${subcommand}" == "-h" || "${subcommand}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+shift
+
+if [[ "${subcommand}" == "compare" ]]; then
+  baseline=""
+  candidate=""
+  output=""
+  compare_cache="${repo_root}/.akm-bench-cache"
+  image="akm-bench:fragment-${bench_fingerprint:0:12}-installed"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --baseline) baseline="${2:-}"; shift 2 ;;
+      --candidate) candidate="${2:-}"; shift 2 ;;
+      --output) output="${2:-}"; shift 2 ;;
+      --image) image="${2:-}"; shift 2 ;;
+      -h|--help) usage; exit 0 ;;
+      *) die "unknown compare option: $1" ;;
+    esac
+  done
+  [[ -n "${baseline}" ]] || die "--baseline is required"
+  [[ -n "${candidate}" ]] || die "--candidate is required"
+  [[ -n "${output}" ]] || die "--output is required"
+  baseline="$(abs_path "${baseline}")"
+  candidate="$(abs_path "${candidate}")"
+  output="$(abs_path "${output}")"
+  [[ -f "${baseline}" ]] || die "baseline report not found: ${baseline}"
+  [[ -f "${candidate}" ]] || die "candidate report not found: ${candidate}"
+  mkdir -p "$(dirname "${output}")" "${compare_cache}"
+  ensure_image "${image}" "" "0"
+  docker run --rm "${docker_user_args[@]}" \
+    -w /opt/akm-bench \
+    -e HOME=/cache/home \
+    -v "$(dirname "${baseline}"):/inputs/baseline:ro" \
+    -v "$(dirname "${candidate}"):/inputs/candidate:ro" \
+    -v "$(dirname "${output}"):/outputs" \
+    -v "${compare_cache}:/cache" \
+    "${image}" bun run src/fragment-contract-cli.ts compare \
+      --baseline "/inputs/baseline/$(basename "${baseline}")" \
+      --candidate "/inputs/candidate/$(basename "${candidate}")" \
+      --output "/outputs/$(basename "${output}")"
+  exit
+fi
+
+[[ "${subcommand}" == "run" ]] || die "unknown subcommand: ${subcommand}"
+
+results_dir=""
+akm_version=""
+akm_source=""
+akm_package=""
+expectation=""
+label=""
+cache_dir="$(pwd -P)/.akm-bench-cache"
+image=""
+no_build="0"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --results-dir) results_dir="${2:-}"; shift 2 ;;
+    --akm-version) akm_version="${2:-}"; shift 2 ;;
+    --akm-source) akm_source="${2:-}"; shift 2 ;;
+    --akm-package) akm_package="${2:-}"; shift 2 ;;
+    --expect) expectation="${2:-}"; shift 2 ;;
+    --label) label="${2:-}"; shift 2 ;;
+    --cache-dir) cache_dir="${2:-}"; shift 2 ;;
+    --image) image="${2:-}"; shift 2 ;;
+    --no-build) no_build="1"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "unknown run option: $1" ;;
+  esac
+done
+
+[[ -n "${results_dir}" ]] || die "--results-dir is required"
+runtime_count=0
+[[ -n "${akm_version}" ]] && runtime_count=$((runtime_count + 1))
+[[ -n "${akm_source}" ]] && runtime_count=$((runtime_count + 1))
+[[ -n "${akm_package}" ]] && runtime_count=$((runtime_count + 1))
+[[ "${runtime_count}" -le 1 ]] || die "choose only one of --akm-version, --akm-source, or --akm-package"
+
+mode="installed"
+if [[ -n "${akm_version}" ]]; then mode="version"; fi
+if [[ -n "${akm_source}" ]]; then mode="source"; fi
+if [[ -n "${akm_package}" ]]; then mode="package"; fi
+if [[ -z "${expectation}" ]]; then
+  if [[ "${akm_version}" == "0.9.14" ]]; then expectation="baseline"; else expectation="candidate"; fi
+fi
+[[ "${expectation}" == "baseline" || "${expectation}" == "candidate" ]] || die "--expect must be baseline or candidate"
+
+results_dir="$(abs_path "${results_dir}")"
+cache_dir="$(abs_path "${cache_dir}")"
+mkdir -p "${results_dir}" "${cache_dir}"
+if [[ -n "${akm_source}" ]]; then
+  akm_source="$(abs_path "${akm_source}")"
+  [[ -f "${akm_source}/package.json" ]] || die "AKM source must contain package.json: ${akm_source}"
+fi
+if [[ -n "${akm_package}" ]]; then
+  akm_package="$(abs_path "${akm_package}")"
+  [[ -f "${akm_package}" ]] || die "AKM package not found: ${akm_package}"
+fi
+
+if [[ -z "${label}" ]]; then
+  case "${mode}" in
+    version) label="akm-${akm_version}" ;;
+    source) label="akm-local-source" ;;
+    package) label="akm-local-package" ;;
+    installed) label="akm-installed" ;;
+  esac
+fi
+label="$(sanitize "${label}")"
+if [[ -z "${image}" ]]; then
+  if [[ "${mode}" == "version" ]]; then
+    image="akm-bench:fragment-${bench_fingerprint:0:12}-akm-$(sanitize "${akm_version}")"
+  else
+    image="akm-bench:fragment-${bench_fingerprint:0:12}-installed"
+  fi
+fi
+ensure_image "${image}" "${akm_version}" "${no_build}"
+
+docker_args=(
+  docker run --rm "${docker_user_args[@]}"
+  -w /opt/akm-bench
+  -e HOME=/cache/home
+  -e BENCH_DOCKER_AKM_MODE="${mode}"
+  -v "${results_dir}:/outputs"
+  -v "${cache_dir}:/cache"
+)
+if [[ "${mode}" == "version" ]]; then
+  docker_args+=(-e "AKM_BENCH_RUNTIME_FINGERPRINT=npm:${akm_version}")
+fi
+if [[ "${mode}" == "source" ]]; then
+  source_revision="$(git -C "${akm_source}" rev-parse HEAD 2>/dev/null || true)"
+  source_status="$(git -C "${akm_source}" status --porcelain --untracked-files=normal 2>/dev/null || true)"
+  if [[ -n "${source_revision}" && -n "${source_status}" ]]; then
+    source_revision="${source_revision}-dirty"
+  fi
+  if [[ -n "${source_revision}" ]]; then
+    docker_args+=(-e "AKM_BENCH_RUNTIME_REVISION=${source_revision}")
+  fi
+  docker_args+=(-v "${akm_source}:/inputs/akm-src:ro")
+fi
+if [[ "${mode}" == "package" ]]; then
+  docker_args+=(-v "${akm_package}:/inputs/akm-package/package.tgz:ro")
+fi
+docker_args+=(
+  "${image}" bun run src/fragment-contract-cli.ts run
+  --expect "${expectation}"
+  --output "/outputs/${label}.json"
+)
+"${docker_args[@]}"

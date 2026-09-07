@@ -46,5 +46,8 @@ COPY bin/docker-entrypoint.sh ./bin/docker-entrypoint.sh
 
 RUN chmod +x /opt/akm-bench/bin/docker-entrypoint.sh
 
+ARG BENCH_SOURCE_FINGERPRINT=unknown
+LABEL dev.akm.bench.source-fingerprint="${BENCH_SOURCE_FINGERPRINT}"
+
 ENTRYPOINT ["/opt/akm-bench/bin/docker-entrypoint.sh"]
 CMD ["bun", "run", "src/cli.ts"]

@@ -10,6 +10,7 @@
     "typecheck": "bunx tsc --noEmit && bunx tsc --noEmit -p analysis/tsconfig.json",
     "test": "bun test ./tests",
     "test:analysis": "bun test analysis",
+    "fragment-contract": "bun run src/fragment-contract-cli.ts",
     "lint": "bunx biome check src/ fixtures/ config/ tests/ analysis/",
     "lint:fix": "bunx biome check --write src/ fixtures/ config/ tests/ analysis/",
     "format": "bunx biome format --write src/ fixtures/ config/ tests/ analysis/ README.md .gitignore package.json tsconfig.json biome.json",

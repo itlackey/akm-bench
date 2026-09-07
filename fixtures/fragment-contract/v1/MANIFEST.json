@@ -1,0 +1,5 @@
+{
+  "name": "fragment-contract-v1",
+  "version": 1,
+  "description": "Deterministic fixtures for AKM fragment retrieval and bounded context contracts"
+}
