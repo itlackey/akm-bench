@@ -249,7 +249,6 @@ export function runFragmentContract(options: {
       "--detail",
       "full",
       "--no-project-context",
-      "--no-track-usage",
     ]);
     const hit = firstHit(search);
     const selectedRef = typeof hit?.ref === "string" ? hit.ref : "";
@@ -267,7 +266,7 @@ export function runFragmentContract(options: {
       },
     });
 
-    const exact = selectedRef ? invoke(["show", selectedRef, "--no-track-usage"]) : search;
+    const exact = selectedRef ? invoke(["show", selectedRef]) : search;
     const exactContent = contentOf(exact);
     addCheck(checks, {
       id: "exact-default-compatible",
@@ -354,7 +353,7 @@ export function runFragmentContract(options: {
       },
     });
 
-    const lead = selectedRef ? invoke(["show", selectedRef, "--context", "lead", "--no-track-usage"]) : search;
+    const lead = selectedRef ? invoke(["show", selectedRef, "--context", "lead"]) : search;
     const leadContent = contentOf(lead);
     const selectedPosition = leadContent.indexOf("QUARTZCURRENTCHOICE");
     const markerPosition = leadContent.indexOf("[Selected matching fragment]");
@@ -390,7 +389,7 @@ export function runFragmentContract(options: {
     });
 
     const charBound = selectedRef
-      ? invoke(["show", selectedRef, "--context", "lead", "--max-chars", "700", "--no-track-usage"])
+      ? invoke(["show", selectedRef, "--context", "lead", "--max-chars", "700"])
       : search;
     const charBoundContent = contentOf(charBound);
     const charBoundAvailable = candidateCapabilityAvailable(charBound);
@@ -414,7 +413,7 @@ export function runFragmentContract(options: {
     });
 
     const tokenBound = selectedRef
-      ? invoke(["show", selectedRef, "--context", "lead", "--max-tokens", "200", "--no-track-usage"])
+      ? invoke(["show", selectedRef, "--context", "lead", "--max-tokens", "200"])
       : search;
     const tokenBoundContent = contentOf(tokenBound);
     const tokenBoundAvailable = candidateCapabilityAvailable(tokenBound);
@@ -439,8 +438,8 @@ export function runFragmentContract(options: {
 
     const previousRef = typeof exact.json?.previousRef === "string" ? exact.json.previousRef : "";
     const nextRef = typeof exact.json?.nextRef === "string" ? exact.json.nextRef : "";
-    const previous = previousRef ? invoke(["show", previousRef, "--no-track-usage"]) : undefined;
-    const next = nextRef ? invoke(["show", nextRef, "--no-track-usage"]) : undefined;
+    const previous = previousRef ? invoke(["show", previousRef]) : undefined;
+    const next = nextRef ? invoke(["show", nextRef]) : undefined;
     addCheck(checks, {
       id: "neighbor-navigation",
       category: "context",
@@ -484,7 +483,6 @@ export function runFragmentContract(options: {
           "700",
           "--max-tokens",
           "200",
-          "--no-track-usage",
         ])
       : search;
     const conflictText = `${conflictingBudgets.stderr}\n${conflictingBudgets.stdout}`.toLowerCase();
@@ -507,7 +505,7 @@ export function runFragmentContract(options: {
       "\n## Unindexed mutation\n\nDISK_ONLY_MUTATION. The current preference is MAGENTA.\n",
       "utf8",
     );
-    const staleExact = selectedRef ? invoke(["show", selectedRef, "--no-track-usage"]) : search;
+    const staleExact = selectedRef ? invoke(["show", selectedRef]) : search;
     const staleExactContent = contentOf(staleExact);
     addCheck(checks, {
       id: "stale-exact-selector",
@@ -521,7 +519,7 @@ export function runFragmentContract(options: {
       evidence: { ...commandEvidence(staleExact) },
     });
 
-    const staleLead = selectedRef ? invoke(["show", selectedRef, "--context", "lead", "--no-track-usage"]) : search;
+    const staleLead = selectedRef ? invoke(["show", selectedRef, "--context", "lead"]) : search;
     const staleLeadContent = contentOf(staleLead);
     const staleLeadAvailable = candidateCapabilityAvailable(staleLead);
     addCheck(checks, {
