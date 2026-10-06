@@ -1,3 +1,0 @@
-prep: disable openai provider train
-akm-search-query: opencode config
-akm-show-ref: skill:opencode

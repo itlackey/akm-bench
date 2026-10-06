@@ -1,9 +1,0 @@
-.git
-.gitignore
-.opencode
-node_modules
-dist
-bench-results
-.bench-docker-cache
-results/bench-report-*.json
-config/opencode.local.json
